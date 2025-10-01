@@ -20,6 +20,7 @@ import json
 import os
 import sys
 
+import pymysql
 from requests import Session
 import requests
 
@@ -50,6 +51,7 @@ from flask import Flask
 import logging
 from logging.handlers import TimedRotatingFileHandler
 import os
+from app_config.database import ConfDataBase
 
 def setup_logger():
     log_dir = cfgserv.log_dir
@@ -170,14 +172,35 @@ def page_not_found(e):
         404,
     )
 
+def initialize_db():
+    with open('./relying_party_reg.sql', 'r') as f:
+        sql = f.read()
+
+    connection = pymysql.connect(
+        host=ConfDataBase.DATABASE['host'],
+        port=ConfDataBase.DATABASE['port'],
+        user=ConfDataBase.DATABASE['user'],
+        password=ConfDataBase.DATABASE['password'],
+    )
+
+    try:
+        with connection.cursor() as cursor:
+            for statement in sql.split(';'):
+                if statement.strip():
+                    cursor.execute(statement)
+        connection.commit()
+    finally:
+        connection.close()
+
+initialize_db()
+
 def create_app():
 
     app = Flask(__name__, instance_relative_config=True)
     app.config['SECRET_KEY'] = ConfService.secret_key
 
-    #app.register_error_handler(Exception, handle_exception)
+    app.register_error_handler(Exception, handle_exception)
     app.register_error_handler(404, page_not_found)
-
     from . import (RPR_routes)
 
     app.register_blueprint(RPR_routes.rpr)

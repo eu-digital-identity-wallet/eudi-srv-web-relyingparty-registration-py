@@ -23,6 +23,8 @@ NOTE: You should only change it if you understand what you're doing.
 
 import logging
 from logging.handlers import TimedRotatingFileHandler
+import os
+import random
 from flask import  session
 import logging
 from logging.handlers import TimedRotatingFileHandler
@@ -30,19 +32,21 @@ from logging.handlers import TimedRotatingFileHandler
 
 class ConfService:
 
-    secret_key = "secret_key"
+    secret_key = os.urandom(32).hex()
 
     #service_url = "http://127.0.0.1:5000/"
-    service_url = "https://registry.serviceproviders.eudiw.dev/"
+    service_url = os.getenv("SERVICE_URL","https://registry.serviceproviders.eudiw.dev/")
 
     #trusted_CAs_path = "app\certs"
-    trusted_CAs_path = "/etc/eudiw/pid-issuer/cert/"
+    trusted_CAs_path = os.getenv("TRUSTED_CAS_PATH","/etc/eudiw/pid-issuer/cert/")
 
     deffered_expiry = 100
 
     #log_dir = "app\logs"
-    log_dir = "app/logs"
+    log_dir = os.getenv("LOG_PATH", "app/log")
 
+    url_verifier=os.getenv("VERIFIER","verifier-backend.eudiw.dev")
+    
 
     # log_dir = "/tmp/log"
     # #log_dir = "../../log"

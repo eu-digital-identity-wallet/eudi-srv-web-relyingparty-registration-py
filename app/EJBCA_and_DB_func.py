@@ -92,18 +92,28 @@ def getCertificateAuthorityName( countryCode):
 
     return CertificateAuthorityName
 
-def getJsonBody(certificateRequest, certificateAuthorityName):
+def getJsonBody(certificateRequest, certificateAuthorityName, countryName):
 
-    payload = {
-        "certificate_request": certificateRequest,
-        "certificate_profile_name": ejbca.certificateProfileName,
-        "end_entity_profile_name":ejbca.endEntityProfileName,
-        "certificate_authority_name": certificateAuthorityName,
-        "username":ejbca.username,
-        "password":ejbca.password,
-        "include_chain": ejbca.includeChain
-    }
-
+    if(countryName == "AV"):
+        payload = {
+            "certificate_request": certificateRequest,
+            "certificate_profile_name": ejbca.avCertificateProfile,
+            "end_entity_profile_name":ejbca.avEndEntityProfile,
+            "certificate_authority_name": certificateAuthorityName,
+            "username":ejbca.username,
+            "password":ejbca.password,
+            "include_chain": ejbca.includeChain
+        }
+    else:
+        payload = {
+            "certificate_request": certificateRequest,
+            "certificate_profile_name": ejbca.certificateProfileName,
+            "end_entity_profile_name":ejbca.endEntityProfileName,
+            "certificate_authority_name": certificateAuthorityName,
+            "username":ejbca.username,
+            "password":ejbca.password,
+            "include_chain": ejbca.includeChain
+        }
     return payload
 
 def getTrustManagerOfCACertificate(ManagementCA):

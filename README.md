@@ -162,6 +162,86 @@ keytool -importkeystore -srckeystore [FileIn.p12] -srcstoretype pkcs12 -destkeys
 + First step is authentication with the PID 
 + After authentication, the user has access to all their certificates and has the option to revoke any certificate they hold by clicking the "Revoke" button.
 
+## Run docker
+
+To start Web Relying Party Registration service a docker compose file, [docker-compose.yml](docker/docker-compose.yml), has been implemented that can be found in `docker` directory.
+
+To start the docker compose environment
+
+```
+# From project root directory 
+cd docker
+docker-compose up -d
+```
+
+To stop the docker compose environment
+
+```
+# From project root directory 
+cd docker
+docker-compose down
+````
+
+## Configuration
+
+The Web Relying Party Registration application can be configured using the following environment variables:
+
+Variable: `SERVICE_URL`<br>
+Description: Application service url
+
+Variable: `TRUSTED_CAS_PATH`<br>
+Description: Container path where CA certificates are located for validate vp_token when doing PID login
+
+Variable: `VERIFIER`<br>
+Description: Verifier URL
+
+Variable: `LOG_PATH`<br>
+Description: Path where log files are saved
+
+Variable: `CERT`<br>
+Description: Container path where the XML signing certificate is stored
+
+Variable: `PRIV_KEY`<br>
+Description: Container path where the private key of the XML signing certificate is stored
+
+Variable: `DB_HOST`<br>
+Description: Database URL
+
+Variable: `DB_PORT`<br>
+Description: Port where Database is running
+
+Variable: `DB_USER`<br>
+Description: Username of Database user
+
+Variable: `DB_PASSWORD`<br>
+Description: Password of Database user
+
+Variable: `DB_NAME`<br>
+Description: Name of Database
+
+Variable: `ca_host`<br>
+Description: EJBCA URL
+
+Variable: `clienteP12ArchiveFilepath`<br>
+Description: Client P12 file to acess EJBCA
+
+Variable: `managementCA`<br>
+Description: EJBCA Management CA
+
+Variable: `clienteP12ArchivePassword`<br>
+Description: Cliente P12 password to acess EJBCA
+
+Variable: `EJBCA_username`<br>
+Description: Username of EJBCA user
+
+Variable: `EJBCA_password`<br>
+Description: Password of EJBCA user
+
+Variable: `certificateProfileName`<br>
+Description: Name of the profile defined in the EJBCA application
+
+Variable: `endEntityProfileName`<br>
+Description: Name of the End Entity Profile defined in the EJBCA application
 
 ## How to contribute
 
@@ -172,7 +252,7 @@ involved, follow the guidelines found in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### License details
 
-Copyright (c) 2023 European Commission
+Copyright (c) 2024 European Commission
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

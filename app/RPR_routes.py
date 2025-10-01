@@ -102,7 +102,7 @@ def initial_page():
 @rpr.route("/authentication", methods=["GET","POST"])
 def authentication():
 
-    url = "https://dev.verifier-backend.eudiw.dev/ui/presentations"
+    url = "https://" + cfgserv.url_verifier +"/ui/presentations"
     payload ={
         "type": "vp_token",
         "nonce": "hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc=",
@@ -145,12 +145,6 @@ def authentication():
                     },
                     {
                     "path": [
-                        "$['eu.europa.ec.eudi.pid.1']['age_over_18']"
-                    ],
-                    "intent_to_retain": False
-                    },
-                    {
-                    "path": [
                         "$['eu.europa.ec.eudi.pid.1']['issuing_authority']"
                     ],
                     "intent_to_retain": False
@@ -176,7 +170,7 @@ def authentication():
     response = requests.request("POST", url, headers=headers, data=json.dumps(payload)).json()
 
     QR_code_url = (
-        "eudi-openid4vp://dev.verifier-backend.eudiw.dev?client_id="
+        "eudi-openid4vp://" + cfgserv.url_verifier + "?client_id="
         + response["client_id"]
         + "&request_uri="
         + response["request_uri"]
@@ -192,13 +186,13 @@ def authentication():
     response_same_device= requests.request("POST", url, headers=headers, data=json.dumps(payload_sameDevice)).json()
 
     deeplink_url = (
-        "eudi-openid4vp://dev.verifier-backend.eudiw.dev?client_id="
+        "eudi-openid4vp://" + cfgserv.url_verifier + "?client_id="
         + response_same_device["client_id"]
         + "&request_uri="
         + response_same_device["request_uri"]
     )
 
-    oid4vp_requests.update({session["session_id"]:{"response": response_same_device, "expires":datetime.now() + timedelta(minutes=cfgserv.deffered_expiry)}})
+    oid4vp_requests.update({session["session_id"]:{"response": response_same_device, "expires":datetime.now() + timedelta(minutes=cfgserv.deffered_expiry), "certificate_List":False}})
 
 
     # Generate QR code
@@ -226,13 +220,13 @@ def authentication():
         "pid_login_qr_code.html",
         url_data=deeplink_url,
         qrcode=qr_img_base64,
-        presentation_id=response["presentation_id"],
+        presentation_id=response["transaction_id"],
         redirect_url= cfgserv.service_url
     )
 @rpr.route("/authentication_List", methods=["GET","POST"])
 def authentication_List():
 
-    url = "https://dev.verifier-backend.eudiw.dev/ui/presentations"
+    url = "https://" + cfgserv.url_verifier +"/ui/presentations"
     payload ={
         "type": "vp_token",
         "nonce": "hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc=",
@@ -275,12 +269,6 @@ def authentication_List():
                     },
                     {
                     "path": [
-                        "$['eu.europa.ec.eudi.pid.1']['age_over_18']"
-                    ],
-                    "intent_to_retain": False
-                    },
-                    {
-                    "path": [
                         "$['eu.europa.ec.eudi.pid.1']['issuing_authority']"
                     ],
                     "intent_to_retain": False
@@ -306,7 +294,7 @@ def authentication_List():
     response = requests.request("POST", url, headers=headers, data=json.dumps(payload)).json()
 
     QR_code_url = (
-        "eudi-openid4vp://dev.verifier-backend.eudiw.dev?client_id="
+        "eudi-openid4vp://" + cfgserv.url_verifier + "?client_id="
         + response["client_id"]
         + "&request_uri="
         + response["request_uri"]
@@ -322,7 +310,7 @@ def authentication_List():
     response_same_device= requests.request("POST", url, headers=headers, data=json.dumps(payload_sameDevice)).json()
 
     deeplink_url = (
-        "eudi-openid4vp://dev.verifier-backend.eudiw.dev?client_id="
+        "eudi-openid4vp://" + cfgserv.url_verifier + "?client_id="
         + response_same_device["client_id"]
         + "&request_uri="
         + response_same_device["request_uri"]
@@ -356,7 +344,7 @@ def authentication_List():
         "pid_login_qr_code.html",
         url_data=deeplink_url,
         qrcode=qr_img_base64,
-        presentation_id=response["presentation_id"],
+        presentation_id=response["transaction_id"],
         redirect_url= cfgserv.service_url
     )
 
@@ -365,7 +353,7 @@ def pid_authorization_get():
 
     presentation_id= request.args.get("presentation_id")
 
-    url = "https://dev.verifier-backend.eudiw.dev/ui/presentations/" + presentation_id + "?nonce=hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc="
+    url = "https://" + cfgserv.url_verifier+ "/ui/presentations/" + presentation_id + "?nonce=hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc="
     headers = {
     'Content-Type': 'application/json',
     }
@@ -385,12 +373,14 @@ def getpidoid4vp():
     if "response_code" in request.args and "session_id" in request.args:
 
         response_code = request.args.get("response_code")
-        presentation_id = oid4vp_requests[request.args.get("session_id")]["response"]["presentation_id"]
+        presentation_id = oid4vp_requests[request.args.get("session_id")]["response"]["transaction_id"]
         session["session_id"]=request.args.get("session_id")
-        if oid4vp_requests[request.args.get("session_id")]["certificate_List"] !=None:
-            session["certificate_List"]=True
+
+        if oid4vp_requests[request.args.get("session_id")]["certificate_List"]:
+            if oid4vp_requests[request.args.get("session_id")]["certificate_List"] == True:
+                session["certificate_List"]=True
         url = (
-            "https://dev.verifier-backend.eudiw.dev/ui/presentations/"
+            "https://" + cfgserv.url_verifier +"/ui/presentations/"
             + presentation_id
             + "?nonce=hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc="
             + "&response_code=" + response_code
@@ -398,7 +388,7 @@ def getpidoid4vp():
 
     elif "presentation_id" in request.args:
         presentation_id = request.args.get("presentation_id")
-        url = "https://dev.verifier-backend.eudiw.dev/ui/presentations/" + presentation_id + "?nonce=hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc="
+        url = "https://" + cfgserv.url_verifier +"/ui/presentations/" + presentation_id + "?nonce=hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc="
 
     headers = {
     'Content-Type': 'application/json',
@@ -432,7 +422,7 @@ def getpidoid4vp():
 
     form_items={
         "Country": "select",
-        "Name": "string",
+        "Organization Name": "string",
         "Common Name": "string",
         "Registration Number": "string",
         "Contact": "contact",
@@ -442,7 +432,7 @@ def getpidoid4vp():
     }
     descriptions = {
         "Country": "Country in which the relying party is established.",
-        "Name": "Name of the relying party as stated in an official record.",
+        "Organization Name": "Organization Name of the relying party as stated in an official record.",
         "Common Name": "Common Name of the Relying Party, in a format suitable for presenting to an end-user.",
         "Registration Number": "Registration number as stated in an official record together with identification data of that official record.",
         "Contact": "Contact details (address, e-mail and phone number) of the relying party.",
@@ -472,7 +462,7 @@ def relying_party_registration():
 
     commonName=request.form.get("Common Name")
     countryName=request.form.get("Country")
-    organizationName=request.form.get("Name")
+    organizationName=request.form.get("Organization Name")
     registration_number=request.form.get("Registration Number")
     email=request.form.get("email")
     dns_Name=request.form.get("DNS Name")
@@ -483,7 +473,7 @@ def relying_party_registration():
     
     certificateRequestString = "-----BEGIN CERTIFICATE REQUEST-----\n"+ base64.b64encode(certificateRequest).decode("utf-8") + "\n"+ "-----END CERTIFICATE REQUEST-----"
     certificateAuthorityName = getCertificateAuthorityName(countryName)
-    certificateRequestBody = getJsonBody(certificateRequestString, certificateAuthorityName)
+    certificateRequestBody = getJsonBody(certificateRequestString, certificateAuthorityName, countryName)
     postUrl = "https://" + ejbca.cahost + "/ejbca/ejbca-rest-api/v1" + ejbca.endpoint
 
     headers ={
@@ -542,7 +532,6 @@ def download(name):
     p12_file_bytes=p12_temp[name]["response"]
 
     final_name = name.split("_")[0] + ".p12"
-    print(final_name)
     
     extra = {'code': session["session_id"]} 
     logger.info(f"Download p12.", extra=extra)

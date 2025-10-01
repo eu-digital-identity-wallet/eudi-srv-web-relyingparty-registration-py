@@ -49,7 +49,6 @@ def validate_vp_token(response_json):
             "family_name",
             "given_name",
             "birth_date",
-            "age_over_18",
             "issuing_authority",
             "issuing_country",
         ],
