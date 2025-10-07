@@ -106,61 +106,55 @@ def authentication():
     payload ={
         "type": "vp_token",
         "nonce": "hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc=",
-        "presentation_definition": {
-            "id": "32f54163-7166-48f1-93d8-ff217bdb0653",
-            "input_descriptors": [
+        "dcql_query": {
+            "credentials": [
             {
-                "id": "eu.europa.ec.eudi.pid.1",
-                "format": {
-                "mso_mdoc": {
-                    "alg": [
-                    "ES256",
-                    "ES384",
-                    "ES512",
-                    "EdDSA"
-                    ]
-                }
+                "id": "query_0",
+                "format": "mso_mdoc",
+                "meta": {
+                "doctype_value": "eu.europa.ec.eudi.pid.1"
                 },
-                "name": "EUDI PID",
-                "purpose": "We need to verify your identity",
-                "constraints": {
-                "fields": [
-                    {
+                "claims": [
+                {
                     "path": [
-                        "$['eu.europa.ec.eudi.pid.1']['family_name']"
+                    "eu.europa.ec.eudi.pid.1",
+                    "family_name"
                     ],
                     "intent_to_retain": False
-                    },
-                    {
+                },
+                {
                     "path": [
-                        "$['eu.europa.ec.eudi.pid.1']['given_name']"
+                    "eu.europa.ec.eudi.pid.1",
+                    "given_name"
                     ],
                     "intent_to_retain": False
-                    },
-                    {
+                },
+                {
                     "path": [
-                        "$['eu.europa.ec.eudi.pid.1']['birth_date']"
+                    "eu.europa.ec.eudi.pid.1",
+                    "birth_date"
                     ],
                     "intent_to_retain": False
-                    },
-                    {
+                },
+                {
                     "path": [
-                        "$['eu.europa.ec.eudi.pid.1']['issuing_authority']"
+                    "eu.europa.ec.eudi.pid.1",
+                    "issuing_authority"
                     ],
                     "intent_to_retain": False
-                    },
-                    {
+                },
+                {
                     "path": [
-                        "$['eu.europa.ec.eudi.pid.1']['issuing_country']"
+                    "eu.europa.ec.eudi.pid.1",
+                    "issuing_country"
                     ],
                     "intent_to_retain": False
-                    }
-                ]
                 }
+                ]
             }
             ]
         }
-        }
+    }
 
 
     headers = {
@@ -168,6 +162,7 @@ def authentication():
     }
 
     response = requests.request("POST", url, headers=headers, data=json.dumps(payload)).json()
+    
 
     QR_code_url = (
         "eudi-openid4vp://" + cfgserv.url_verifier + "?client_id="
@@ -230,61 +225,55 @@ def authentication_List():
     payload ={
         "type": "vp_token",
         "nonce": "hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc=",
-        "presentation_definition": {
-            "id": "32f54163-7166-48f1-93d8-ff217bdb0653",
-            "input_descriptors": [
+        "dcql_query": {
+            "credentials": [
             {
-                "id": "eu.europa.ec.eudi.pid.1",
-                "format": {
-                "mso_mdoc": {
-                    "alg": [
-                    "ES256",
-                    "ES384",
-                    "ES512",
-                    "EdDSA"
-                    ]
-                }
+                "id": "query_0",
+                "format": "mso_mdoc",
+                "meta": {
+                "doctype_value": "eu.europa.ec.eudi.pid.1"
                 },
-                "name": "EUDI PID",
-                "purpose": "We need to verify your identity",
-                "constraints": {
-                "fields": [
-                    {
+                "claims": [
+                {
                     "path": [
-                        "$['eu.europa.ec.eudi.pid.1']['family_name']"
+                    "eu.europa.ec.eudi.pid.1",
+                    "family_name"
                     ],
                     "intent_to_retain": False
-                    },
-                    {
+                },
+                {
                     "path": [
-                        "$['eu.europa.ec.eudi.pid.1']['given_name']"
+                    "eu.europa.ec.eudi.pid.1",
+                    "given_name"
                     ],
                     "intent_to_retain": False
-                    },
-                    {
+                },
+                {
                     "path": [
-                        "$['eu.europa.ec.eudi.pid.1']['birth_date']"
+                    "eu.europa.ec.eudi.pid.1",
+                    "birth_date"
                     ],
                     "intent_to_retain": False
-                    },
-                    {
+                },
+                {
                     "path": [
-                        "$['eu.europa.ec.eudi.pid.1']['issuing_authority']"
+                    "eu.europa.ec.eudi.pid.1",
+                    "issuing_authority"
                     ],
                     "intent_to_retain": False
-                    },
-                    {
+                },
+                {
                     "path": [
-                        "$['eu.europa.ec.eudi.pid.1']['issuing_country']"
+                    "eu.europa.ec.eudi.pid.1",
+                    "issuing_country"
                     ],
                     "intent_to_retain": False
-                    }
-                ]
                 }
+                ]
             }
             ]
         }
-        }
+    }
 
 
     headers = {
@@ -404,7 +393,7 @@ def getpidoid4vp():
     if error == True:
         return error_msg
     
-    mdoc_json = cbor2elems(response.json()["vp_token"][0] + "==")
+    mdoc_json = cbor2elems(response.json()["vp_token"]["query_0"][0] + "==")
 
     attributesForm={}
 
