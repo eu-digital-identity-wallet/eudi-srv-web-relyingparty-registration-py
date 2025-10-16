@@ -3,9 +3,10 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="Title" content="Request PID" />
-    <meta name="Keywords" content="EUDI Wallet, PID, Enrolment" />
-    <meta name="Description" content="Request PID for EUDI Wallet" />
+    <meta name="Title" content="Relying Party Registration" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" />
+    <meta name="Keywords" content="EUDI Wallet, PID, Enrolment, Form" />
+    <meta name="Description" content="PID Form for EUDI Wallet" />
     <meta name="robots" content="noindex, nofollow" />
     <meta http-equiv="Cache-Control" content="no-cache,no-store,must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
@@ -14,6 +15,7 @@
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/apple-touch-icon.png') }}" />
     <link href="{{ url_for('static', filename='bootstrap-3.4.1-dist/css/bootstrap.min.css') }}" rel="stylesheet" type="text/css" />
     <link href="{{ url_for('static', filename='css/stylesheets/custom/custom_en_9.7.1.20.1679559965505.css') }}" media="all" rel="stylesheet" type="text/css" />
+   
     <link href="{{ url_for('static', filename='fontawesome-free-5.15.4-web/css/fontawesome.min.css') }}" rel="stylesheet" type="text/css" />
     <script type="text/javascript" id="jqueryId" src="{{ url_for('static', filename='scripts/jquery/jquery-3.6.3.min.js') }}" charset="UTF-8"></script>
 
@@ -40,7 +42,31 @@
     <script type="text/javascript" src="https://webgate.ec.europa.eu/cas/scripts/locval/locval_en_9.7.1.20.1679559965505.js" integrity="sha256-fGdBvjTPjOPZBmgDo8xMKgZUwmXXCzYZ+BbHErfhc/Q= sha384-Y9eAdYjT/TZ0VPUxw3Ex/TVSZZzPsV1mRoKD0BTkrQn0L615z24j26O2CZdT1Xl+ sha512-T9HoOOy1OkJ0l1GWqvT2RAR9frKd4zImDm1uyHxjmB/nxNBhmdjEhR9MckiWiNv2/UrFrMZJwSMB4Po/ExbFOw==" charset="UTF-8"></script>
 -->
 
-    <title>Relying Party Registration</title>
+    <title>Relying Party User Menu</title>
+    <style>
+        .menu-container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .menu-option {
+            padding: 15px;
+            background-color: #0073e6;
+            color: #fff;
+            text-align: center;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            display: block;
+        }
+        .menu-option:hover {
+            background-color: #005bb5;
+        }
+    </style>
 </head>
 
 <body id="responsive-main-nav">
@@ -66,18 +92,33 @@
                     <!--
                     <p class="relying-party"><strong>etranslation</strong> requires you to authenticate</p>
                     -->
-                    <h1>Testing Relying Party Registration</h1>
+                    <h1>Relying Party User Menu</h1>
                     <div id="content" class="content-wrap content-center col-md-6 col-sm-7">
 
                         <div class="genericErrors" id="genericErrorsDesc">
 
                         </div>
-                        <!-- <status>EID_COUNTRY_SELECTION</status> -->
-                        <p> This is a Testing Relying Party Registration. To register a new Relying Party please use the following url: <a href={{pid_auth}}>{{pid_auth}}</a></p>
+    
+                        <h2>Legal Entity </h2>
+                        <a href="{{ url_for('RPR.legal_entity_add_edit') }}" class="menu-option">Create Legal Entity </a>
+                        <a href="{{ url_for('RPR.legal_entity_list') }}" class="menu-option">List of Legal Entities </a>
                         
-                        <!--bean-ext:form action="" styleClass="mt"-->
+                        <h2>Relying Party Information</h2>
                         
-                        </div>
+                        <a href="{{ url_for('RPR.RP_create') }}" class="menu-option">Create Relying Party</a>
+                        <a href="{{ url_for('RPR.RP_list') }}" class="menu-option">List of Relying Parties</a>
+
+                        <a href="{{ url_for('RPR.logout') }}" class="menu-option" style="background-color: #ff4d4d;">Logout</a>
+                        <form>
+                            <div class="col-md-12" id="hidden_elems">
+                                <div class="col" >
+                                    <input type="hidden" value="{{ temp_user_id }}" name="temp_user_id">
+                                </div>
+                            </div>
+                        </form>
+                            <div class="clearfix"></div>
+                        <!--<script type="text/javascript" src="{{ url_for('static', filename='scripts/dynamic-validator/selectCountryForm_9.7.1.20.1679559965505_en.js') }}" charset="UTF-8" defer="true"></script>-->
+                    </div>
 
                 </div>
             </div>
@@ -111,5 +152,4 @@
     </footer>
     <!-- Version 9.7.1.20 - 23/03/2023 - 09:26 -->
 </body>
-
 </html>

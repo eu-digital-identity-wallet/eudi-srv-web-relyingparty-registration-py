@@ -96,7 +96,7 @@ rpr.template_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), '
 @rpr.route('/', methods=['GET','POST'])
 def initial_page():
 
-    return render_template('initial_page.html', redirect_url= cfgserv.service_url, pid_auth = cfgserv.service_url + "authentication", certificateList=cfgserv.service_url + "authentication_List")
+    return render_template('initial_page.html', redirect_url= cfgserv.service_url, pid_auth = cfgserv.service_url + "authentication")
 
 
 @rpr.route("/authentication", methods=["GET","POST"])
@@ -173,7 +173,6 @@ def authentication():
 
     payload_sameDevice=payload
     session["session_id"]=str(uuid.uuid4())
-    session["certificate_List"]=False
 
     payload_sameDevice.update({"wallet_response_redirect_uri_template":cfgserv.service_url +
                                                        "getpidoid4vp?response_code={RESPONSE_CODE}&session_id=" + session["session_id"]})
@@ -188,124 +187,6 @@ def authentication():
     )
 
     oid4vp_requests.update({session["session_id"]:{"response": response_same_device, "expires":datetime.now() + timedelta(minutes=cfgserv.deffered_expiry), "certificate_List":False}})
-
-
-    # Generate QR code
-    # img = qrcode.make("uri")
-    # QRCode.print_ascii()
-
-    qrcode = segno.make(QR_code_url)
-    out = io.BytesIO()
-    qrcode.save(out, kind='png', scale=3)
-
-    """ qrcode.to_artistic(
-        background=cfgtest.qr_png,
-        target=out,
-        kind="png",
-        scale=4,
-    ) """
-    # qrcode.terminal()
-    # qr_img_base64 = qrcode.png_data_uri(scale=4)
-
-    qr_img_base64 = "data:image/png;base64," + base64.b64encode(out.getvalue()).decode(
-        "utf-8"
-    )
-
-    return render_template(
-        "pid_login_qr_code.html",
-        url_data=deeplink_url,
-        qrcode=qr_img_base64,
-        presentation_id=response["transaction_id"],
-        redirect_url= cfgserv.service_url
-    )
-@rpr.route("/authentication_List", methods=["GET","POST"])
-def authentication_List():
-
-    url = "https://" + cfgserv.url_verifier +"/ui/presentations"
-    payload ={
-        "type": "vp_token",
-        "nonce": "hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc=",
-        "dcql_query": {
-            "credentials": [
-            {
-                "id": "query_0",
-                "format": "mso_mdoc",
-                "meta": {
-                "doctype_value": "eu.europa.ec.eudi.pid.1"
-                },
-                "claims": [
-                {
-                    "path": [
-                    "eu.europa.ec.eudi.pid.1",
-                    "family_name"
-                    ],
-                    "intent_to_retain": False
-                },
-                {
-                    "path": [
-                    "eu.europa.ec.eudi.pid.1",
-                    "given_name"
-                    ],
-                    "intent_to_retain": False
-                },
-                {
-                    "path": [
-                    "eu.europa.ec.eudi.pid.1",
-                    "birth_date"
-                    ],
-                    "intent_to_retain": False
-                },
-                {
-                    "path": [
-                    "eu.europa.ec.eudi.pid.1",
-                    "issuing_authority"
-                    ],
-                    "intent_to_retain": False
-                },
-                {
-                    "path": [
-                    "eu.europa.ec.eudi.pid.1",
-                    "issuing_country"
-                    ],
-                    "intent_to_retain": False
-                }
-                ]
-            }
-            ]
-        }
-    }
-
-
-    headers = {
-        "Content-Type": "application/json",
-    }
-
-    response = requests.request("POST", url, headers=headers, data=json.dumps(payload)).json()
-
-    QR_code_url = (
-        "eudi-openid4vp://" + cfgserv.url_verifier + "?client_id="
-        + response["client_id"]
-        + "&request_uri="
-        + response["request_uri"]
-    )
-
-    payload_sameDevice=payload
-    session["session_id"]=str(uuid.uuid4())
-    session["certificate_List"]=True
-
-    payload_sameDevice.update({"wallet_response_redirect_uri_template":cfgserv.service_url +
-                                                       "getpidoid4vp?response_code={RESPONSE_CODE}&session_id=" + session["session_id"]})
-
-    response_same_device= requests.request("POST", url, headers=headers, data=json.dumps(payload_sameDevice)).json()
-
-    deeplink_url = (
-        "eudi-openid4vp://" + cfgserv.url_verifier + "?client_id="
-        + response_same_device["client_id"]
-        + "&request_uri="
-        + response_same_device["request_uri"]
-    )
-
-    oid4vp_requests.update({session["session_id"]:{"response": response_same_device, "expires":datetime.now() + timedelta(minutes=cfgserv.deffered_expiry), "certificate_List":True}})
 
 
     # Generate QR code
@@ -403,38 +284,93 @@ def getpidoid4vp():
 
     temp_user_id=str(uuid.uuid4())
     session[temp_user_id]= attributesForm
+    session["temp_user_id"] =temp_user_id
 
-    if session["certificate_List"]== True:
-        return certificate_List(temp_user_id)
+    #check user~
+    #user exitir menu
+    return redirect(url_for('RPR.menu_RP_user'))
+    #user nao existe, criar user
+    
+
+@rpr.route("/user_auth", methods=["GET", "POST"])
+def user_auth():
+    
+    temp_user_id = session['temp_user_id']
+
+    #user data
+    user_data_pid = session[temp_user_id]
+
+    address = request.form.get('address')
+    email = request.form.get('email')
+    phone_number = request.form.get('phone_number')
+    country = request.form.get('Country')
+    identifier= request.form.get("Identifier")
+    info_uri = request.form.get("Information URI")
+
+    #introduzir os dados na BD legal entity
+    #check = func.user_db_info(role, operator_name, PostalAddress, electronicAddress, user['id'], session["session_id"])
+
+    
+
+    return redirect(url_for('RPR.menu_RP_user'))
+    
+@rpr.route('/menu_RP_user', methods=['GET','POST'])
+def menu_lotl():
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+    
+    return render_template("rp_user_menu.html", user = user['given_name'], temp_user_id = temp_user_id)
+
+@rpr.route('/create_legal_entity', methods=['GET','POST'])
+def legal_entity_add_edit():
 
     attributesForm={}
 
     form_items={
+        "Identifer":"string",
         "Country": "select",
-        "Organization Name": "string",
-        "Common Name": "string",
-        "Registration Number": "string",
         "Contact": "contact",
-        "Intended use of European Digital Identity Wallets": "text_area",
-        "DNS Name":"string",
+        "Information URI":"string",
+    }
+    descriptions = {
+        "Country": "Country in which the Legal Entity is established.",
+        "Identifier": "Identifier wick identifies the legal entity.",
+        "Contact": "Contact details (address, e-mail and phone number) of the relying party.",
+        "Information URI": "Information and support URI from the legal entity.",
+    }
+
+    return render_template("dynamic-form.html", desc = descriptions, countries = ejbca.countries ,attributes=attributesForm, redirect_url= cfgserv.service_url + "user_auth")
+
+@rpr.route('/RP_create', methods=['GET','POST'])
+def RP_create():
+
+    attributesForm={}
+
+    form_items={
+        "Trade Name": "string",
+        "Support URI": "string",
+        "Services Description": "string",
+        "Entitlement": "select",
+        "Type of Policy": "select",
+        "Policy":"string",
         "Password":"password"
     }
     descriptions = {
-        "Country": "Country in which the relying party is established.",
-        "Organization Name": "Organization Name of the relying party as stated in an official record.",
-        "Common Name": "Common Name of the Relying Party, in a format suitable for presenting to an end-user.",
-        "Registration Number": "Registration number as stated in an official record together with identification data of that official record.",
-        "Contact": "Contact details (address, e-mail and phone number) of the relying party.",
-        "Intended use of European Digital Identity Wallets": "Intended use of European Digital Identity Wallets, including an indication of the data to be requested by the relying party from users.",
-        "DNS Name":"DNS Name to add to the certificate.",
+        "Trade Name": "Trade name (common name, service name) of the Wallet-Relying Party.",
+        "Support URI": "Information and support URI from the legal entity.",
+        "Services Description": "Descriptions of the services provided by the Wallet-Relying Party.",
+        "Entitlement": "Set of entitlements of the Wallet-Relying Party. ",
+        "Type of Policy":"Type of the policy.",
+        "Policy URI": "URI where the policy is published.",
         "Password":"Password required for P12 file. "
     }
 
+    return render_template("dynamic-form.html", desc = descriptions, countries = ejbca.countries ,attributes=attributesForm, redirect_url= cfgserv.service_url + "relying_party_registration_request")
 
-    attributesForm.update(form_items)
-    
+@rpr.route('/RP_list', methods=['GET','POST'])
+def RP_list():
 
-    return render_template("dynamic-form.html", desc = descriptions, countries = ejbca.countries ,attributes=attributesForm,temp_user_id=temp_user_id, redirect_url= cfgserv.service_url + "relying_party_registration_request")
+
 
 @rpr.route("/relying_party_registration_request", methods=["GET", "POST"])
 def relying_party_registration():
@@ -449,12 +385,13 @@ def relying_party_registration():
     givenName=user["given_name"]
     surname=user["family_name"]
 
-    commonName=request.form.get("Common Name")
-    countryName=request.form.get("Country")
-    organizationName=request.form.get("Organization Name")
-    registration_number=request.form.get("Registration Number")
-    email=request.form.get("email")
-    dns_Name=request.form.get("DNS Name")
+    tradeName=request.form.get("Trade Name")
+    supportURI=request.form.get("Support URI")
+    #como as TSLs, ex: lang en, description=test  
+    servicesDescription=request.form.get("Services Description")#como as TSLs, ex: lang en, description=test  
+    entitlement=request.form.get("Entitlement")
+    # verificar legal entity se é pertence ao sector público, se sim True, se não False
+    isPSB= False
     password=request.form.get("Password")
 
 

@@ -192,14 +192,14 @@ def initialize_db():
     finally:
         connection.close()
 
-initialize_db()
+#initialize_db()
 
 def create_app():
 
     app = Flask(__name__, instance_relative_config=True)
     app.config['SECRET_KEY'] = ConfService.secret_key
 
-    app.register_error_handler(Exception, handle_exception)
+    #app.register_error_handler(Exception, handle_exception)
     app.register_error_handler(404, page_not_found)
     from . import (RPR_routes)
 
