@@ -338,6 +338,7 @@ def legal_entity_add_edit():
         "Contact": "Contact details (address, e-mail and phone number) of the relying party.",
         "Information URI": "Information and support URI from the legal entity.",
     }
+    attributesForm.update(form_items)
 
     return render_template("dynamic-form.html", desc = descriptions, countries = ejbca.countries ,attributes=attributesForm, redirect_url= cfgserv.service_url + "user_auth")
 
@@ -365,10 +366,73 @@ def RP_create():
         "Password":"Password required for P12 file. "
     }
 
+    attributesForm.update(form_items)
+    
     return render_template("dynamic-form.html", desc = descriptions, countries = ejbca.countries ,attributes=attributesForm, redirect_url= cfgserv.service_url + "relying_party_registration_request")
 
 @rpr.route('/RP_list', methods=['GET','POST'])
 def RP_list():
+
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+    
+    tsl_dict = func.get_tsl_info(user["id"], session["session_id"])
+    
+    header_table=[ "Version","Sequence Number","TSL Type","Scheme Name","Scheme Territory","Issue Date","Next Update"]
+    if(tsl_dict == "err"):
+        data={}
+    else:
+
+        data={}
+
+        for tsl in tsl_dict:
+            data_temp={
+                tsl["tsl_id"]:{
+                    "Version":tsl["Version"],
+                    "Sequence Number":tsl["SequenceNumber"],
+                    "TSL Type":tsl["TSLType"],
+                    "Scheme Name":tsl["SchemeName_lang"],
+                    "Scheme Territory":tsl["schemeTerritory"],
+                    "Issue Date":tsl["issue_date"],
+                    "Next Update":tsl["next_update"]
+                }
+            }
+            data.update(data_temp)
+    
+    tsp_dict = func.get_tsp_update(user["id"], session["session_id"])
+    
+    list = []
+    if(data != {}):
+        if(tsp_dict != "err"):
+
+            for item in tsp_dict:
+                name = json.loads(item["name"])
+                
+                name_txt = name[0]["text"] if name else "No Name"
+                if(item["tsl_id"] != None):
+                    tsl_name = func.get_tsl_name(item["tsl_id"], session["session_id"])
+                    aux_name = json.loads(tsl_name["SchemeName_lang"])
+                    tsl_name = aux_name[0]["text"] if aux_name else "No Name"
+                    
+                    new_item = {
+                        "id": item["tsp_id"],
+                        "name": name_txt,
+                        "associated_id": item["tsl_id"],
+                        "ass_name": tsl_name
+                    }
+                else:
+                    new_item = {
+                        "id": item["tsp_id"],
+                        "name": name_txt,
+                        "associated_id": item["tsl_id"],
+                        "ass_name": ""
+                    }
+                
+                list.append(new_item)
+    
+
+    menu= cfgserv.service_url + "menu"
+    return render_template("CertificateList.html", h1 = "Trusted Service Lists", menu = menu, data=data, title="Trusted Lists", list= list, header_table=header_table, url=cfgserv.service_url +"tsl", temp_user_id = temp_user_id)
 
 
 
