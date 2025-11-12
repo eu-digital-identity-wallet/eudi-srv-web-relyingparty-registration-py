@@ -98,9 +98,13 @@
                         <div class="genericErrors" id="genericErrorsDesc">
 
                         </div>
+
+                        <h2>Person </h2>
+                        <a href="{{ url_for('RPR.create_person') }}" class="menu-option">Create Person </a>
+                        <a href="{{ url_for('RPR.Person_list') }}" class="menu-option">List of Persons </a>
     
                         <h2>Legal Entity </h2>
-                        <a href="{{ url_for('RPR.legal_entity_add_edit') }}" class="menu-option">Create Legal Entity </a>
+                        <a href="{{ url_for('RPR.create_legal_entity') }}" class="menu-option">Create Legal Entity </a>
                         <a href="{{ url_for('RPR.legal_entity_list') }}" class="menu-option">List of Legal Entities </a>
                         
                         <h2>Relying Party Information</h2>

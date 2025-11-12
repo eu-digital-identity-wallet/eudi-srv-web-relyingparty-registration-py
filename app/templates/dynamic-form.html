@@ -42,7 +42,7 @@
     <script type="text/javascript" src="https://webgate.ec.europa.eu/cas/scripts/locval/locval_en_9.7.1.20.1679559965505.js" integrity="sha256-fGdBvjTPjOPZBmgDo8xMKgZUwmXXCzYZ+BbHErfhc/Q= sha384-Y9eAdYjT/TZ0VPUxw3Ex/TVSZZzPsV1mRoKD0BTkrQn0L615z24j26O2CZdT1Xl+ sha512-T9HoOOy1OkJ0l1GWqvT2RAR9frKd4zImDm1uyHxjmB/nxNBhmdjEhR9MckiWiNv2/UrFrMZJwSMB4Po/ExbFOw==" charset="UTF-8"></script>
 -->
 
-    <title>Form for your Relying Party Registration</title>
+    <title>{{title}}</title>
 </head>
 
 <body id="responsive-main-nav">
@@ -68,19 +68,18 @@
                     <!--
                     <p class="relying-party"><strong>etranslation</strong> requires you to authenticate</p>
                     -->
-                    <h1>Enter the data for Relying Party Registration</h1>
+                    <h1>{{title}}</h1>
                     <div id="content" class="content-wrap content-center col-md-6 col-sm-7">
 
                         <div class="genericErrors" id="genericErrorsDesc">
 
                         </div>
                         <!-- <status>EID_COUNTRY_SELECTION</status> -->
-                        <h2>Please enter your Relying Party information</h2>
+                        <h2>{{title_description}}</h2>
                         <!--bean-ext:form action="" styleClass="mt"-->
                         <form id="selectCountryForm" method="post" action="{{redirect_url}}" onsubmit="return validateImage()" accept-charset="UTF-8" enctype="multipart/form-data" autocapitalize="off" spellcheck="false">
                             <!-- <div class="nodisplay"><input type="hidden" name="TxId" value="ECAS_TX-7404446-Rej9lkLFeXORXm9rG7q4Xqo1xGRJ86gt3hoJcfMG3XyxQrAyn8mu9PbXRCZoKKUbCzLlIzG5jKgHy4vlfgkG5M-rS0vSrmBGYCAxyMeVAWeYi-PVgrhNnzagSfzJvUraGtvIPzqv8cbsV46ZMUiinVIlcDkNWEKzr5uBS6CMnabjUfRGxDHabrZictNyNLy0AsLWy" /></div><input type="hidden" name="loginRequestId" value="ECAS_LR-12907874-lFk8VGOXm5Wv9sTtMFxxCMYjUFYj1oyp1KB0e9CptxxL0NuACxlcyti7UHNPxbdzOqSrnNBPN1ll8kLzi00LRN-rS0vSrmBGYCna66T9IuSKW-P6QgQVzQzxVCzOgIh6P3d1X9xVGnkDA3YFGOAmdliNnzQVzScjsEzc7t8ao1FsJS3VNDfzPNYnzH2FPsp38aFmqD" id="loginRequestId" /> -->
-                            <h3>Test Provider Form</h3>
-                            <p>This data is only used for requesting Relying Party Registration for testing purposes.</p>
+
                             <div id="eidasCountries">
                                 {% for name, value in attributes.items() %}
                                         {% if value == 'select' %}
@@ -89,12 +88,26 @@
                                                     <label for="{{ name }}">{{ name }}</label>
                                                     <small class="form-text text-muted">{{ desc[name] }}</small>
                                                     <select class="form-control" name="{{ name }}" required>
-                                                        {% for code, description in countries.items() %}
-                                                            <option value="{{ code }}">{{ code }}</option>
+                                                        {% for select in select_dict %}
+                                                            <option value="{{ select}}">{{ select}}</option>
                                                         {% endfor %}
                                                     </select>
                                                 </div>
-                                            </div>      
+                                            </div> 
+                                        {% elif value == 'multi_string' %}
+                                            <div class="row g-3">
+                                                <div class="col-md-12">
+                                                    <label for="{{ name }}">{{ name }}</label>
+                                                    <small class="form-text text-muted">{{ desc[name] }}</small>
+                                                    <select class="js-example-basic-single" id="Lang" name="Lang" style="width: 100%; box-sizing: border-box;" required>
+                                                        <option value="">--Select--</option>
+                                                        {% for value in lang %}
+                                                            <option value="{{ value }}">{{ value }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                    <input type="text" class="form-control" placeholder="{{ name }}" aria-label="{{ name }}" name="{{ name }}" required >
+                                                </div>
+                                            </div>    
                                         {% elif value == 'string' %}
                                             <div class="row g-3">
                                                 <div class="col-md-12">
@@ -180,7 +193,7 @@
                                                         <label for="Driving">Contact Details</label>
                                                         <small class="form-text text-muted">{{ desc[name] }}</small>
                                                             <div class="col">
-                                                                Address:
+                                                                Postal Address:
                                                                 <input type="text" class="form-control" placeholder="Address" aria-label="Address" name="address" required>
                                                             </div>
                                                             <div class="col">
