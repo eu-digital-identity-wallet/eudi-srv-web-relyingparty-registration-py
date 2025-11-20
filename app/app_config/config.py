@@ -34,11 +34,11 @@ class ConfService:
 
     secret_key = os.urandom(32).hex()
 
-    #service_url = "http://127.0.0.1:5000/"
-    service_url = os.getenv("SERVICE_URL","https://registry.serviceproviders.eudiw.dev/")
+    service_url = "http://127.0.0.1:5000/"
+    #service_url = os.getenv("SERVICE_URL","https://registry.serviceproviders.eudiw.dev/")
 
-    #trusted_CAs_path = "app\certs"
-    trusted_CAs_path = os.getenv("TRUSTED_CAS_PATH","/etc/eudiw/pid-issuer/cert/")
+    trusted_CAs_path = "app\certs"
+    #trusted_CAs_path = os.getenv("TRUSTED_CAS_PATH","/etc/eudiw/pid-issuer/cert/")
 
     deffered_expiry = 100
 
@@ -46,6 +46,16 @@ class ConfService:
     log_dir = os.getenv("LOG_PATH", "app/logs")
 
     url_verifier=os.getenv("VERIFIER","verifier-backend.eudiw.dev")
+
+    eu_languages = [
+        "bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr",
+        "ga", "hr", "hu", "it", "lt", "lv", "mt", "nl", "pl", "pt",
+        "ro", "sk", "sl", "sv"]
+
+    eu_countries = [
+        "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR",
+        "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL",
+        "PL", "PT", "RO", "SK", "SI", "ES", "SE","UT", "EU"]
     
 
     # log_dir = "/tmp/log"

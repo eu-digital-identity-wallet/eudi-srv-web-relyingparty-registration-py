@@ -19,12 +19,15 @@
 This rpr_routes.py file is the blueprint of the Web RelyingParty Registration service.
 """
 
+import ast
 import base64
 import binascii
+from collections import defaultdict
 from datetime import datetime, timedelta
 import io
 import json
 import os
+import re
 from uuid import uuid4
 import uuid
 import cbor2
@@ -171,22 +174,25 @@ def authentication():
         + response["request_uri"]
     )
 
-    payload_sameDevice=payload
+    
     session["session_id"]=str(uuid.uuid4())
+    session["certificate_List"]=False
 
-    payload_sameDevice.update({"wallet_response_redirect_uri_template":cfgserv.service_url +
-                                                       "getpidoid4vp?response_code={RESPONSE_CODE}&session_id=" + session["session_id"]})
+    # payload_sameDevice=payload
 
-    response_same_device= requests.request("POST", url, headers=headers, data=json.dumps(payload_sameDevice)).json()
+    # payload_sameDevice.update({"wallet_response_redirect_uri_template":cfgserv.service_url +
+    #                                                    "getpidoid4vp?response_code={RESPONSE_CODE}&session_id=" + session["session_id"]})
 
-    deeplink_url = (
-        "eudi-openid4vp://" + cfgserv.url_verifier + "?client_id="
-        + response_same_device["client_id"]
-        + "&request_uri="
-        + response_same_device["request_uri"]
-    )
+    # response_same_device= requests.request("POST", url, headers=headers, data=json.dumps(payload_sameDevice)).json()
 
-    oid4vp_requests.update({session["session_id"]:{"response": response_same_device, "expires":datetime.now() + timedelta(minutes=cfgserv.deffered_expiry), "certificate_List":False}})
+    # deeplink_url = (
+    #     "eudi-openid4vp://" + cfgserv.url_verifier + "?client_id="
+    #     + response_same_device["client_id"]
+    #     + "&request_uri="
+    #     + response_same_device["request_uri"]
+    # )
+
+    # oid4vp_requests.update({session["session_id"]:{"response": response_same_device, "expires":datetime.now() + timedelta(minutes=cfgserv.deffered_expiry), "certificate_List":False}})
 
 
     # Generate QR code
@@ -212,7 +218,7 @@ def authentication():
 
     return render_template(
         "pid_login_qr_code.html",
-        url_data=deeplink_url,
+        url_data="deeplink_url",
         qrcode=qr_img_base64,
         presentation_id=response["transaction_id"],
         redirect_url= cfgserv.service_url
@@ -310,14 +316,14 @@ def user_auth():
 
     return redirect(url_for('RPR.menu_RP_user'))
     
-@rpr.route('/menu_RP_user', methods=['GET','POST'])
+@rpr.route('/menu', methods=['GET','POST'])
 def menu_RP_user():
     temp_user_id = session['temp_user_id']
     user = session[temp_user_id]
     
     return render_template("rp_user_menu.html", user = user['given_name'], temp_user_id = temp_user_id)
 
-@rpr.route('/create_natural_person', methods=['GET','POST'])
+@rpr.route('/person/create_natural_person', methods=['GET','POST'])
 def create_natural_person():
 
     attributesForm={}
@@ -336,9 +342,9 @@ def create_natural_person():
     }
     attributesForm.update(form_items)
 
-    return render_template("dynamic-form.html",title="Create Natural Person",title_description="Please enter your Natural Person data.", desc = descriptions, countries = ejbca.countries ,attributes=attributesForm, redirect_url= cfgserv.service_url + "add_natural_person_db")
+    return render_template("dynamic-form.html",title="Create Natural Person",title_description="Please enter your Natural Person data.", desc = descriptions, countries = cfgserv.eu_countries ,attributes=attributesForm, redirect_url= cfgserv.service_url + "add_natural_person_db")
 
-@rpr.route('/add_natural_person_db', methods=['GET','POST'])
+@rpr.route('/person/add_natural_person_db', methods=['GET','POST'])
 def add_natural_person_db():
 
     temp_user_id = session['temp_user_id']
@@ -353,7 +359,7 @@ def add_natural_person_db():
 
     return render_template("rp_user_menu.html", user = user['given_name'], temp_user_id = temp_user_id)
 
-@rpr.route('/create_legal_person', methods=['GET','POST'])
+@rpr.route('/person/create_legal_person', methods=['GET','POST'])
 def create_legal_person():
 
     attributesForm={}
@@ -368,9 +374,9 @@ def create_legal_person():
     }
     attributesForm.update(form_items)
 
-    return render_template("dynamic-form.html",title="Create Legal Person",title_description="Please enter your Legal Person data.", desc = descriptions, countries = ejbca.countries ,attributes=attributesForm, redirect_url= cfgserv.service_url + "add_legal_person_db")
+    return render_template("dynamic-form.html",title="Create Legal Person",title_description="Please enter your Legal Person data.", desc = descriptions, countries = cfgserv.eu_countries, lang=cfgserv.eu_languages ,attributes=attributesForm, redirect_url= cfgserv.service_url + "add_legal_person_db")
 
-@rpr.route('/add_legal_person_db', methods=['GET','POST'])
+@rpr.route('/person/add_legal_person_db', methods=['GET','POST'])
 def add_legal_person_db():
 
     temp_user_id = session['temp_user_id']
@@ -385,14 +391,88 @@ def add_legal_person_db():
 
     return render_template("rp_user_menu.html", user = user['given_name'], temp_user_id = temp_user_id)
 
+@rpr.route('/person/update_legal_entities', methods=["GET", "POST"])
+def update_legal_entities():
 
-@rpr.route('/create_legal_entity', methods=['GET','POST'])
+    person_id = request.args.get("id")
+    legal_entities = ast.literal_eval(request.args.get("checks"))
+    user_id =request.args.get("user_id")
+    log_id = request.args.get("log_id")
+
+    for elem in legal_entities:
+        legal_entity_id = int(elem)
+
+        check = func.update_legal_entity(legal_entity_id, person_id, session["session_id"])
+        
+        if check is None:
+            return ("erro")
+
+    return redirect('/person/list')
+
+@rpr.route('/person/list')
+def person_list():
+        
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+    
+    person_dict = func.get_person_info(user["id"], session["session_id"])
+    
+    header_table=[ "Person Type", "Name"]
+    if(person_dict == "err"):
+        data={}
+    else:
+
+        data={}
+
+        for person in person_dict:
+            data_temp={
+                person["person_id"]:{
+                    "Person Type":person["personType"],
+                    "Name":person["name"]
+                }
+            }
+            data.update(data_temp)
+    
+    legal_entity_dict = func.get_legal_entity_info(user["id"], session["session_id"])
+    
+    list = []
+    if(data != {}):
+        if(legal_entity_dict != "err"):
+
+            for item in legal_entity_dict:
+                name = item["name"]
+                
+                if(item["person_id"] != None):
+                    person_name = func.get_person_name(item["person_id"], session["session_id"])
+                    
+                    new_item = {
+                        "id": item["legal_entity_id"],
+                        "name": name,
+                        "associated_id": item["person_id"],
+                        "ass_name": person_name
+                    }
+                else:
+                    new_item = {
+                        "id": item["legal_entity_id"],
+                        "name": name,
+                        "associated_id": item["person_id"],
+                        "ass_name": ""
+                    }
+                
+                list.append(new_item)
+    
+    menu= cfgserv.service_url + "menu"
+    return render_template("CertificateList.html", h1 = "Person List", menu = menu, data=data, title="Persons", list= list, header_table=header_table, url=cfgserv.service_url +"persons", temp_user_id = temp_user_id)
+
+
+
+@rpr.route('/legal_entity/create', methods=['GET','POST'])
 def create_legal_entity():                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
 
     attributesForm={}
 
     form_items={
-        "type of Identifier":"select",
+        "Type of Identifier":"select",
         "Identifer":"string",
         "Country": "select",
         "Contact": "contact",
@@ -408,7 +488,7 @@ def create_legal_entity():
     attributesForm.update(form_items)
 
     select_dict={
-        "Country":list(ejbca.countries.keys()),
+        "Country":list(cfgserv.eu_countries),
         "Type of Identifier":["http://data.europa.eu/eudi/id/EORI-No",
                             "http://data.europa.eu/eudi/id/LEI" ,
                             "http://data.europa.eu/eudi/id/EUID" ,
@@ -417,9 +497,9 @@ def create_legal_entity():
                             "http://data.europa.eu/eudi/id/Excise"]
     }
 
-    return render_template("dynamic-form.html", title="Create Legal Entity",title_description="Please enter your Legal Entity data.", desc = descriptions, countries = ejbca.countries ,attributes=attributesForm, select_dict=select_dict, redirect_url= cfgserv.service_url + "user_auth")
+    return render_template("dynamic-form.html", title="Create Legal Entity",title_description="Please enter your Legal Entity data.", desc = descriptions, countries = cfgserv.eu_countries ,attributes=attributesForm, select_dict=select_dict, redirect_url= cfgserv.service_url + "user_auth")
 
-@rpr.route('/add_legal_entity_db', methods=['GET','POST'])
+@rpr.route('/legal_entity/add_legal_entity_db', methods=['GET','POST'])
 def add_legal_entity_db():
 
     temp_user_id = session['temp_user_id']
@@ -439,8 +519,126 @@ def add_legal_entity_db():
 
     return render_template("rp_user_menu.html", user = user['given_name'], temp_user_id = temp_user_id)
 
+@rpr.route('/legal_entity/edit', methods=["GET", "POST"])
+def legal_entity_edit():
+    
+    if not request.args.get("id"):
+        return ""
+    
+    legal_entity_id = request.args.get("id")
 
-@rpr.route('/RP_create', methods=['GET','POST'])
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+
+    db_data = func.get_data_legal_entity_edit(legal_entity_id, session["session_id"])
+
+    return render_template("dynamic-form_edit_add.html", h3 = "Legal Entity Information", id = legal_entity_id, lang = cfgserv.eu_languages, data_edit = db_data, Langs=cfgserv.eu_languages,Countries=cfgserv.eu_countries, temp_user_id=temp_user_id, redirect_url= cfgserv.service_url + "legal_entity/edit_db")
+
+@rpr.route('/legal_entity/edit_db', methods=["GET", "POST"])
+def legal_entity_edit_db():
+
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+
+    legal_entity_id = request.form.get("id")
+
+    form = dict(request.form)
+    form.pop("proceed")
+    grouped = defaultdict(list)
+
+    for key, value in form.items():
+        grouped[key] = value
+
+    check = func.edit_legal_entity_db_info(
+        grouped, 
+        legal_entity_id, 
+        session["session_id"]
+    )
+
+    if check is None:
+        return ("erro")
+    else:
+        return redirect('/legal_entity/list')
+    
+@rpr.route('/legal_entity/update_RPs', methods=["GET", "POST"])
+def update_RPs():
+
+    legal_entity_id = request.args.get("id")
+    RPs = ast.literal_eval(request.args.get("checks"))
+    user_id =request.args.get("user_id")
+    log_id = request.args.get("log_id")
+
+    for elem in RPs:
+        RP_id = int(elem)
+
+        check = func.update_RP(RP_id, legal_entity_id, session["session_id"])
+        
+        if check is None:
+            return ("erro")
+
+    return redirect('/legal_entity/list')
+
+@rpr.route('/legal_entity/list')
+def legal_entity_list():
+        
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+    
+    legal_entity_dict = func.get_legal_entity_info(user["id"], session["session_id"])
+    
+    header_table=[ "Identifier","Postal Address","Country","E-mail","Phone","Information URI"]
+    if(legal_entity_dict == "err"):
+        data={}
+    else:
+
+        data={}
+
+        for legal_entity in legal_entity_dict:
+            data_temp={
+                legal_entity["legal_entity_id"]:{
+                    "Identifier":legal_entity["identifier"],
+                    "Postal Address":legal_entity["postalAddress"],
+                    "Country":legal_entity["country"],
+                    "E-mail":legal_entity["email"],
+                    "Phone":legal_entity["phone"],
+                    "Information URI":legal_entity["infoURI"]
+                }
+            }
+            data.update(data_temp)
+    
+    RP_dict = func.get_RP_info(user["id"], session["session_id"])
+    
+    list = []
+    if(data != {}):
+        if(RP_dict != "err"):
+
+            for item in RP_dict:
+                name_txt = item["TradeName"]
+
+                if(item["legal_entity_id"] != None):
+                    legal_entity_name = func.get_legal_entity_name(item["legal_entity_id"], session["session_id"])
+                    
+                    new_item = {
+                        "id": item["RP_id"],
+                        "name": name_txt,
+                        "associated_id": item["legal_entity_id"],
+                        "ass_name": legal_entity_name
+                    }
+                else:
+                    new_item = {
+                        "id": item["RP_id"],
+                        "name": name_txt,
+                        "associated_id": item["legal_entity_id"],
+                        "ass_name": ""
+                    }
+                
+                list.append(new_item)
+    
+    menu= cfgserv.service_url + "menu"
+    return render_template("CertificateList.html", h1 = "Legal Entity List", menu = menu, data=data, title="Legal Entities", list= list, header_table=header_table, url=cfgserv.service_url +"legal_entity", temp_user_id = temp_user_id)
+
+
+@rpr.route('/RP/create', methods=['GET','POST'])
 def RP_create():
 
     attributesForm={}
@@ -488,10 +686,10 @@ def RP_create():
 
     }
     
-    return render_template("dynamic-form.html",title="Create Relying Party",title_description="Please enter your Relying Party data.", desc = descriptions, countries = ejbca.countries ,attributes=attributesForm, select_dict=select_dict, redirect_url= cfgserv.service_url + "relying_party_registration_request")
+    return render_template("dynamic-form.html",title="Create Relying Party",title_description="Please enter your Relying Party data.", desc = descriptions, countries = cfgserv.eu_countries, lang=cfgserv.eu_languages, attributes=attributesForm, select_dict=select_dict, redirect_url= cfgserv.service_url + "relying_party_registration_request")
 
-@rpr.route('/add_RP_db', methods=['GET','POST'])
-def add_legal_person_db():
+@rpr.route('/RP/add_RP_db', methods=['GET','POST'])
+def add_RP_db():
 
     temp_user_id = session['temp_user_id']
     user = session[temp_user_id]
@@ -512,7 +710,66 @@ def add_legal_person_db():
 
     return render_template("rp_user_menu.html", user = user['given_name'], temp_user_id = temp_user_id)
 
-@rpr.route('/RP_list', methods=['GET','POST'])
+@rpr.route('/RP/edit', methods=["GET", "POST"])
+def RP_edit():
+    
+    if not request.args.get("id"):
+        return ""
+    
+    RP_id = request.args.get("id")
+
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+
+    db_data = func.get_data_RP_edit(RP_id, session["session_id"])
+
+    return render_template("dynamic-form_edit_add.html", h3 = "Relying Party Information", id = RP_id, lang = cfgserv.eu_languages, data_edit = db_data, Langs=cfgserv.eu_languages,Countries=cfgserv.eu_countries, temp_user_id=temp_user_id, redirect_url= cfgserv.service_url + "RP/edit_db")
+
+@rpr.route('/RP/edit_db', methods=["GET", "POST"])
+def RP_edit_db():
+
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+
+    RP_id = request.form.get("id")
+
+    form = dict(request.form)
+    form.pop("proceed")
+    grouped = defaultdict(list)
+
+    for key, value in form.items():
+        grouped[key] = value
+
+    check = func.edit_RP_db_info(
+        grouped, 
+        RP_id, 
+        session["session_id"]
+    )
+
+    if check is None:
+        return ("erro")
+    else:
+        return redirect('/RP/list')
+    
+@rpr.route('/RP/update_intended_uses', methods=["GET", "POST"])
+def update_intended_uses():
+
+    RP_id = request.args.get("id")
+    intended_uses = ast.literal_eval(request.args.get("checks"))
+    user_id =request.args.get("user_id")
+    log_id = request.args.get("log_id")
+
+    for elem in intended_uses:
+        intended_use_id = int(elem)
+
+        check = func.update_intended_use(intended_use_id, RP_id, session["session_id"])
+        
+        if check is None:
+            return ("erro")
+
+    return redirect('/RP/list')
+
+@rpr.route('/RP/list', methods=['GET','POST'])
 def RP_list():
 
     temp_user_id = session['temp_user_id']
@@ -541,30 +798,27 @@ def RP_list():
             }
             data.update(data_temp)
     
-    intended_use_dict = func.get_RP_update(user["id"], session["session_id"])
+    intended_use_dict = func.get_intended_use(user["id"], session["session_id"])
     
     list = []
     if(data != {}):
-        if(tsp_dict != "err"):
+        if(intended_use_dict != "err"):
 
-            for item in tsp_dict:
-                name = json.loads(item["name"])
+            for item in intended_use_dict:
+                name_txt = item["identifier"]
                 
-                name_txt = name[0]["text"] if name else "No Name"
                 if(item["RP_id"] != None):
                     RP_name = func.get_RP_name(item["RP_id"], session["session_id"])
-                    aux_name = json.loads(RP_name["SchemeName_lang"])
-                    RP_name = aux_name[0]["text"] if aux_name else "No Name"
                     
                     new_item = {
-                        "id": item["tsp_id"],
+                        "id": item["intended_use_id"],
                         "name": name_txt,
                         "associated_id": item["RP_id"],
                         "ass_name": RP_name
                     }
                 else:
                     new_item = {
-                        "id": item["tsp_id"],
+                        "id": item["intended_use_id"],
                         "name": name_txt,
                         "associated_id": item["RP_id"],
                         "ass_name": ""
@@ -575,6 +829,208 @@ def RP_list():
 
     menu= cfgserv.service_url + "menu"
     return render_template("CertificateList.html", h1 = "Relying Party List", menu = menu, data=data, title="Relying Parties", list= list, header_table=header_table, url=cfgserv.service_url +"RP", temp_user_id = temp_user_id)
+
+@rpr.route('/intended_use/create', methods=['GET','POST'])
+def intended_use_create():
+
+    attributesForm={}
+
+    form_items={
+        "Purpose": "multi_string",
+        "Type of Privacy Policy ": "select",
+        "Privacy Policy URI": "string",
+        "Credential":"select",
+    }
+    descriptions = {
+        "Purpose": "Purpose of the intended data processing",
+        "Type of Policy":"Type of the policy.",
+        "Privacy Policy URI": "URI where the policy is published.",
+        "Credential":"Requestable attestatio which may be requested by the Wallet-Relying Party within the scope of the present intended use of data." 
+    }
+
+    attributesForm.update(form_items)
+
+    select_dict={
+        "Type of Privacy Policy ":["http://data.europa.eu/eudi/policy/trust-service-practice-statement ",
+                        "http://data.europa.eu/eudi/policy/terms-and-conditions",
+                        "http://data.europa.eu/eudi/policy/privacy-statement",
+                        "http://data.europa.eu/eudi/policy/privacy-policy",
+                        "http://data.europa.eu/eudi/policy/registration-policy"]
+
+    }
+    
+    return render_template("dynamic-form.html",title="Create Intended Use",title_description="Please enter your Intended Use data.", desc = descriptions, countries = cfgserv.eu_countries ,attributes=attributesForm, select_dict=select_dict, redirect_url= cfgserv.service_url + "/intended_use/add_intended_use_db")
+
+@rpr.route('/intended_use/add_intended_use_db', methods=['GET','POST'])
+def add_intended_use_db():
+
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+
+    purpose=request.form.get("Purpose")
+    purpose_lang=request.form.get("Lang")
+    type_of_policy=request.form.get("Type of Policy")
+    policy_uri=request.form.get("Policy URI")
+    credentials=request.form.get("Credential")
+    
+
+    #add bd
+
+
+    return render_template("rp_user_menu.html", user = user['given_name'], temp_user_id = temp_user_id)
+
+@rpr.route('/intended_use/edit', methods=["GET", "POST"])
+def intended_use_edit():
+    
+    if not request.args.get("id"):
+        return ""
+    
+    intended_use_id = request.args.get("id")
+
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+
+    db_data = func.get_data_intended_use_edit(intended_use_id, session["session_id"])
+
+    return render_template("dynamic-form_edit_add.html", h3 = "Intended Use Information", id = intended_use_id, lang = cfgserv.eu_languages, data_edit = db_data, Langs=cfgserv.eu_languages,Countries=cfgserv.eu_countries, temp_user_id=temp_user_id, redirect_url= cfgserv.service_url + "intended_use/edit_db")
+
+@rpr.route('/intended_use/edit_db', methods=["GET", "POST"])
+def intended_use_edit_db():
+
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+
+    intended_use_id = request.form.get("id")
+
+    form = dict(request.form)
+    form.pop("proceed")
+    grouped = defaultdict(list)
+
+    for key, value in form.items():
+        grouped[key] = value
+
+    check = func.edit_intended_use_db_info(
+        grouped, 
+        intended_use_id, 
+        session["session_id"]
+    )
+
+    if check is None:
+        return ("erro")
+    else:
+        return redirect('/intended_use/list')
+
+@rpr.route('/intended_use/list', methods=['GET','POST'])
+def intended_use_list():
+
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+    
+    intended_use_dict = func.get_intended_use_info(user["id"], session["session_id"])
+    
+    header_table=[ "Identifer","Purpose","Created At","Revoked At","Credentials"]
+    if(intended_use_dict == "err"):
+        data={}
+    else:
+
+        data={}
+
+        for intended_use in intended_use_dict:
+            data_temp={
+                intended_use["intended_use_id"]:{
+                    "Identifer":intended_use["identifier"],
+                    "Purpose":intended_use["purpose"],
+                    "Created At":intended_use["createdAt"],
+                    "Revoked At":intended_use["revokedAt"],
+                    "Credentials":intended_use["credential"]
+                }
+            }
+            data.update(data_temp)
+    
+   
+    menu= cfgserv.service_url + "menu"
+    return render_template("CertificateList.html", h1 = "Intended Use List", menu = menu, data=data, title="Intended Uses", list= list, header_table=header_table, url=cfgserv.service_url +"intended_use", temp_user_id = temp_user_id)
+
+@rpr.route('/credential/create', methods=['GET','POST'])
+def credential_create():
+
+    attributesForm={}
+
+    form_items={
+        "Format": "string",
+        "Meta": "string",
+        "Claim": "claim",
+    }
+    descriptions = {
+        "Format": "Format of the attestation.",
+        "Meta":"An object defining additional properties requested by the Verifier (including the credential type) that apply to the metadata and validity data of the Credential",
+        "Claim": "Attributes in the requested attestation.(Optional)"}
+
+    attributesForm.update(form_items)
+
+    select_dict={}
+    
+    return render_template("dynamic-form.html",title="Create Intended Use",title_description="Please enter your Intended Use data.", desc = descriptions, countries = cfgserv.eu_countries ,attributes=attributesForm, select_dict=select_dict, redirect_url= cfgserv.service_url + "/credential/add_credential_db")
+
+@rpr.route('/credential/add_credential_db', methods=['GET','POST'])
+def add_credential_db():
+
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+
+    format=request.form.get("Purpose")
+    meta=request.form.get("Lang")
+
+
+    dict_form=dict(request.form)
+    grouped = defaultdict(list)
+    
+
+    for key, value in dict_form.items():
+        match=re.match(r"(path)_(.*?).(\d+)",key)
+        if match:
+            attr, prefix, index = match.groups()
+            index = int(index)
+            while len(grouped[prefix]) <= index:
+                grouped[prefix].append({})
+            grouped[prefix][index][attr] = value
+            
+
+    #add bd
+
+
+    return render_template("rp_user_menu.html", user = user['given_name'], temp_user_id = temp_user_id)
+
+
+
+@rpr.route('/credential/list', methods=['GET','POST'])
+def credential_list():
+
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+    
+    credential_dict = func.get_credential_info()
+    
+    header_table=[ "Format","Meta", "Claims"]
+    if(credential_dict == "err"):
+        data={}
+    else:
+
+        data={}
+
+        for credential in credential_dict:
+            data_temp={
+                credential["credential_id"]:{
+                    "Format":credential["format"],
+                    "Meta":credential["meta"],
+                    "claims":credential["claim"],
+                }
+            }
+            data.update(data_temp)
+    
+   
+    menu= cfgserv.service_url + "menu"
+    return render_template("CertificateList.html", h1 = "Credential List", menu = menu, data=data, title="Credentials", list= list, header_table=header_table, url=cfgserv.service_url +"credential", temp_user_id = temp_user_id)
 
 
 @rpr.route("/relying_party_registration_request", methods=["GET", "POST"])
