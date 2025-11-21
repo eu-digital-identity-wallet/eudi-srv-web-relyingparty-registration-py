@@ -323,7 +323,7 @@ def menu_RP_user():
     
     return render_template("rp_user_menu.html", user = user['given_name'], temp_user_id = temp_user_id)
 
-@rpr.route('/person/create_natural_person', methods=['GET','POST'])
+@rpr.route('/natural_person/create_natural_person', methods=['GET','POST'])
 def create_natural_person():
 
     attributesForm={}
@@ -342,9 +342,9 @@ def create_natural_person():
     }
     attributesForm.update(form_items)
 
-    return render_template("dynamic-form.html",title="Create Natural Person",title_description="Please enter your Natural Person data.", desc = descriptions, countries = cfgserv.eu_countries ,attributes=attributesForm, redirect_url= cfgserv.service_url + "add_natural_person_db")
+    return render_template("dynamic-form.html",title="Create Natural Person",title_description="Please enter your Natural Person data.", desc = descriptions, countries = cfgserv.eu_countries ,attributes=attributesForm, redirect_url= cfgserv.service_url + "natural_person/add_natural_person_db")
 
-@rpr.route('/person/add_natural_person_db', methods=['GET','POST'])
+@rpr.route('/natural_person/add_natural_person_db', methods=['GET','POST'])
 def add_natural_person_db():
 
     temp_user_id = session['temp_user_id']
@@ -359,7 +359,82 @@ def add_natural_person_db():
 
     return render_template("rp_user_menu.html", user = user['given_name'], temp_user_id = temp_user_id)
 
-@rpr.route('/person/create_legal_person', methods=['GET','POST'])
+@rpr.route('/natural_person/update_legal_entities', methods=["GET", "POST"])
+def update_legal_entities():
+
+    natural_person_id = request.args.get("id")
+    legal_entities = ast.literal_eval(request.args.get("checks"))
+    user_id =request.args.get("user_id")
+    log_id = request.args.get("log_id")
+
+    for elem in legal_entities:
+        legal_entity_id = int(elem)
+
+        check = func.update_legal_entity(legal_entity_id, natural_person_id, session["session_id"])
+        
+        if check is None:
+            return ("erro")
+
+    return redirect('/person/list')
+
+@rpr.route('/natural_person/list')
+def person_list():
+        
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+    
+    person_dict = func.get_person_info(user["id"], session["session_id"])
+    
+    header_table=[ "Given Name", "Family Name", "Date of Birth", "Place of Birth"]
+    if(person_dict == "err"):
+        data={}
+    else:
+
+        data={}
+
+        for person in person_dict:
+            data_temp={
+                person["natural_person_id"]:{
+                    "Given Name":person["givenName"],
+                    "Family Name":person["familyName"],
+                    "Date of Birth":person["dateofBirth"],
+                    "Place of Birth":person["placeofBirth"]
+                }
+            }
+            data.update(data_temp)
+    
+    legal_entity_dict = func.get_legal_entity_info(user["id"], session["session_id"])
+    
+    list = []
+    if(data != {}):
+        if(legal_entity_dict != "err"):
+
+            for item in legal_entity_dict:
+                name = item["name"]
+                
+                if(item["natural_person_id"] != None):
+                    person_name = func.get_person_name(item["natural_person_id"], session["session_id"])
+                    
+                    new_item = {
+                        "id": item["legal_entity_id"],
+                        "name": name,
+                        "associated_id": item["natural_person_id"],
+                        "ass_name": person_name
+                    }
+                else:
+                    new_item = {
+                        "id": item["legal_entity_id"],
+                        "name": name,
+                        "associated_id": item["natural_person_id"],
+                        "ass_name": ""
+                    }
+                
+                list.append(new_item)
+    
+    menu= cfgserv.service_url + "menu"
+    return render_template("CertificateList.html", h1 = "Natural Person List", menu = menu, data=data, title="Natural Persons", list= list, header_table=header_table, url=cfgserv.service_url +"natural_person", temp_user_id = temp_user_id)
+
+@rpr.route('/legal_person/create_legal_person', methods=['GET','POST'])
 def create_legal_person():
 
     attributesForm={}
@@ -374,9 +449,9 @@ def create_legal_person():
     }
     attributesForm.update(form_items)
 
-    return render_template("dynamic-form.html",title="Create Legal Person",title_description="Please enter your Legal Person data.", desc = descriptions, countries = cfgserv.eu_countries, lang=cfgserv.eu_languages ,attributes=attributesForm, redirect_url= cfgserv.service_url + "add_legal_person_db")
+    return render_template("dynamic-form.html",title="Create Legal Person",title_description="Please enter your Legal Person data.", desc = descriptions, countries = cfgserv.eu_countries, lang=cfgserv.eu_languages ,attributes=attributesForm, redirect_url= cfgserv.service_url + "legal_person/add_legal_person_db")
 
-@rpr.route('/person/add_legal_person_db', methods=['GET','POST'])
+@rpr.route('/legal_person/add_legal_person_db', methods=['GET','POST'])
 def add_legal_person_db():
 
     temp_user_id = session['temp_user_id']
@@ -388,13 +463,12 @@ def add_legal_person_db():
 
     #add bd
 
-
     return render_template("rp_user_menu.html", user = user['given_name'], temp_user_id = temp_user_id)
 
-@rpr.route('/person/update_legal_entities', methods=["GET", "POST"])
+@rpr.route('/legal_person/update_legal_entities', methods=["GET", "POST"])
 def update_legal_entities():
 
-    person_id = request.args.get("id")
+    legal_person_id = request.args.get("id")
     legal_entities = ast.literal_eval(request.args.get("checks"))
     user_id =request.args.get("user_id")
     log_id = request.args.get("log_id")
@@ -402,22 +476,22 @@ def update_legal_entities():
     for elem in legal_entities:
         legal_entity_id = int(elem)
 
-        check = func.update_legal_entity(legal_entity_id, person_id, session["session_id"])
+        check = func.update_legal_entity(legal_entity_id, legal_person_id, session["session_id"])
         
         if check is None:
             return ("erro")
 
     return redirect('/person/list')
 
-@rpr.route('/person/list')
+@rpr.route('/legal_person/list')
 def person_list():
         
     temp_user_id = session['temp_user_id']
     user = session[temp_user_id]
     
-    person_dict = func.get_person_info(user["id"], session["session_id"])
+    person_dict = func.get_legal_person_info(user["id"], session["session_id"])
     
-    header_table=[ "Person Type", "Name"]
+    header_table=[ "Legal Name", "Established By Law"]
     if(person_dict == "err"):
         data={}
     else:
@@ -426,9 +500,9 @@ def person_list():
 
         for person in person_dict:
             data_temp={
-                person["person_id"]:{
-                    "Person Type":person["personType"],
-                    "Name":person["name"]
+                person["legal_person_id"]:{
+                    "Legal Name":person["legalName"],
+                    "Established By Law":person["establishedByLaw"]
                 }
             }
             data.update(data_temp)
@@ -442,29 +516,27 @@ def person_list():
             for item in legal_entity_dict:
                 name = item["name"]
                 
-                if(item["person_id"] != None):
-                    person_name = func.get_person_name(item["person_id"], session["session_id"])
+                if(item["legal_person_id"] != None):
+                    person_name = func.get_person_name(item["legal_person_id"], session["session_id"])
                     
                     new_item = {
                         "id": item["legal_entity_id"],
                         "name": name,
-                        "associated_id": item["person_id"],
+                        "associated_id": item["legal_person_id"],
                         "ass_name": person_name
                     }
                 else:
                     new_item = {
                         "id": item["legal_entity_id"],
                         "name": name,
-                        "associated_id": item["person_id"],
+                        "associated_id": item["legal_person_id"],
                         "ass_name": ""
                     }
                 
                 list.append(new_item)
     
     menu= cfgserv.service_url + "menu"
-    return render_template("CertificateList.html", h1 = "Person List", menu = menu, data=data, title="Persons", list= list, header_table=header_table, url=cfgserv.service_url +"persons", temp_user_id = temp_user_id)
-
-
+    return render_template("CertificateList.html", h1 = "Legal Person List", menu = menu, data=data, title="Legal Persons", list= list, header_table=header_table, url=cfgserv.service_url +"legal_person", temp_user_id = temp_user_id)
 
 @rpr.route('/legal_entity/create', methods=['GET','POST'])
 def create_legal_entity():                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
@@ -959,7 +1031,7 @@ def credential_create():
     form_items={
         "Format": "string",
         "Meta": "string",
-        "Claim": "claim",
+        "Claim": "multi_string",
     }
     descriptions = {
         "Format": "Format of the attestation.",
@@ -1023,7 +1095,7 @@ def credential_list():
                 credential["credential_id"]:{
                     "Format":credential["format"],
                     "Meta":credential["meta"],
-                    "claims":credential["claim"],
+                    "Claims":credential["claim"],
                 }
             }
             data.update(data_temp)

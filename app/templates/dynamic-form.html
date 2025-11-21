@@ -88,7 +88,7 @@
                                                     <label for="{{ name }}">{{ name }}</label>
                                                     <small class="form-text text-muted">{{ desc[name] }}</small>
                                                     <select class="form-control" name="{{ name }}" required>
-                                                        {% for select in select_dict[name] %}
+                                                        {% for select in select_dict[] %}
                                                             <option value="{{ select}}">{{ select}}</option>
                                                         {% endfor %}
                                                     </select>
