@@ -292,8 +292,24 @@ def getpidoid4vp():
     session[temp_user_id]= attributesForm
     session["temp_user_id"] =temp_user_id
 
-    #check user
-    return redirect(url_for('RPR.menu_RP_user'))
+    user=session[temp_user_id]
+
+    givenName=user["given_name"]
+    surname=user["family_name"]
+    birth_date=user["birth_date"]
+    issuing_country=user["issuing_country"]
+    issuance_authority=user["issuing_authority"]
+
+    new_user = get_hash_user_pid.User(surname, givenName, birth_date, issuing_country, issuance_authority)
+    hash_pid = new_user.hash
+
+    check_user = db.check_user(hash_pid, session["session_id"])
+    
+    if(check_user == None):
+        db.insert_user(hash_pid, session["session_id"])
+        return redirect(url_for('RPR.menu_RP_user'))
+    else:
+        return redirect(url_for('RPR.menu_RP_user'))
     
 
 @rpr.route("/user_auth", methods=["GET", "POST"])
@@ -323,7 +339,7 @@ def menu_RP_user():
     
     return render_template("rp_user_menu.html", user = user['given_name'], temp_user_id = temp_user_id)
 
-@rpr.route('/natural_person/create_natural_person', methods=['GET','POST'])
+@rpr.route('/natural_person/create_person', methods=['GET','POST'])
 def create_natural_person():
 
     attributesForm={}
@@ -355,86 +371,113 @@ def add_natural_person_db():
     birthdate=request.form.get("Date of Birth")
     birthplace=request.form.get( "Place of Birth")
 
-    #add BD
+    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+    hash_pid = new_user.hash
+    user_id = db.check_user(hash_pid, session["session_id"])
 
-    return render_template("rp_user_menu.html", user = user['given_name'], temp_user_id = temp_user_id)
+    db.insert_user_naturalPerson(given_name, family_name, birthdate, birthplace, user_id, session["session_id"]) 
+   
+    return redirect('/natural_person/list')
 
 @rpr.route('/natural_person/update_legal_entities', methods=["GET", "POST"])
 def update_legal_entities():
-
+    
     natural_person_id = request.args.get("id")
     legal_entities = ast.literal_eval(request.args.get("checks"))
-    user_id =request.args.get("user_id")
-    log_id = request.args.get("log_id")
+    check_legal_entities = db.get_check_legal_entity_info(natural_person_id, session["session_id"])
 
+    temp_user_id = session['temp_user_id']
+
+    check_legal_entities = db.get_check_legal_entity_info(natural_person_id, session["session_id"]) or []
+
+    previous = { x["naturalperson_id"] for x in check_legal_entities }
+    current = { int(x) for x in legal_entities }
+    to_remove = previous - current
+        
+    for elem in to_remove:
+        db.remove_naturalPerson_legal_entity(elem, session["session_id"])
+    
     for elem in legal_entities:
         legal_entity_id = int(elem)
 
-        check = func.update_legal_entity(legal_entity_id, natural_person_id, session["session_id"])
+        check = db.update_naturalPerson_legal_entity(natural_person_id, legal_entity_id, session["session_id"])
         
         if check is None:
             return ("erro")
 
-    return redirect('/person/list')
+    return redirect('/natural_person/list')
 
-@rpr.route('/natural_person/list')
-def person_list():
-        
+def list_naturalPerson():
     temp_user_id = session['temp_user_id']
     user = session[temp_user_id]
     
-    person_dict = func.get_person_info(user["id"], session["session_id"])
+    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+    hash_pid = new_user.hash
+    user_id = db.check_user(hash_pid, session["session_id"])
+
+    person_dict = db.get_natural_person_info(user_id, session["session_id"])
     
     header_table=[ "Given Name", "Family Name", "Date of Birth", "Place of Birth"]
-    if(person_dict == "err"):
+    
+    if(person_dict == "err" or person_dict == None):
         data={}
     else:
-
         data={}
 
         for person in person_dict:
             data_temp={
-                person["natural_person_id"]:{
+                person["naturalperson_id"]:{
                     "Given Name":person["givenName"],
                     "Family Name":person["familyName"],
-                    "Date of Birth":person["dateofBirth"],
-                    "Place of Birth":person["placeofBirth"]
+                    "Date of Birth":person["dateOfBirth"],
+                    "Place of Birth":person["placeOfBirth"]
                 }
             }
             data.update(data_temp)
     
-    legal_entity_dict = func.get_legal_entity_info(user["id"], session["session_id"])
+    legal_entity_dict = db.get_legal_entity_info(user_id, session["session_id"])
     
     list = []
     if(data != {}):
-        if(legal_entity_dict != "err"):
+        if(legal_entity_dict != "err" and legal_entity_dict != None):
 
             for item in legal_entity_dict:
-                name = item["name"]
-                
-                if(item["natural_person_id"] != None):
-                    person_name = func.get_person_name(item["natural_person_id"], session["session_id"])
-                    
+                name = item["identifier"]
+
+                if(item["naturalperson_id"] != None):
+                    person_name = db.get_natural_person_info_le(item["naturalperson_id"], session["session_id"])
+
                     new_item = {
-                        "id": item["legal_entity_id"],
+                        "id": item["legalentity_id"],
                         "name": name,
-                        "associated_id": item["natural_person_id"],
+                        "associated_id": item["naturalperson_id"],
                         "ass_name": person_name
                     }
                 else:
                     new_item = {
-                        "id": item["legal_entity_id"],
+                        "id": item["legalentity_id"],
                         "name": name,
-                        "associated_id": item["natural_person_id"],
+                        "associated_id": item["naturalperson_id"],
                         "ass_name": ""
                     }
                 
                 list.append(new_item)
     
     menu= cfgserv.service_url + "menu"
+
+    return menu, data, header_table, list 
+
+@rpr.route('/natural_person/list')
+def natural_person_list():
+
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+        
+    menu, data, header_table, list = list_naturalPerson()
+        
     return render_template("CertificateList.html", h1 = "Natural Person List", menu = menu, data=data, title="Natural Persons", list= list, header_table=header_table, url=cfgserv.service_url +"natural_person", temp_user_id = temp_user_id)
 
-@rpr.route('/legal_person/create_legal_person', methods=['GET','POST'])
+@rpr.route('/legal_person/create_person', methods=['GET','POST'])
 def create_legal_person():
 
     attributesForm={}
@@ -457,95 +500,121 @@ def add_legal_person_db():
     temp_user_id = session['temp_user_id']
     user = session[temp_user_id]
 
-    legal_name= request.form.get("Legal Name")
-    established_by_law=request.form.get("Established By Law"),
-    lang=request.form.get("Lang")
+    legal_name = request.form.get("Legal Name")
+    established_by_law = request.form.get("Established By Law")
+    lang = request.form.get("Lang")
 
-    #add bd
+    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+    hash_pid = new_user.hash
+    user_id = db.check_user(hash_pid, session["session_id"])
 
-    return render_template("rp_user_menu.html", user = user['given_name'], temp_user_id = temp_user_id)
+    legalBasis = '[{"lang":"' + lang + '", "legalBasis":"' + established_by_law + '"}]'
+
+    db.insert_user_legalPerson(legal_name, legalBasis, user_id, session["session_id"])
+
+    return redirect('/legal_person/list')
 
 @rpr.route('/legal_person/update_legal_entities', methods=["GET", "POST"])
-def update_legal_entities():
-
+def update_legal_person_entities():
     legal_person_id = request.args.get("id")
     legal_entities = ast.literal_eval(request.args.get("checks"))
-    user_id =request.args.get("user_id")
-    log_id = request.args.get("log_id")
 
+    temp_user_id = session['temp_user_id']
+
+    check_legal_entities = db.get_check_legal_entity_info(legal_person_id, session["session_id"]) or []
+
+    previous = { x["legalentity"] for x in check_legal_entities }
+    current = { int(x) for x in legal_entities }
+    to_remove = previous - current
+        
+    for elem in to_remove:
+        db.remove_legalPerson_legal_entity(elem, session["session_id"])
+    
     for elem in legal_entities:
         legal_entity_id = int(elem)
 
-        check = func.update_legal_entity(legal_entity_id, legal_person_id, session["session_id"])
+        check = db.update_legalPerson_legal_entity(legal_person_id, legal_entity_id, session["session_id"])
         
         if check is None:
             return ("erro")
+    
+    return redirect('/legal_person/list')
 
-    return redirect('/person/list')
-
-@rpr.route('/legal_person/list')
-def person_list():
-        
+def list_legalPerson():
     temp_user_id = session['temp_user_id']
     user = session[temp_user_id]
+
+    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+    hash_pid = new_user.hash
+    user_id = db.check_user(hash_pid, session["session_id"])
     
-    person_dict = func.get_legal_person_info(user["id"], session["session_id"])
-    
+    person_dict = db.get_legal_person_info(user_id, session["session_id"])
+
     header_table=[ "Legal Name", "Established By Law"]
-    if(person_dict == "err"):
+    if(person_dict == None):
         data={}
     else:
-
         data={}
 
         for person in person_dict:
             data_temp={
-                person["legal_person_id"]:{
+                person["legalperson_id"]:{
                     "Legal Name":person["legalName"],
-                    "Established By Law":person["establishedByLaw"]
+                    "Established By Law":person["legalBasis"]
                 }
             }
             data.update(data_temp)
-    
-    legal_entity_dict = func.get_legal_entity_info(user["id"], session["session_id"])
+
+    legal_entity_dict = db.get_legal_entity_info(user_id, session["session_id"])
     
     list = []
     if(data != {}):
-        if(legal_entity_dict != "err"):
+        if(legal_entity_dict != "err" and legal_entity_dict != None):
 
             for item in legal_entity_dict:
-                name = item["name"]
+                name = item["identifier"]
                 
-                if(item["legal_person_id"] != None):
-                    person_name = func.get_person_name(item["legal_person_id"], session["session_id"])
+                if(item["legalperson_id"] != None):
+                    person_name = db.get_legal_person_info_le(item["legalperson_id"], session["session_id"])
                     
                     new_item = {
-                        "id": item["legal_entity_id"],
+                        "id": item["legalentity_id"],
                         "name": name,
-                        "associated_id": item["legal_person_id"],
+                        "associated_id": item["legalperson_id"],
                         "ass_name": person_name
                     }
                 else:
                     new_item = {
-                        "id": item["legal_entity_id"],
+                        "id": item["legalentity_id"],
                         "name": name,
-                        "associated_id": item["legal_person_id"],
+                        "associated_id": item["legalperson_id"],
                         "ass_name": ""
                     }
                 
                 list.append(new_item)
     
     menu= cfgserv.service_url + "menu"
-    return render_template("CertificateList.html", h1 = "Legal Person List", menu = menu, data=data, title="Legal Persons", list= list, header_table=header_table, url=cfgserv.service_url +"legal_person", temp_user_id = temp_user_id)
 
-@rpr.route('/legal_entity/create', methods=['GET','POST'])
+    return menu, data, header_table, list
+
+@rpr.route('/legal_person/list')
+def legal_person_list():
+
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+        
+    menu, data, header_table, list = list_legalPerson()
+
+    return render_template("CertificateList.html", h1 = "Legal Person List", list = list, menu = menu, data=data, title="Legal Persons", header_table=header_table, url=cfgserv.service_url +"legal_person", temp_user_id = temp_user_id)
+
+@rpr.route('/legal_entity/create_person', methods=['GET','POST'])
 def create_legal_entity():                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
 
     attributesForm={}
 
     form_items={
         "Type of Identifier":"select",
-        "Identifer":"string",
+        "Identifier":"string",
         "Country": "select",
         "Contact": "contact",
         "Information URI":"string",
@@ -569,27 +638,29 @@ def create_legal_entity():
                             "http://data.europa.eu/eudi/id/Excise"]
     }
 
-    return render_template("dynamic-form.html", title="Create Legal Entity",title_description="Please enter your Legal Entity data.", desc = descriptions, countries = cfgserv.eu_countries ,attributes=attributesForm, select_dict=select_dict, redirect_url= cfgserv.service_url + "user_auth")
+    return render_template("dynamic-form.html", title="Create Legal Entity",title_description="Please enter your Legal Entity data.", desc = descriptions, countries = cfgserv.eu_countries ,attributes=attributesForm, select_dict=select_dict, redirect_url= cfgserv.service_url + "legal_entity/add_legal_entity_db")
 
 @rpr.route('/legal_entity/add_legal_entity_db', methods=['GET','POST'])
 def add_legal_entity_db():
 
     temp_user_id = session['temp_user_id']
     user = session[temp_user_id]
-
+    
     type_of_identifier= request.form.get("Type of Identifier")
     identifier= request.form.get("Identifier")
     address=request.form.get("address")
-    email=request.form("email")
+    email=request.form.get("email")
     phone_number=request.form.get("phone_number")
     information_URI=request.form.get("Information URI")
     country=request.form.get("Country")
+
+    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+    hash_pid = new_user.hash
+    user_id = db.check_user(hash_pid, session["session_id"])
+
+    db.insert_legal_entity(address, country, email, phone_number, information_URI, identifier, type_of_identifier, user_id, session["session_id"]) 
     
-
-    #add bd
-
-
-    return render_template("rp_user_menu.html", user = user['given_name'], temp_user_id = temp_user_id)
+    return redirect('/legal_entity/list')
 
 @rpr.route('/legal_entity/edit', methods=["GET", "POST"])
 def legal_entity_edit():
@@ -634,40 +705,51 @@ def legal_entity_edit_db():
     
 @rpr.route('/legal_entity/update_RPs', methods=["GET", "POST"])
 def update_RPs():
-
+    
     legal_entity_id = request.args.get("id")
     RPs = ast.literal_eval(request.args.get("checks"))
-    user_id =request.args.get("user_id")
-    log_id = request.args.get("log_id")
+    
+    temp_user_id = session['temp_user_id']
 
+    check_rp = db.get_check_rp_info(legal_entity_id, session["session_id"]) or []
+
+    previous = { x["wrp_id"] for x in check_rp }
+    current = { int(x) for x in RPs }
+    to_remove = previous - current
+
+    for elem in to_remove:
+        db.remove_legal_entity_wrp(elem, session["session_id"])
+    
     for elem in RPs:
         RP_id = int(elem)
-
-        check = func.update_RP(RP_id, legal_entity_id, session["session_id"])
+        
+        check = db.update_wrp_legal_entity(legal_entity_id, RP_id, session["session_id"])
         
         if check is None:
-            return ("erro")
+            return ("err")
 
     return redirect('/legal_entity/list')
-
-@rpr.route('/legal_entity/list')
-def legal_entity_list():
-        
+    
+def list_legalEntity():
     temp_user_id = session['temp_user_id']
     user = session[temp_user_id]
     
-    legal_entity_dict = func.get_legal_entity_info(user["id"], session["session_id"])
+    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+    hash_pid = new_user.hash
+    user_id = db.check_user(hash_pid, session["session_id"])
+    
+    legal_entity_dict = db.get_legal_entity_info(user_id, session["session_id"])
     
     header_table=[ "Identifier","Postal Address","Country","E-mail","Phone","Information URI"]
-    if(legal_entity_dict == "err"):
+    
+    if(legal_entity_dict == "err" or legal_entity_dict == None):
         data={}
     else:
-
         data={}
 
         for legal_entity in legal_entity_dict:
             data_temp={
-                legal_entity["legal_entity_id"]:{
+                legal_entity["legalentity_id"]:{
                     "Identifier":legal_entity["identifier"],
                     "Postal Address":legal_entity["postalAddress"],
                     "Country":legal_entity["country"],
@@ -678,39 +760,50 @@ def legal_entity_list():
             }
             data.update(data_temp)
     
-    RP_dict = func.get_RP_info(user["id"], session["session_id"])
+    RP_dict = db.get_rp_info(user_id, session["session_id"])
     
     list = []
     if(data != {}):
-        if(RP_dict != "err"):
+        if(RP_dict != "err" and RP_dict != None):
 
             for item in RP_dict:
-                name_txt = item["TradeName"]
+                name_txt = item["tradeName"]
 
-                if(item["legal_entity_id"] != None):
-                    legal_entity_name = func.get_legal_entity_name(item["legal_entity_id"], session["session_id"])
+                if(item["supervisorAuthority"] != None):    
+                    legal_entity_name = db.get_legal_entity_info_rp(item["supervisorAuthority"], session["session_id"])
                     
                     new_item = {
-                        "id": item["RP_id"],
+                        "id": item["wrp_id"],
                         "name": name_txt,
-                        "associated_id": item["legal_entity_id"],
+                        "associated_id": item["supervisorAuthority"],
                         "ass_name": legal_entity_name
                     }
                 else:
                     new_item = {
-                        "id": item["RP_id"],
+                        "id": item["wrp_id"],
                         "name": name_txt,
-                        "associated_id": item["legal_entity_id"],
+                        "associated_id": item["supervisorAuthority"],
                         "ass_name": ""
                     }
                 
                 list.append(new_item)
     
     menu= cfgserv.service_url + "menu"
+
+    return menu, data, header_table, list
+
+@rpr.route('/legal_entity/list')
+def legal_entity_list():
+
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+
+    menu, data, header_table, list = list_legalEntity()
+            
     return render_template("CertificateList.html", h1 = "Legal Entity List", menu = menu, data=data, title="Legal Entities", list= list, header_table=header_table, url=cfgserv.service_url +"legal_entity", temp_user_id = temp_user_id)
 
 
-@rpr.route('/RP/create', methods=['GET','POST'])
+@rpr.route('/RP/create_person', methods=['GET','POST'])
 def RP_create():
 
     attributesForm={}
@@ -758,7 +851,7 @@ def RP_create():
 
     }
     
-    return render_template("dynamic-form.html",title="Create Relying Party",title_description="Please enter your Relying Party data.", desc = descriptions, countries = cfgserv.eu_countries, lang=cfgserv.eu_languages, attributes=attributesForm, select_dict=select_dict, redirect_url= cfgserv.service_url + "relying_party_registration_request")
+    return render_template("dynamic-form.html",title="Create Relying Party",title_description="Please enter your Relying Party data.", desc = descriptions, countries = cfgserv.eu_countries, lang=cfgserv.eu_languages, attributes=attributesForm, select_dict=select_dict, redirect_url= cfgserv.service_url + "RP/add_RP_db")
 
 @rpr.route('/RP/add_RP_db', methods=['GET','POST'])
 def add_RP_db():
@@ -767,20 +860,24 @@ def add_RP_db():
     user = session[temp_user_id]
 
     trade_name= request.form.get("Trade Name")
-    support_URI= request.form.get("Support URI"),
+    support_URI= request.form.get("Support URI")
     srvDescription_lang=request.form.get("Lang")
-    srvDescription=request.form.get("Services Description"),
-    entitlement= request.form.get("Entitlement"),
-    registry_uri=request.form.get("Registry URI"),
-    type_of_policy=request.form.get("Type of Policy"),
-    policy_uri=request.form.get("Policy URI"),
+    srvDescription=request.form.get("Services Description")
+    entitlement= request.form.get("Entitlement")
+    registry_uri=request.form.get("Registry URI")
+    type_of_policy=request.form.get("Type of Policy")
+    policy_uri=request.form.get("Policy URI")
     x5c=request.form.get("x5c")
     
+    srvDescription = '[{"lang":"' + srvDescription_lang + '", "srvDescription":"' + srvDescription + '"}]'
+    
+    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+    hash_pid = new_user.hash
+    user_id = db.check_user(hash_pid, session["session_id"])
 
-    #add bd
+    db.insert_RP(trade_name, support_URI, srvDescription, entitlement, registry_uri, type_of_policy, policy_uri, x5c, user_id, session["session_id"])
 
-
-    return render_template("rp_user_menu.html", user = user['given_name'], temp_user_id = temp_user_id)
+    return redirect('/RP/list')
 
 @rpr.route('/RP/edit', methods=["GET", "POST"])
 def RP_edit():
@@ -822,108 +919,79 @@ def RP_edit_db():
         return ("erro")
     else:
         return redirect('/RP/list')
-    
-@rpr.route('/RP/update_intended_uses', methods=["GET", "POST"])
-def update_intended_uses():
 
-    RP_id = request.args.get("id")
-    intended_uses = ast.literal_eval(request.args.get("checks"))
-    user_id =request.args.get("user_id")
-    log_id = request.args.get("log_id")
-
-    for elem in intended_uses:
-        intended_use_id = int(elem)
-
-        check = func.update_intended_use(intended_use_id, RP_id, session["session_id"])
-        
-        if check is None:
-            return ("erro")
-
-    return redirect('/RP/list')
-
-@rpr.route('/RP/list', methods=['GET','POST'])
-def RP_list():
-
+def wallet_rp_list():
     temp_user_id = session['temp_user_id']
     user = session[temp_user_id]
+
+    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+    hash_pid = new_user.hash
+    user_id = db.check_user(hash_pid, session["session_id"])
     
-    RP_dict = func.get_RP_info(user["id"], session["session_id"])
+    RP_dict = db.get_rp_info(user_id, session["session_id"])
     
     header_table=[ "Trade Name","Support URIs","Description","Entitlement","Provides Attestations","Supervisory Authority","Registry URI"]
-    if(RP_dict == "err"):
+    
+    if(RP_dict == "err" or RP_dict == None):
         data={}
     else:
-
         data={}
 
         for RP in RP_dict:
             data_temp={
-                RP["RP_id"]:{
-                    "Trade Name":RP["Version"],
-                    "Support URIs":RP["SequenceNumber"],
-                    "Description":RP["RPType"],
-                    "Entitlement":RP["SchemeName_lang"],
-                    "Provides Attestations":RP["schemeTerritory"],
-                    "Supervisory Authority":RP["issue_date"],
-                    "Registry URI":RP["next_update"]
+                RP["wrp_id"]:{
+                    "Trade Name":RP["tradeName"],
+                    "Support URIs":RP["supportURI"],
+                    "Description":RP["srvDescription"],
+                    "Entitlement":RP["entitlement"],
+                    "Provides Attestations":RP["providesAttestations"],
+                    "Supervisory Authority":RP["supervisorAuthority"],
+                    "Registry URI":RP["registryURI"]
                 }
             }
             data.update(data_temp)
     
-    intended_use_dict = func.get_intended_use(user["id"], session["session_id"])
-    
-    list = []
-    if(data != {}):
-        if(intended_use_dict != "err"):
-
-            for item in intended_use_dict:
-                name_txt = item["identifier"]
-                
-                if(item["RP_id"] != None):
-                    RP_name = func.get_RP_name(item["RP_id"], session["session_id"])
-                    
-                    new_item = {
-                        "id": item["intended_use_id"],
-                        "name": name_txt,
-                        "associated_id": item["RP_id"],
-                        "ass_name": RP_name
-                    }
-                else:
-                    new_item = {
-                        "id": item["intended_use_id"],
-                        "name": name_txt,
-                        "associated_id": item["RP_id"],
-                        "ass_name": ""
-                    }
-                
-                list.append(new_item)
-    
-
     menu= cfgserv.service_url + "menu"
-    return render_template("CertificateList.html", h1 = "Relying Party List", menu = menu, data=data, title="Relying Parties", list= list, header_table=header_table, url=cfgserv.service_url +"RP", temp_user_id = temp_user_id)
+    
+    return menu, data, header_table
 
-@rpr.route('/intended_use/create', methods=['GET','POST'])
+@rpr.route('/RP/list', methods=['GET','POST'])
+def RP_list():
+    
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+
+    menu, data, header_table = wallet_rp_list()
+    return render_template("CertificateList.html", h1 = "Relying Party List", menu = menu, data=data, title="Relying Parties", header_table=header_table, url=cfgserv.service_url +"RP", temp_user_id = temp_user_id)
+
+@rpr.route('/intended_use/create_person', methods=['GET','POST'])
 def intended_use_create():
 
     attributesForm={}
 
     form_items={
         "Purpose": "multi_string",
-        "Type of Privacy Policy ": "select",
+        "Type of Privacy Policy": "select",
         "Privacy Policy URI": "string",
-        "Credential":"select",
+        "Created at": "full-date",
+        "Revoked at": "full-date",
+        "Intended Use Identifier": "string"
+
+        
     }
     descriptions = {
         "Purpose": "Purpose of the intended data processing",
         "Type of Policy":"Type of the policy.",
         "Privacy Policy URI": "URI where the policy is published.",
-        "Credential":"Requestable attestatio which may be requested by the Wallet-Relying Party within the scope of the present intended use of data." 
+        "Created at": "full-date",
+        "Revoked at": "full-date",
+        "Intended Use Identifier": "string"
     }
 
     attributesForm.update(form_items)
 
     select_dict={
-        "Type of Privacy Policy ":["http://data.europa.eu/eudi/policy/trust-service-practice-statement ",
+        "Type of Privacy Policy":["http://data.europa.eu/eudi/policy/trust-service-practice-statement ",
                         "http://data.europa.eu/eudi/policy/terms-and-conditions",
                         "http://data.europa.eu/eudi/policy/privacy-statement",
                         "http://data.europa.eu/eudi/policy/privacy-policy",
@@ -938,18 +1006,24 @@ def add_intended_use_db():
 
     temp_user_id = session['temp_user_id']
     user = session[temp_user_id]
-
+ 
     purpose=request.form.get("Purpose")
     purpose_lang=request.form.get("Lang")
-    type_of_policy=request.form.get("Type of Policy")
-    policy_uri=request.form.get("Policy URI")
-    credentials=request.form.get("Credential")
+    type_policy=request.form.get("Type of Privacy Policy")
+    policy_uri=request.form.get("Privacy Policy URI")
+    createAt=request.form.get("Created at")
+    revokeAt=request.form.get("Revoked at")
+    intendedUseIdentifier=request.form.get("Intended Use Identifier")
     
+    purpose = '[{"lang":"' + purpose_lang + '", "srvDescription":"' + purpose + '"}]'
+    
+    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+    hash_pid = new_user.hash
+    user_id = db.check_user(hash_pid, session["session_id"])
 
-    #add bd
+    db.insert_intended_use(createAt, revokeAt, intendedUseIdentifier, type_policy, policy_uri, purpose, user_id, session["session_id"])
 
-
-    return render_template("rp_user_menu.html", user = user['given_name'], temp_user_id = temp_user_id)
+    return redirect('/intended_use/list')
 
 @rpr.route('/intended_use/edit', methods=["GET", "POST"])
 def intended_use_edit():
@@ -991,52 +1065,125 @@ def intended_use_edit_db():
         return ("erro")
     else:
         return redirect('/intended_use/list')
+    
+def list_intended_use():
+
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
+    
+    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+    hash_pid = new_user.hash
+    user_id = db.check_user(hash_pid, session["session_id"])
+    
+    intended_use_dict = db.get_intended_use_info(user_id, session["session_id"])
+    
+    header_table=[ "Identifier","Purpose","Created At","Revoked At","Type of Policy", "Policy URI"]
+
+    if(intended_use_dict == "err" or intended_use_dict == None):
+        data={}
+    else:
+        data={}
+        for intended_use in intended_use_dict:
+            data_temp={
+                intended_use["intendeduse_id"]:{
+                    "Identifier":intended_use["intendedUseIdentifier"],
+                    "Purpose":intended_use["purpose"],
+                    "Created At":intended_use["createdAt"],
+                    "Revoked At":intended_use["revokedAt"],
+                    "Type of Policy":intended_use["type_policy"],
+                    "Policy URI":intended_use["policy_uri"]
+                }
+            }
+            data.update(data_temp)
+    
+    wrp_dict = db.get_rp_info(user_id, session["session_id"])
+
+    list = []
+    if(data != {}):
+        if(wrp_dict != "err" and wrp_dict != None):
+
+            for item in wrp_dict:
+                name_txt = item["tradeName"]
+                
+                if(item["intended_use"] != None):
+                    intended_use_name = db.get_iu_info_rp(item["intended_use"], session["session_id"])
+                    
+                    new_item = {
+                        "id": item["wrp_id"],
+                        "name": name_txt,
+                        "associated_id": item["intended_use"],
+                        "ass_name": intended_use_name
+                    }
+                else:
+                    new_item = {
+                        "id": item["wrp_id"],
+                        "name": name_txt,
+                        "associated_id": item["intended_use"],
+                        "ass_name": ""
+                    }
+                
+                list.append(new_item)
+    
+    menu= cfgserv.service_url + "menu"
+
+    return menu, data, header_table, list
+
+@rpr.route('/intended_use/update_RPs', methods=["GET", "POST"])
+def update_RPs_iu():
+    
+    iu_id = request.args.get("id")
+    RPs = ast.literal_eval(request.args.get("checks"))
+    
+    temp_user_id = session['temp_user_id']
+
+    check_rp = db.get_check_rp_info_iu(iu_id, session["session_id"]) or []
+
+    previous = { x["wrp_id"] for x in check_rp }
+    current = { int(x) for x in RPs }
+    to_remove = previous - current
+
+    for elem in to_remove:
+        db.remove_iu_wrp(elem, session["session_id"])
+    
+    for elem in RPs:
+        RP_id = int(elem)
+        
+        check = db.update_wrp_iu(iu_id, RP_id, session["session_id"])
+        
+        if check is None:
+            return ("err")
+    
+    return redirect('/intended_use/list')
 
 @rpr.route('/intended_use/list', methods=['GET','POST'])
 def intended_use_list():
 
     temp_user_id = session['temp_user_id']
     user = session[temp_user_id]
-    
-    intended_use_dict = func.get_intended_use_info(user["id"], session["session_id"])
-    
-    header_table=[ "Identifer","Purpose","Created At","Revoked At","Credentials"]
-    if(intended_use_dict == "err"):
-        data={}
-    else:
 
-        data={}
+    menu, data, header_table, list = list_intended_use()
 
-        for intended_use in intended_use_dict:
-            data_temp={
-                intended_use["intended_use_id"]:{
-                    "Identifer":intended_use["identifier"],
-                    "Purpose":intended_use["purpose"],
-                    "Created At":intended_use["createdAt"],
-                    "Revoked At":intended_use["revokedAt"],
-                    "Credentials":intended_use["credential"]
-                }
-            }
-            data.update(data_temp)
-    
-   
-    menu= cfgserv.service_url + "menu"
     return render_template("CertificateList.html", h1 = "Intended Use List", menu = menu, data=data, title="Intended Uses", list= list, header_table=header_table, url=cfgserv.service_url +"intended_use", temp_user_id = temp_user_id)
 
-@rpr.route('/credential/create', methods=['GET','POST'])
+@rpr.route('/credential/create_person', methods=['GET','POST'])
 def credential_create():
 
     attributesForm={}
 
     form_items={
+        "Name": "string",
         "Format": "string",
         "Meta": "string",
-        "Claim": "multi_string",
+        "Path": "string",
+        "Credential Values": "string",
     }
     descriptions = {
+        "Name": "string",
         "Format": "Format of the attestation.",
         "Meta":"An object defining additional properties requested by the Verifier (including the credential type) that apply to the metadata and validity data of the Credential",
-        "Claim": "Attributes in the requested attestation.(Optional)"}
+        "Path": "string",
+        "Credential Values": "string"
+    }
 
     attributesForm.update(form_items)
 
@@ -1050,41 +1197,34 @@ def add_credential_db():
     temp_user_id = session['temp_user_id']
     user = session[temp_user_id]
 
-    format=request.form.get("Purpose")
-    meta=request.form.get("Lang")
-
-
-    dict_form=dict(request.form)
-    grouped = defaultdict(list)
+    name=request.form.get("Name")
+    format=request.form.get("Format")
+    meta=request.form.get("Meta")
+    path=request.form.get("Path")
+    credentialValues=request.form.get("Credential Values")
     
+    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+    hash_pid = new_user.hash
+    user_id = db.check_user(hash_pid, session["session_id"])
 
-    for key, value in dict_form.items():
-        match=re.match(r"(path)_(.*?).(\d+)",key)
-        if match:
-            attr, prefix, index = match.groups()
-            index = int(index)
-            while len(grouped[prefix]) <= index:
-                grouped[prefix].append({})
-            grouped[prefix][index][attr] = value
-            
+    db.insert_credential(name, format, meta, path, credentialValues, user_id, session["session_id"])
 
-    #add bd
+    return redirect('/credential/list')
 
-
-    return render_template("rp_user_menu.html", user = user['given_name'], temp_user_id = temp_user_id)
-
-
-
-@rpr.route('/credential/list', methods=['GET','POST'])
-def credential_list():
+def cred_list():
 
     temp_user_id = session['temp_user_id']
     user = session[temp_user_id]
     
-    credential_dict = func.get_credential_info()
+    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+    hash_pid = new_user.hash
+    user_id = db.check_user(hash_pid, session["session_id"])
     
-    header_table=[ "Format","Meta", "Claims"]
-    if(credential_dict == "err"):
+    credential_dict = db.get_credential_info(user_id, session["session_id"])
+    
+    header_table=[ "Name","Format", "Meta", "Path", "Credential Values"]
+
+    if(credential_dict == "err" or credential_dict == None):
         data={}
     else:
 
@@ -1093,20 +1233,88 @@ def credential_list():
         for credential in credential_dict:
             data_temp={
                 credential["credential_id"]:{
+                    "Name":credential["name"],
                     "Format":credential["format"],
                     "Meta":credential["meta"],
-                    "Claims":credential["claim"],
+                    "Path":credential["path"],
+                    "Values":credential["credentialValues"],
                 }
             }
             data.update(data_temp)
     
+    ie_dict = db.get_intended_use_info(user_id, session["session_id"])
+
+    list = []
+    if(data != {}):
+        if(ie_dict != "err" and ie_dict != None):
+
+            for item in ie_dict:
+                name_txt = item["intendedUseIdentifier"]
+                
+                if(item["credential_id"] != None):
+                    credential_name = db.get_iu_info_cred(item["credential_id"], session["session_id"])
+                    
+                    new_item = {
+                        "id": item["intendeduse_id"],
+                        "name": name_txt,
+                        "associated_id": item["credential_id"],
+                        "ass_name": credential_name
+                    }
+                else:
+                    new_item = {
+                        "id": item["intendeduse_id"],
+                        "name": name_txt,
+                        "associated_id": item["credential_id"],
+                        "ass_name": ""
+                    }
+                
+                list.append(new_item)
    
     menu= cfgserv.service_url + "menu"
+
+    return menu, data, header_table, list
+
+@rpr.route('/credential/list', methods=['GET','POST'])
+def credential_list():
+    temp_user_id = session['temp_user_id']
+
+    menu, data, header_table, list = cred_list()
+
     return render_template("CertificateList.html", h1 = "Credential List", menu = menu, data=data, title="Credentials", list= list, header_table=header_table, url=cfgserv.service_url +"credential", temp_user_id = temp_user_id)
 
+@rpr.route('/credential/update_intended_uses', methods=["GET", "POST"])
+def update_intended_uses():
+    
+    cred_id = request.args.get("id")
+    iu = ast.literal_eval(request.args.get("checks"))
+    
+    temp_user_id = session['temp_user_id']
+
+    check_iu = db.get_check_iu_info(cred_id, session["session_id"]) or []
+
+    previous = { x["intendeduse_id"] for x in check_iu }
+    current = { int(x) for x in iu }
+    to_remove = previous - current
+
+    for elem in to_remove:
+        db.remove_cred_iu(elem, session["session_id"])
+    
+    for elem in iu:
+        RP_id = int(elem)
+        
+        check = db.update_iu_cred(cred_id, RP_id, session["session_id"])
+        
+        if check is None:
+            return ("err")
+
+    return redirect('/credential/list')
+    
 
 @rpr.route("/relying_party_registration_request", methods=["GET", "POST"])
 def relying_party_registration():
+    
+    temp_user_id = session['temp_user_id']
+    user = session[temp_user_id]
 
     modulus=crypto.key_size
     exponent=crypto.exponent

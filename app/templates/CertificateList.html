@@ -115,7 +115,7 @@
 
                             <div class="panel-heading">
                                 <a type="button" href="{{ menu }}" class="btn btn-danger"><span class="glyphicon glyphicon-arrow-left"></span> Back</a>
-                                <a type="button" href="{{url}}/create" class="btn btn-success"><span class="glyphicon glyphicon-plus"></span> Create a new {{h1}}</a>
+                                <a type="button" href="{{url}}/create_person" class="btn btn-success"><span class="glyphicon glyphicon-plus"></span> Create a new {{h1}}</a>
                             </div>
                             <h3 class="panel-title">Your {{h1}}</h3>
                             
@@ -166,7 +166,7 @@
                                                 <td>
                                                     <a class="btn btn btn-info btn-xs" id="{{id}}" href="{{url}}/edit?id={{id}}"><span class="glyphicon glyphicon-pencil"></span></a>
                                                     <!-- <a class="btn btn-danger btn-xs" id="{{id}}" data-toggle="modal" data-target="#myModal" data-id="{{id}}"><span class="glyphicon glyphicon-remove-circle"></span></a> -->
-                                                    {% if title != "Credentials" %}
+                                                    {% if title != "Relying Parties" %}
                                                         <a class="btn btn-default" id="{{id}}" data-toggle="modal" data-target="#ModalList" data-id="{{id}}"><span class="glyphicon glyphicon-cog"></span></a>
                                                     {% endif %}
                                                     {% if title == "Relying Parties" or title== "Intended Uses" %}
@@ -184,10 +184,10 @@
 
                 </div>
             </div>
-            {% if title == "Persons"%}
+            {% if title == "Persons" %}
                 <p><span class="glyphicon glyphicon-cog"></span> = Add Legal Entities</p>
 
-            {% elif title=="Legal Entities %"}
+            {% elif title=="Legal Entities" %}
                 <p><span class="glyphicon glyphicon-cog"></span> = Add Relying Parties</p>
                 
             {% elif title == "Relying Parties" %}
@@ -197,6 +197,7 @@
             {% elif title == "Intended Uses" %}
                 <p><span class="glyphicon glyphicon-cog"></span> = Add Credentials</p>
                 <p><span class="glyphicon glyphicon-file"></span> = Generate registration certificate</p>
+            {% endif %}
     </div>
     <footer class="main-footer container-fluid" role="contentinfo">
         <div class="container">
@@ -256,7 +257,7 @@
         var modalbody=document.getElementById('modalList-body');
         modalbody.innerHTML="";
         
-        var  list= {{ list | tojson |safe}};
+        var  list = {{ list | default([]) | tojson | safe }};
 
         list.forEach(function (object){
 
@@ -293,19 +294,22 @@ function Ajax_request_update(checks,id) {
 
     var title= {{title | tojson}};
 
-    var list= {{list | tojson}}
+    var  list = {{ list | default([]) | tojson | safe }};
 
-    if ( title == "Persons"){
+    if ( title == "Natural Persons"){
        var  url='{{url}}/update_legal_entities'
-
-    }else if (title == "Legal Entities" ){
+    }
+    else if (title == "Legal Persons" ){
+        var url='{{url}}/update_legal_entities'
+    }
+    else if (title == "Legal Entities" ){
         var url='{{url}}/update_RPs'
     }
-    else if (title == "Relying Parties" ){
+    else if (title == "Credentials" ){
         var url='{{url}}/update_intended_uses'
     }
     else if (title == "Intended Uses" ){
-        var url='{{url}}/update_credentials'
+        var url='{{url}}/update_RPs'
     }
 
     var check = JSON.stringify(checks)

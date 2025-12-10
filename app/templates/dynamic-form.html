@@ -88,7 +88,7 @@
                                                     <label for="{{ name }}">{{ name }}</label>
                                                     <small class="form-text text-muted">{{ desc[name] }}</small>
                                                     <select class="form-control" name="{{ name }}" required>
-                                                        {% for select in select_dict[] %}
+                                                        {% for select in select_dict[name] %}
                                                             <option value="{{ select}}">{{ select}}</option>
                                                         {% endfor %}
                                                     </select>
@@ -101,7 +101,7 @@
                                                     <small class="form-text text-muted">{{ desc[name] }}</small>
                                                     <select class="js-example-basic-single" id="Lang" name="Lang" style="width: 100%; box-sizing: border-box;" required>
                                                         <option value="">--Select--</option>
-                                                        {% for value in lang %}
+                                                        {% for value in countries %}
                                                             <option value="{{ value }}">{{ value }}</option>
                                                         {% endfor %}
                                                     </select>

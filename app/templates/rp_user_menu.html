@@ -100,23 +100,28 @@
                         </div>
 
                         <h2>Legal Person </h2>
-                        <a href="{{ url_for('RPR.create_legal_person') }}" class="menu-option">Create Legal Person </a>
+                        <!-- <a href="{{ url_for('RPR.create_legal_person') }}" class="menu-option">Create Legal Person </a> -->
                         <a href="{{ url_for('RPR.legal_person_list') }}" class="menu-option">List of legal Persons </a>
 
                         <h2>Natural Person </h2>
-                        <a href="{{ url_for('RPR.create_natural_person') }}" class="menu-option">Create Natural Person </a>
+                        <!-- <a href="{{ url_for('RPR.create_natural_person') }}" class="menu-option">Create Natural Person </a> -->
                         <a href="{{ url_for('RPR.natural_person_list') }}" class="menu-option">List of Natural Persons </a>
     
                         <h2>Legal Entity </h2>
-                        <a href="{{ url_for('RPR.create_legal_entity') }}" class="menu-option">Create Legal Entity </a>
+                        <!-- <a href="{{ url_for('RPR.create_legal_entity') }}" class="menu-option">Create Legal Entity </a> -->
                         <a href="{{ url_for('RPR.legal_entity_list') }}" class="menu-option">List of Legal Entities </a>
                         
                         <h2>Relying Party Information</h2>
-                        
-                        <a href="{{ url_for('RPR.RP_create') }}" class="menu-option">Create Relying Party</a>
+                        <!-- <a href="{{ url_for('RPR.RP_create') }}" class="menu-option">Create Relying Party</a> -->
                         <a href="{{ url_for('RPR.RP_list') }}" class="menu-option">List of Relying Parties</a>
+                        
+                        <h2>Intended Use Information</h2>
+                        <a href="{{ url_for('RPR.intended_use_list') }}" class="menu-option">List of Intended Uses</a>
 
-                        <a href="{{ url_for('RPR.logout') }}" class="menu-option" style="background-color: #ff4d4d;">Logout</a>
+                        <h2>Credential Information</h2>
+                        <a href="{{ url_for('RPR.credential_list') }}" class="menu-option">List of Credentials</a>
+
+                        <a href="{{ url_for('RPR.Logout') }}" class="menu-option" style="background-color: #ff4d4d;">Logout</a>
                         <form>
                             <div class="col-md-12" id="hidden_elems">
                                 <div class="col" >
