@@ -673,9 +673,20 @@ def legal_entity_edit():
     temp_user_id = session['temp_user_id']
     user = session[temp_user_id]
 
-    db_data = func.get_data_legal_entity_edit(legal_entity_id, session["session_id"])
+    db_data = db.get_legal_entity_info_edit(legal_entity_id, session["session_id"])
 
-    return render_template("dynamic-form_edit_add.html", h3 = "Legal Entity Information", id = legal_entity_id, lang = cfgserv.eu_languages, data_edit = db_data, Langs=cfgserv.eu_languages,Countries=cfgserv.eu_countries, temp_user_id=temp_user_id, redirect_url= cfgserv.service_url + "legal_entity/edit_db")
+    select_dict = {
+        "identifierType": [
+            "http://data.europa.eu/eudi/id/EORI-No",
+            "http://data.europa.eu/eudi/id/LEI" ,
+            "http://data.europa.eu/eudi/id/EUID" ,
+            "http://data.europa.eu/eudi/id/VATIN"  ,
+            "http://data.europa.eu/eudi/id/TIN" ,
+            "http://data.europa.eu/eudi/id/Excise"
+        ]
+    }
+
+    return render_template("dynamic-form_edit_add.html", h3 = "Legal Entity Information", id = legal_entity_id, select_dict = select_dict, lang = cfgserv.eu_languages, data_edit = db_data, Langs=cfgserv.eu_languages,Countries=cfgserv.eu_countries, temp_user_id=temp_user_id, redirect_url= cfgserv.service_url + "legal_entity/edit_db")
 
 @rpr.route('/legal_entity/edit_db', methods=["GET", "POST"])
 def legal_entity_edit_db():
@@ -692,7 +703,7 @@ def legal_entity_edit_db():
     for key, value in form.items():
         grouped[key] = value
 
-    check = func.edit_legal_entity_db_info(
+    check = db.update_legal_entity_edit(
         grouped, 
         legal_entity_id, 
         session["session_id"]
@@ -890,9 +901,19 @@ def RP_edit():
     temp_user_id = session['temp_user_id']
     user = session[temp_user_id]
 
-    db_data = func.get_data_RP_edit(RP_id, session["session_id"])
+    db_data = db.get_rp_info_edit(RP_id, session["session_id"])
 
-    return render_template("dynamic-form_edit_add.html", h3 = "Relying Party Information", id = RP_id, lang = cfgserv.eu_languages, data_edit = db_data, Langs=cfgserv.eu_languages,Countries=cfgserv.eu_countries, temp_user_id=temp_user_id, redirect_url= cfgserv.service_url + "RP/edit_db")
+    select_dict = {
+        "typePolicy":[
+            "http://data.europa.eu/eudi/policy/trust-service-practice-statement ",
+            "http://data.europa.eu/eudi/policy/terms-and-conditions",
+            "http://data.europa.eu/eudi/policy/privacy-statement",
+            "http://data.europa.eu/eudi/policy/privacy-policy",
+            "http://data.europa.eu/eudi/policy/registration-policy"
+        ]
+    }
+
+    return render_template("dynamic-form_edit_add.html", h3 = "Relying Party Information", id = RP_id, select_dict = select_dict, lang = cfgserv.eu_languages, data_edit = db_data, Langs=cfgserv.eu_languages,Countries=cfgserv.eu_countries, temp_user_id=temp_user_id, redirect_url= cfgserv.service_url + "RP/edit_db")
 
 @rpr.route('/RP/edit_db', methods=["GET", "POST"])
 def RP_edit_db():
@@ -909,7 +930,7 @@ def RP_edit_db():
     for key, value in form.items():
         grouped[key] = value
 
-    check = func.edit_RP_db_info(
+    check = db.update_RP_edit(
         grouped, 
         RP_id, 
         session["session_id"]
@@ -1036,9 +1057,19 @@ def intended_use_edit():
     temp_user_id = session['temp_user_id']
     user = session[temp_user_id]
 
-    db_data = func.get_data_intended_use_edit(intended_use_id, session["session_id"])
+    db_data = db.get_iu_info_edit(intended_use_id, session["session_id"])
 
-    return render_template("dynamic-form_edit_add.html", h3 = "Intended Use Information", id = intended_use_id, lang = cfgserv.eu_languages, data_edit = db_data, Langs=cfgserv.eu_languages,Countries=cfgserv.eu_countries, temp_user_id=temp_user_id, redirect_url= cfgserv.service_url + "intended_use/edit_db")
+    select_dict = {
+        "type_policy": [
+            "http://data.europa.eu/eudi/policy/trust-service-practice-statement",
+            "http://data.europa.eu/eudi/policy/terms-and-conditions",
+            "http://data.europa.eu/eudi/policy/privacy-statement",
+            "http://data.europa.eu/eudi/policy/privacy-policy",
+            "http://data.europa.eu/eudi/policy/registration-policy"
+        ]
+    }
+
+    return render_template("dynamic-form_edit_add.html", h3 = "Intended Use Information", id = intended_use_id, select_dict = select_dict, lang = cfgserv.eu_languages, data_edit = db_data, Langs=cfgserv.eu_languages,Countries=cfgserv.eu_countries, temp_user_id=temp_user_id, redirect_url= cfgserv.service_url + "intended_use/edit_db")
 
 @rpr.route('/intended_use/edit_db', methods=["GET", "POST"])
 def intended_use_edit_db():
@@ -1055,7 +1086,7 @@ def intended_use_edit_db():
     for key, value in form.items():
         grouped[key] = value
 
-    check = func.edit_intended_use_db_info(
+    check = db.update_iu_edit(
         grouped, 
         intended_use_id, 
         session["session_id"]

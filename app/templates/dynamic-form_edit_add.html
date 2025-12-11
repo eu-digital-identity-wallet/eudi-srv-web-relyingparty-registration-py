@@ -83,168 +83,66 @@
                             <input type="hidden" name="id" value="{{ id }}">
                             
                             <h3>{{ h3 }}</h3>
-                            {% for name, value in data_edit.items() %}
-                                {% if name == "postal_address" %}
-                                    <div class="row g-3">
-                                        <button type="button" class="collapsible col-xs-12 col-md-12 btn btn-default">Postal Address</button>
-                                        <div class="content">
-                                            {% for data in value %}
-                                                <label for="Lang">Lang</label>
-                                                <select class="form-control js-example-basic-single" style="width: 100%; box-sizing: border-box;" name="postal_address_lang.{{loop.index0}}"  required>
-                                                    {% for lang1 in Langs %}
-                                                        <option value="{{ lang1 }}" {% if data['lang'] == lang1 %} selected {% endif %}>{{ lang1 }}</option>
-                                                    {% endfor %}
-                                                </select>
-                                                
-                                                <label for="StreetAddress">StreetAddress</label>
-                                                <input type="text" class="form-control" placeholder="StreetAddress"  name="postal_address_StreetAddress.{{loop.index0}}" value="{{ data['StreetAddress'] }}" required >
-                                                
-                                                <label for="Locality">Locality</label>
-                                                <input type="text" class="form-control" placeholder="Locality" name="postal_address_Locality.{{loop.index0}}" value="{{ data['Locality'] }}"required >
-                                                
-                                                <label for="StateOrProvince">StateOrProvince</label>
-                                                <input type="text" class="form-control" placeholder="StateOrProvince" name="postal_address_StateOrProvince.{{loop.index0}}" value="{{ data['StateOrProvince'] }}"required >
-                                                
-                                                <label for="PostalCode">PostalCode</label>
-                                                <input type="text" class="form-control" placeholder="PostalCode" name="postal_address_PostalCode.{{loop.index0}}" value="{{ data['PostalCode']}}"required >
-                                                
-                                                <label for="CountryName">CountryName</label>
-                                                <select class="form-control js-example-basic-single" style="width: 100%; box-sizing: border-box;"  name="postal_address_CountryName.{{loop.index0}}"  required>
-                                                    {% for country in Countries %}
-                                                        <option value="{{ lang }}" {% if data['CountryName'] == country %} selected {% endif %}>{{ country }}</option>
-                                                    {% endfor %}
-                                                </select>
+                            {% for item in data_edit %}
+                            {% for name, value in item.items() %}
+
+                                <button type="button" class="collapsible col-xs-12 col-md-12 btn btn-default">
+                                    {{ name }}
+                                </button>
+
+                                <div class="content" style="display:none;">
+
+                                    {% if name == "country" %}
+                                        <label>{{ name }}</label>
+                                        <select class="form-control" name="{{ name }}" required>
+                                            {% for c in lang %}
+                                                <option value="{{ c }}" {% if value == c %}selected{% endif %}>{{ c }}</option>
                                             {% endfor %}
-                                        </div>
-                                    </div>
-                                {% elif name=="schemeTerritory" %}
-                                    {% if value is not none and value|length > 0 %}
-                                        <div class="row g-3">
-                                            <button type="button" class="collapsible col-xs-12 col-md-12 btn btn-default">Scheme Territory</button>
-                                            <div class="content">
-                                                <label for="SchemeCountry">SchemeCountry</label>
-                                                <select class="form-control js-example-basic-single" style="width: 100%; box-sizing: border-box;"  name="SchemeCountry"  required>
-                                                    {% for country in Countries %}
-                                                        <option value="{{ country}}" {% if value == country %} selected {% endif %}>{{ country }}</option>
-                                                    {% endfor %}
-                                                </select>
-                                            </div>
-                                        </div>
-                                    {% endif %} 
-                                {% elif name=="DistributionPoints" %}
-                                    {% if value is not none and value|length > 0 %}
-                                        <div class="row g-3">
-                                            <button type="button" class="collapsible col-xs-12 col-md-12 btn btn-default">Distribution Points</button>
-                                            <div class="content">
-                                                {% for data in value %}
-                                                    <div class="content_child">
-                                                        <label for="URI">URI</label>
-                                                        <input type="text" class="form-control" placeholder="URI" name="DistributionPoints.{{ loop.index0 }}" value="{{ data }}" required>
-                                                    </div>
-                                                {% endfor %}
-                                            </div>
-                                        </div>    
-                                    {% endif %}  
-                                    {% elif name == "SchemeTypeCommunityRules_lang" %}
-                                        {% if value is not none and value|length > 0 %}
-                                            <button type="button" class="collapsible col-xs-12 col-md-12 btn btn-default">
-                                                Scheme Type Community Rules
-                                            </button>
-                                            <div class="content">
-                                            {% for data in value %}
-                                                {% set outer_loop = loop %}
-                                                <div class="content_child">
-                                                    {% for key, key_data in data.items() %}
-                                                        {% if key == "lang" %}
-                                                            <label for="Lang">Lang</label>
-                                                            <select class="form-control js-example-basic-single" style="width: 100%; box-sizing: border-box;" name="{{key}}_{{name}}.{{outer_loop.index0}}" required>
-                                                                {% for lang in Langs %}
-                                                                    <option value="{{ lang }}" {% if key_data == lang %} selected {% endif %}>{{ lang }}</option>
-                                                                {% endfor %}
-                                                            </select>
-                                                        {% elif key == "URI" %}
-                                                            <label for="{{ key }}">{{ key }}</label>
-                                                            <select class="form-control" name="{{ key }}_{{ name }}.{{ outer_loop.index0 }}" required>
-                                                                {% for rule_name, rule_value in rules.items() %}
-                                                                    <option value="{{ rule_value }}" {% if key_data == rule_value %} selected {% endif %}>
-                                                                        {{ rule_name }} - {{ rule_value }}
-                                                                    </option>
-                                                                {% endfor %}
-                                                            </select>
-                                                        {% else %}
-                                                            <label for="{{ key }}">{{ key }}</label>
-                                                            <input type="text" class="form-control" placeholder="{{ key }}" aria-label="{{ key }}" name="{{ key }}_{{ name }}.{{ outer_loop.index0 }}" value="{{ key_data }}" required>
-                                                        {% endif %}
-                                                    {% endfor %}
-                                                </div>
+                                        </select>
+                                    
+                                    {% elif name == "type_policy" %}
+                                        <label>{{ name }}</label>
+                                        <select class="form-control" name="{{ name }}" required>
+                                            {% for option in select_dict[name] %}
+                                                <option value="{{ option }}" {% if value == option %}selected{% endif %}>
+                                                    {{ option }}
+                                                </option>
                                             {% endfor %}
-                                        {% endif %}
-                                    </div>
-                                
-                                {% else %}
-                                    <div class="row g-3">
-                                        {% if name=="operator_name" %}
-                                            <button type="button" class="collapsible col-xs-12 col-md-12 btn btn-default">Operator Name</button>
- 
-                                        {% elif name=="ElectronicAddress" %}
-                                            <button type="button" class="collapsible col-xs-12 col-md-12 btn btn-default">Electronic Address</button>
-                                            
-                                        {% elif name=="EletronicAddress" %}
-                                        <button type="button" class="collapsible col-xs-12 col-md-12 btn btn-default">Electronic Address</button>
-                                                        
-                                        {% elif name=="trade_name" %}
-                                        <button type="button" class="collapsible col-xs-12 col-md-12 btn btn-default">Trade Name</button>
-                                                   
-                                        {% elif name=="ServiceName" %}
-                                        <button type="button" class="collapsible col-xs-12 col-md-12 btn btn-default">Service Name</button>
-                                                  
-                                        {% elif name=="SchemeServiceDefinitionURI" %}
-                                        <button type="button" class="collapsible col-xs-12 col-md-12 btn btn-default">Scheme Service Definition URI</button>
-                                                  
-                                        {% elif name=="SchemeName_lang" %}
-                                        <button type="button" class="collapsible col-xs-12 col-md-12 btn btn-default">Scheme Name</button>
-                                                  
-                                        {% elif name=="Uri_lang" %}
-                                        <button type="button" class="collapsible col-xs-12 col-md-12 btn btn-default">Uri</button>
-                                                  
-                                        {% elif name=="PolicyOrLegalNotice_lang" %}
-                                        <button type="button" class="collapsible col-xs-12 col-md-12 btn btn-default">Policy Or Legal Notice</button>
-                                                  
-                                        {% elif name=="SchemeTypeCommunityRules_lang" %}
-                                        <button type="button" class="collapsible col-xs-12 col-md-12 btn btn-default">Scheme Type Community Rules</button>
-                                                  
-                                        {% else %}
-                                            <button type="button" class="collapsible col-xs-12 col-md-12 btn btn-default">{{name}}</button>
-                                        {% endif %} 
-                                        <div class="content">
-                                            {% if value is not none and value|length > 0 %}
-                                                {% for data in value %}
-                                                    {% set outer_loop = loop %}
-                                                    <div class="content_child">
-                                                        {% for key, key_data in data.items() %}
-                                                            {% if key == "lang" %}
-                                                                <label for="Lang">Lang</label>
-                                                                <select class="form-control js-example-basic-single" style="width: 100%; box-sizing: border-box;" name="{{key}}_{{name}}.{{outer_loop.index0}}" required>
-                                                                    {% for lang in Langs %}
-                                                                        <option value="{{ lang }}" {% if key_data == lang %} selected {% endif %}>{{ lang }}</option>
-                                                                    {% endfor %}
-                                                                </select>
-                                                            {% else %}
-                                                                <label for="{{ key }}">{{ key }}</label>
-                                                                {% if name == "operator_name" and outer_loop.first %}
-                                                                    <input type="text" class="form-control" placeholder="{{ key }}" aria-label="{{ key }}" value="{{ key_data }}" readonly>
-                                                                {% else %}
-                                                                    <input type="text" class="form-control" placeholder="{{ key }}" aria-label="{{ key }}" name="{{ key }}_{{ name }}.{{ outer_loop.index0 }}" value="{{ key_data }}" required>
-                                                                {% endif %}
-                                                            {% endif %}
-                                                        {% endfor %}
-                                                    </div>
-                                                {% endfor %}
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                {% endif %}                                                              
-                            {% endfor %}    
+                                        </select>
+
+                                    {% elif name == "typePolicy" %}
+                                        <label>{{ name }}</label>
+                                        <select class="form-control" name="{{ name }}" required>
+                                            {% for option in select_dict[name] %}
+                                                <option value="{{ option }}" {% if value == option %}selected{% endif %}>
+                                                    {{ option }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                    
+                                    {% elif name == "identifierType" %}
+                                        <label>{{ name }}</label>
+                                        <select class="form-control" name="{{ name }}" required>
+                                            {% for option in select_dict[name] %}
+                                                <option value="{{ option }}" {% if value == option %}selected{% endif %}>
+                                                    {{ option }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+
+                                    {% else %}
+                                        <label>{{ name }}</label>
+                                        <input type="text" class="form-control"
+                                            name="{{ name }}"
+                                            value="{{ value }}"
+                                            required>
+                                    {% endif %}
+
+                                </div>
+
+                            {% endfor %}
+                        {% endfor %}
+                        
                             <div class="clearfix"></div>
                             <span class="more-submit">
                                 <input type="submit"  name="proceed" accesskey="S" value="Submit" class="btn btn-primary" title="Submit" /><a onclick="history.back()" class="btn btn-back">Cancel</a>

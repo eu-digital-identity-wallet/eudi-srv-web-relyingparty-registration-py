@@ -1234,3 +1234,217 @@ def remove_cred_iu(id, log_id):
         if connection:
             cursor.close()
             connection.close()
+
+
+def get_legal_entity_info_edit(le_id, log_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            select_query = """
+                SELECT postalAddress, country, email, phone, infoURI, identifier, identifierType
+                FROM legalentity
+                WHERE legalentity_id = %s
+            """
+            
+            cursor.execute(select_query, (le_id,))
+            result = cursor.fetchall()
+            
+            if result: 
+                legal_entity_data = [
+                    {"postalAddress": row[0], "country": row[1], "email": row[2], "phone": row[3], "infoURI": row[4], "identifier": row[5], "identifierType": row[6]} 
+                    for row in result
+                ]
+                extra = {'code': log_id} 
+                logger.info(f"Legal Entity found: {le_id}", extra=extra)
+                return legal_entity_data
+            else:
+                extra = {'code': log_id}
+                logger.info("Legal Entity not found.", extra=extra)
+                print("Legal Entity not found.")
+                return None
+        else:
+            return None
+
+    except pymysql.MySQLError as e:
+        extra = {'code': log_id}
+        logger.error(f"Error checking legal Entity: {e}", extra=extra)
+        print(f"Error checking legal Entity: {e}")
+        return None
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def update_legal_entity_edit(grouped, legal_entity_id, log_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = """
+                                UPDATE legalentity 
+                                SET country = %s, email = %s, infoURI = %s, phone = %s, postalAddress = %s, identifier = %s, identifierType = %s
+                                WHERE legalentity_id = %s
+                            """
+            cursor.execute(insert_query, (grouped["country"], grouped["email"], grouped["infoURI"], grouped["phone"], grouped["postalAddress"], grouped["identifier"], grouped["identifierType"], legal_entity_id,))
+            
+            connection.commit()
+            
+            extra = {'code': log_id} 
+            logger.info(f"Legal Entity successfully updated: {id}", extra=extra)
+
+            print(f"Legal Entity successfully updated: {id}")
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        extra = {'code': log_id} 
+        logger.error(f"Error updating Legal Entity: {e}", extra=extra)
+        print(f"Error updating Legal Entity: {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def get_rp_info_edit(rp_id, log_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            select_query = """
+                SELECT tradeName, supportURI, registryURI, policyURI, typePolicy
+                FROM walletrelyingparty
+                WHERE wrp_id = %s
+            """
+            
+            cursor.execute(select_query, (rp_id,))
+            result = cursor.fetchall()
+            
+            if result: 
+                rp_data = [
+                    {"tradeName": row[0], "supportURI": row[1], "registryURI": row[2], "policyURI": row[3], "typePolicy": row[4]} 
+                    for row in result
+                ]
+                extra = {'code': log_id} 
+                logger.info(f"RP found: {rp_id}", extra=extra)
+                return rp_data
+            else:
+                extra = {'code': log_id}
+                logger.info("RP not found.", extra=extra)
+                print("RP not found.")
+                return None
+        else:
+            return None
+
+    except pymysql.MySQLError as e:
+        extra = {'code': log_id}
+        logger.error(f"Error checking RP: {e}", extra=extra)
+        print(f"Error checking RP: {e}")
+        return None
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def update_RP_edit(grouped, rp_id, log_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = """
+                                UPDATE walletrelyingparty 
+                                SET tradeName = %s, supportURI = %s, registryURI = %s, policyURI = %s, typePolicy = %s
+                                WHERE wrp_id = %s
+                            """
+            cursor.execute(insert_query, (grouped["tradeName"], grouped["supportURI"], grouped["registryURI"], grouped["policyURI"], grouped["typePolicy"], rp_id,))
+            
+            connection.commit()
+            
+            extra = {'code': log_id} 
+            logger.info(f"RP successfully updated: {id}", extra=extra)
+
+            print(f"RP successfully updated: {id}")
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        extra = {'code': log_id} 
+        logger.error(f"Error updating RP: {e}", extra=extra)
+        print(f"Error updating RP: {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+ 
+def get_iu_info_edit(iu_id, log_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            select_query = """
+                SELECT intendedUseIdentifier, type_policy, policy_uri
+                FROM intendeduse
+                WHERE intendeduse_id = %s
+            """
+            
+            cursor.execute(select_query, (iu_id,))
+            result = cursor.fetchall()
+            
+            if result: 
+                rp_data = [
+                    {"intendedUseIdentifier": row[0], "type_policy": row[1], "policy_uri": row[2]} 
+                    for row in result
+                ]
+                extra = {'code': log_id} 
+                logger.info(f"Intended Use found: {iu_id}", extra=extra)
+                return rp_data
+            else:
+                extra = {'code': log_id}
+                logger.info("Intended Use not found.", extra=extra)
+                print("Intended Use not found.")
+                return None
+        else:
+            return None
+
+    except pymysql.MySQLError as e:
+        extra = {'code': log_id}
+        logger.error(f"Error checking Intended Use: {e}", extra=extra)
+        print(f"Error checking Intended Use: {e}")
+        return None
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def update_iu_edit(grouped, iu_id, log_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = """
+                                UPDATE intendeduse 
+                                SET intendedUseIdentifier = %s, type_policy = %s, policy_uri = %s
+                                WHERE intendeduse_id = %s
+                            """
+            cursor.execute(insert_query, (grouped["intendedUseIdentifier"], grouped["type_policy"], grouped["policy_uri"], iu_id,))
+            
+            connection.commit()
+            
+            extra = {'code': log_id} 
+            logger.info(f"Intended Use successfully updated: {id}", extra=extra)
+
+            print(f"Intended Use successfully updated: {id}")
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        extra = {'code': log_id} 
+        logger.error(f"Error updating Intended Use: {e}", extra=extra)
+        print(f"Error updating Intended Use: {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
