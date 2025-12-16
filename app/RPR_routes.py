@@ -722,7 +722,7 @@ def update_RPs():
     
     temp_user_id = session['temp_user_id']
 
-    check_rp = db.get_check_rp_info(legal_entity_id, session["session_id"]) or []
+    check_rp = db.get_check_cred_info(legal_entity_id, session["session_id"]) or []
 
     previous = { x["wrp_id"] for x in check_rp }
     current = { int(x) for x in RPs }
