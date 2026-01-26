@@ -166,7 +166,7 @@
                                                 <td>
                                                     <a class="btn btn btn-info btn-xs" id="{{id}}" href="{{url}}/edit?id={{id}}"><span class="glyphicon glyphicon-pencil"></span></a>
                                                     <!-- <a class="btn btn-danger btn-xs" id="{{id}}" data-toggle="modal" data-target="#myModal" data-id="{{id}}"><span class="glyphicon glyphicon-remove-circle"></span></a> -->
-                                                    {% if title != "Relying Parties" %}
+                                                    {% if title != "Intended Uses" %}
                                                         <a class="btn btn-default" id="{{id}}" data-toggle="modal" data-target="#ModalList" data-id="{{id}}"><span class="glyphicon glyphicon-cog"></span></a>
                                                     {% endif %}
                                                     {% if title == "Relying Parties" or title== "Intended Uses" %}
@@ -308,8 +308,8 @@ function Ajax_request_update(checks,id) {
     else if (title == "Credentials" ){
         var url='{{url}}/update_intended_uses'
     }
-    else if (title == "Intended Uses" ){
-        var url='{{url}}/update_RPs'
+    else if (title == "Relying Parties" ){
+        var url='{{url}}/update_intended_use'
     }
 
     var check = JSON.stringify(checks)

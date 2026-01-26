@@ -972,9 +972,39 @@ def wallet_rp_list():
             }
             data.update(data_temp)
     
+    iu_dict = db.get_intended_use_info(user_id, session["session_id"])
+
+    list = []
+    if(data != {}):
+        if(iu_dict != "err" and iu_dict != None):
+
+            for item in iu_dict:
+                name_txt = item["intendedUseIdentifier"]
+                
+                if(item["wrp"] != None):
+                    wrp_name = db.get_iu_info_rp(item["wrp"], session["session_id"])
+                    
+                    new_item = {
+                        "id": item["intendeduse_id"],
+                        "name": name_txt,
+                        "associated_id": item["wrp"],
+                        "ass_name": wrp_name
+                    }
+                else:
+                    print("\n\n\n\n teste \n\n\n\n")
+                    new_item = {
+                        "id": item["intendeduse_id"],
+                        "name": name_txt,
+                        "associated_id": item["wrp"],
+                        "ass_name": ""
+                    }
+                
+                list.append(new_item)
+    
+    
     menu= cfgserv.service_url + "menu"
     
-    return menu, data, header_table
+    return menu, data, header_table, list
 
 @rpr.route('/RP/list', methods=['GET','POST'])
 def RP_list():
@@ -982,8 +1012,36 @@ def RP_list():
     temp_user_id = session['temp_user_id']
     user = session[temp_user_id]
 
-    menu, data, header_table = wallet_rp_list()
-    return render_template("CertificateList.html", h1 = "Relying Party List", menu = menu, data=data, title="Relying Parties", header_table=header_table, url=cfgserv.service_url +"RP", temp_user_id = temp_user_id)
+    menu, data, header_table, list = wallet_rp_list()
+    return render_template("CertificateList.html", h1 = "Relying Party List", menu = menu, data=data, title="Relying Parties", header_table=header_table, list= list, url=cfgserv.service_url +"RP", temp_user_id = temp_user_id)
+
+@rpr.route('/RP/update_intended_use', methods=["GET", "POST"])
+def update_iu_rp():
+    
+    print("\n\n\n\n\nentrou")
+    rp_id = request.args.get("id")
+    RPs = ast.literal_eval(request.args.get("checks"))
+    temp_user_id = session['temp_user_id']
+
+    check_rp = db.get_check_iu_info_rp(rp_id, session["session_id"]) or []
+
+    previous = { x["intendeduse_id"] for x in check_rp }
+    current = { int(x) for x in RPs }
+    to_remove = previous - current
+
+    for elem in to_remove:
+        db.remove_wrp_iu(elem, session["session_id"])
+    
+    for elem in RPs:
+        iu_id = int(elem)
+        
+        check = db.update_iu_wrp(rp_id, iu_id, session["session_id"])
+        
+        if check is None:
+            return ("err")
+    
+    return redirect('/RP/list')
+
 
 @rpr.route('/intended_use/create_person', methods=['GET','POST'])
 def intended_use_create():
@@ -1127,37 +1185,9 @@ def list_intended_use():
             }
             data.update(data_temp)
     
-    wrp_dict = db.get_rp_info(user_id, session["session_id"])
-
-    list = []
-    if(data != {}):
-        if(wrp_dict != "err" and wrp_dict != None):
-
-            for item in wrp_dict:
-                name_txt = item["tradeName"]
-                
-                if(item["intended_use"] != None):
-                    intended_use_name = db.get_iu_info_rp(item["intended_use"], session["session_id"])
-                    
-                    new_item = {
-                        "id": item["wrp_id"],
-                        "name": name_txt,
-                        "associated_id": item["intended_use"],
-                        "ass_name": intended_use_name
-                    }
-                else:
-                    new_item = {
-                        "id": item["wrp_id"],
-                        "name": name_txt,
-                        "associated_id": item["intended_use"],
-                        "ass_name": ""
-                    }
-                
-                list.append(new_item)
-    
     menu= cfgserv.service_url + "menu"
 
-    return menu, data, header_table, list
+    return menu, data, header_table
 
 @rpr.route('/intended_use/update_RPs', methods=["GET", "POST"])
 def update_RPs_iu():
@@ -1192,9 +1222,9 @@ def intended_use_list():
     temp_user_id = session['temp_user_id']
     user = session[temp_user_id]
 
-    menu, data, header_table, list = list_intended_use()
+    menu, data, header_table = list_intended_use()
 
-    return render_template("CertificateList.html", h1 = "Intended Use List", menu = menu, data=data, title="Intended Uses", list= list, header_table=header_table, url=cfgserv.service_url +"intended_use", temp_user_id = temp_user_id)
+    return render_template("CertificateList.html", h1 = "Intended Use List", menu = menu, data=data, title="Intended Uses", header_table=header_table, url=cfgserv.service_url +"intended_use", temp_user_id = temp_user_id)
 
 @rpr.route('/credential/create_person', methods=['GET','POST'])
 def credential_create():
@@ -1315,7 +1345,7 @@ def credential_list():
 
 @rpr.route('/credential/update_intended_uses', methods=["GET", "POST"])
 def update_intended_uses():
-    
+    print("\n\n\n\n\n\n\n entrou \n\n\n\n\n\n")
     cred_id = request.args.get("id")
     iu = ast.literal_eval(request.args.get("checks"))
     

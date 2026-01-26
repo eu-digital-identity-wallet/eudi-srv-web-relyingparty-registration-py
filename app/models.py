@@ -460,7 +460,7 @@ def get_intended_use_info(user_id, log_id):
             
             if result: 
                 intended_use_data = [
-                    {"intendeduse_id": row[0], "createdAt": row[1], "revokedAt": row[2], "intendedUseIdentifier": row[3], "type_policy": row[4], "policy_uri": row[5], "purpose": row[6], "credential_id": row[7], "user_id": row[8]} 
+                    {"intendeduse_id": row[0], "createdAt": row[1], "revokedAt": row[2], "intendedUseIdentifier": row[3], "type_policy": row[4], "policy_uri": row[5], "purpose": row[6], "credential_id": row[7], "user_id": row[8], "wrp": row[9]} 
                     for row in result
                 ]
                 extra = {'code': log_id} 
@@ -965,9 +965,9 @@ def get_iu_info_rp(user_id, log_id):
             cursor = connection.cursor()
 
             select_query = """
-                SELECT intendedUseIdentifier
-                FROM intendeduse
-                WHERE intendeduse_id = %s
+                SELECT tradeName
+                FROM walletrelyingparty
+                WHERE wrp_id = %s
             """
             
             cursor.execute(select_query, (user_id,))
@@ -976,49 +976,8 @@ def get_iu_info_rp(user_id, log_id):
             if result: 
                 
                 extra = {'code': log_id} 
-                logger.info(f"IU found for the user_id: {user_id}", extra=extra)
-                return result
-            else:
-                extra = {'code': log_id}
-                logger.info("IU with user_id not found.", extra=extra)
-                print("IU with user_id not found.")
-                return None
-        else:
-            return None
-
-    except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
-        print(f"Error checking user: {e}")
-        return None
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-
-def get_check_rp_info_iu(user_id, log_id):
-    try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            select_query = """
-                SELECT wrp_id
-                FROM walletrelyingparty
-                WHERE intended_use = %s
-            """
-            
-            cursor.execute(select_query, (user_id,))
-            result = cursor.fetchall()
-            
-            if result: 
-                rp_data = [
-                    {"wrp_id": row[0]} 
-                    for row in result
-                ]
-                extra = {'code': log_id} 
                 logger.info(f"WRP found for the user_id: {user_id}", extra=extra)
-                return rp_data
+                return result
             else:
                 extra = {'code': log_id}
                 logger.info("WRP with user_id not found.", extra=extra)
@@ -1037,61 +996,102 @@ def get_check_rp_info_iu(user_id, log_id):
             cursor.close()
             connection.close()
 
-def remove_iu_wrp(id, log_id):
+def get_check_iu_info_rp(wrp_id, log_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            select_query = """
+                SELECT intendeduse_id
+                FROM intendeduse
+                WHERE wrp = %s
+            """
+            
+            cursor.execute(select_query, (wrp_id,))
+            result = cursor.fetchall()
+            
+            if result: 
+                rp_data = [
+                    {"intendeduse_id": row[0]} 
+                    for row in result
+                ]
+                extra = {'code': log_id} 
+                logger.info(f"Intended_Use found for the wrp_id: {wrp_id}", extra=extra)
+                return rp_data
+            else:
+                extra = {'code': log_id}
+                logger.info("Intended_Use with wrp_id not found.", extra=extra)
+                print("Intended_Use with wrp_id not found.")
+                return None
+        else:
+            return None
+
+    except pymysql.MySQLError as e:
+        extra = {'code': log_id}
+        logger.error(f"Error checking user: {e}", extra=extra)
+        print(f"Error checking user: {e}")
+        return None
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def remove_wrp_iu(id, log_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
             insert_query = """
-                                UPDATE walletrelyingparty 
-                                SET intended_use = NULL
-                                WHERE wrp_id = %s
+                                UPDATE intendeduse 
+                                SET wrp = NULL
+                                WHERE intendeduse_id = %s
                             """
             cursor.execute(insert_query, (id,))
             
             connection.commit()
             
             extra = {'code': log_id} 
-            logger.info(f"wrp successfully updated: {id}", extra=extra)
+            logger.info(f"Intended Use successfully updated: {id}", extra=extra)
 
-            print(f"wrp successfully updated: {id}")
+            print(f"Intended Use successfully updated: {id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code': log_id} 
-        logger.error(f"Error updating wrp: {e}", extra=extra)
-        print(f"Error updating wrp: {e}")
+        logger.error(f"Error updating Intended Use: {e}", extra=extra)
+        print(f"Error updating Intended Use: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def update_wrp_iu(le, wrp, log_id):
+def update_iu_wrp(wrp, iu, log_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
             insert_query = """
-                                UPDATE walletrelyingparty 
-                                SET intended_use = %s
-                                WHERE wrp_id = %s
+                                UPDATE intendeduse 
+                                SET wrp = %s
+                                WHERE intendeduse_id = %s
                             """
-            cursor.execute(insert_query, (le, wrp,))
+            cursor.execute(insert_query, (wrp, iu,))
             
             connection.commit()
             
             extra = {'code': log_id} 
-            logger.info(f"wrp successfully updated: {id}", extra=extra)
+            logger.info(f"Intended Use successfully updated: {id}", extra=extra)
 
-            print(f"wrp successfully updated: {id}")
+            print(f"Intended Use successfully updated: {id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code': log_id} 
-        logger.error(f"Error updating wrp: {e}", extra=extra)
-        print(f"Error updating wrp: {e}")
+        logger.error(f"Error updating Intended Use: {e}", extra=extra)
+        print(f"Error updating Intended Use: {e}")
     finally:
         if connection:
             cursor.close()

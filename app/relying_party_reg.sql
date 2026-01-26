@@ -46,11 +46,14 @@ CREATE TABLE IF NOT EXISTS `intendeduse` (
   `purpose` text DEFAULT NULL,
   `credential_id` int(11) DEFAULT NULL,
   `user_id` int(11) DEFAULT NULL,
+  `wrp` int(11) DEFAULT NULL,
   PRIMARY KEY (`intendeduse_id`),
   KEY `fk_iu_cred` (`credential_id`),
   KEY `fk_iu_user` (`user_id`),
+  KEY `fk_iu_wrp` (`wrp`),
   CONSTRAINT `fk_iu_cred` FOREIGN KEY (`credential_id`) REFERENCES `credential` (`credential_id`),
-  CONSTRAINT `fk_iu_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`)
+  CONSTRAINT `fk_iu_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`),
+  CONSTRAINT `fk_iu_wrp` FOREIGN KEY (`wrp`) REFERENCES `walletrelyingparty` (`wrp_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Exportação de dados não seleccionada.
@@ -75,7 +78,7 @@ CREATE TABLE IF NOT EXISTS `legalentity` (
   CONSTRAINT `fk_le_legalperson` FOREIGN KEY (`legalperson_id`) REFERENCES `legalperson` (`legalperson_id`),
   CONSTRAINT `fk_le_naturalperson` FOREIGN KEY (`naturalperson_id`) REFERENCES `naturalperson` (`naturalperson_id`),
   CONSTRAINT `fk_le_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Exportação de dados não seleccionada.
 
