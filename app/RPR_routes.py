@@ -363,21 +363,64 @@ def create_natural_person():
 @rpr.route('/natural_person/add_natural_person_db', methods=['GET','POST'])
 def add_natural_person_db():
 
-    temp_user_id = session['temp_user_id']
-    user = session[temp_user_id]
+    if 'temp_user_id' in session:   
+        temp_user_id = session['temp_user_id']
+        user = session[temp_user_id]
 
-    given_name= request.form.get("Given Name")
-    family_name=request.form.get("Family Name")
-    birthdate=request.form.get("Date of Birth")
-    birthplace=request.form.get( "Place of Birth")
+        given_name= request.form.get("Given Name")
+        family_name=request.form.get("Family Name")
+        birthdate=request.form.get("Date of Birth")
+        birthplace=request.form.get( "Place of Birth")
 
-    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
-    hash_pid = new_user.hash
-    user_id = db.check_user(hash_pid, session["session_id"])
+        new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+        hash_pid = new_user.hash
+        user_id = db.check_user(hash_pid, session["session_id"])
 
-    db.insert_user_naturalPerson(given_name, family_name, birthdate, birthplace, user_id, session["session_id"]) 
+        db.insert_user_naturalPerson(given_name, family_name, birthdate, birthplace, user_id, session["session_id"]) 
+    
+        return redirect('/natural_person/list')
+
+    else:
+        hash_pid = request.args.get("hash_pid")
+        given_name= request.args.get("given_name")
+        family_name=request.args.get("family_name")
+        birthdate=request.args.get("birthdate")
+        birthplace=request.args.get("birthplace")
+
+        required_fields = {
+            "hash_pid": hash_pid,
+            "given_name": given_name,
+            "family_name": family_name,
+            "birthdate": birthdate,
+            "birthplace": birthplace
+        }
+
+        missing_fields = [name for name, value in required_fields.items() if not value]
+
+        if missing_fields:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Missing required fields.",
+                "data": {
+                    "missing_fields": missing_fields
+                }
+            }, 400
+
+        session_id = str(uuid.uuid4())
+        user_id = db.check_user(hash_pid, session_id)
+
+        id = db.insert_user_naturalPerson(given_name, family_name, birthdate, birthplace, user_id, session_id) 
    
-    return redirect('/natural_person/list')
+        return {
+            "status": "success",
+            "code": 201,
+            "message": "Natural Person successfully created.",
+            "data": {
+                "Natural Person id": id
+            }
+        }, 201
+
 
 @rpr.route('/natural_person/update_legal_entities', methods=["GET", "POST"])
 def update_legal_entities():
@@ -407,15 +450,88 @@ def update_legal_entities():
 
     return redirect('/natural_person/list')
 
-def list_naturalPerson():
-    temp_user_id = session['temp_user_id']
-    user = session[temp_user_id]
-    
-    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
-    hash_pid = new_user.hash
-    user_id = db.check_user(hash_pid, session["session_id"])
+@rpr.route('/natural_person/ui_update_legal_entities', methods=["GET", "POST"])
+def ui_update_legal_entities():
 
-    person_dict = db.get_natural_person_info(user_id, session["session_id"])
+    data = request.get_json(silent=True)
+
+    if not data:
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+
+    hash_pid = data.get("hash_pid")
+    natural_person = data.get("natural_person")
+    legal_entities_ids = data.get("legal_entities_ids")
+
+    required_fields = {
+        "hash_pid": hash_pid,
+        "natural_person": natural_person,
+        "legal_entities_ids": legal_entities_ids
+    }
+
+    missing_fields = [name for name, value in required_fields.items() if not value]
+
+    if missing_fields:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Missing required fields.",
+            "data": {
+                "missing_fields": missing_fields
+            }
+        }, 400
+
+    if not isinstance(legal_entities_ids, list):
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Legal Entities ids must be a list"
+            }, 400
+    
+    session_id = str(uuid.uuid4())
+    user_id = db.check_user(hash_pid, session_id)
+    
+    all_natural_person = db.get_natural_person_info(user_id, session_id)
+    valid_natural_person_ids = {str(p["naturalperson_id"]) for p in all_natural_person}
+
+    if str(natural_person) not in valid_natural_person_ids:
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Natural person does not exist or does not belong to this user"
+            }, 400
+    
+    all_legal_entities = db.get_legal_entity_info(user_id, session_id)
+    valid_ids = {int(e["legalentity_id"]) for e in all_legal_entities}
+
+    invalid_ids = [
+        le_id for le_id in legal_entities_ids
+        if int(le_id) not in valid_ids
+    ]
+        
+    if invalid_ids:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Some legal entities do not exist or do not belong to this user",
+            "invalid_legal_entities_ids": invalid_ids
+        }, 400
+
+    for elem_id in legal_entities_ids:
+        db.update_naturalPerson_legal_entity(natural_person, elem_id, session_id)
+
+    return {
+        "status": "success",
+        "message": "Associations updated successfully",
+        "updated_count": len(legal_entities_ids)
+    }, 200
+
+def list_naturalPerson(user_id, session_id):
+
+    person_dict = db.get_natural_person_info(user_id, session_id)
     
     header_table=[ "Given Name", "Family Name", "Date of Birth", "Place of Birth"]
     
@@ -435,7 +551,7 @@ def list_naturalPerson():
             }
             data.update(data_temp)
     
-    legal_entity_dict = db.get_legal_entity_info(user_id, session["session_id"])
+    legal_entity_dict = db.get_legal_entity_info(user_id, session_id)
     
     list = []
     if(data != {}):
@@ -445,7 +561,7 @@ def list_naturalPerson():
                 name = item["identifier"]
 
                 if(item["naturalperson_id"] != None):
-                    person_name = db.get_natural_person_info_le(item["naturalperson_id"], session["session_id"])
+                    person_name = db.get_natural_person_info_le(item["naturalperson_id"], session_id)
 
                     new_item = {
                         "id": item["legalentity_id"],
@@ -470,12 +586,80 @@ def list_naturalPerson():
 @rpr.route('/natural_person/list')
 def natural_person_list():
 
-    temp_user_id = session['temp_user_id']
-    user = session[temp_user_id]
+    if 'temp_user_id' in session:
+        temp_user_id = session['temp_user_id']
+        user = session[temp_user_id]
         
-    menu, data, header_table, list = list_naturalPerson()
+        new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+        hash_pid = new_user.hash
+        user_id = db.check_user(hash_pid, session["session_id"])
+                
+        menu, data, header_table, list = list_naturalPerson(user_id, session["session_id"])
+            
+        return render_template("CertificateList.html", h1 = "Natural Person List", menu = menu, data=data, title="Natural Persons", list= list, header_table=header_table, url=cfgserv.service_url +"natural_person", temp_user_id = temp_user_id)
+
+    else:
+        hash_pid = request.args.get("hash_pid")
         
-    return render_template("CertificateList.html", h1 = "Natural Person List", menu = menu, data=data, title="Natural Persons", list= list, header_table=header_table, url=cfgserv.service_url +"natural_person", temp_user_id = temp_user_id)
+        session_id = str(uuid.uuid4())
+        user_id = db.check_user(hash_pid, session_id)
+        
+        menu, data, header_table, list = list_naturalPerson(user_id, session_id)
+
+        used_ids = {
+            str(item["associated_id"])
+            for item in list
+            if item["associated_id"] is not None
+        }
+
+        natural_persons = []
+        available = []
+
+        for pid, person in data.items():
+            p = {
+                "id": int(pid),
+                "given_name": person["Given Name"],
+                "family_name": person["Family Name"],
+                "date_of_birth": person["Date of Birth"],
+                "place_of_birth": person["Place of Birth"]
+            }
+            natural_persons.append(p)
+
+            if pid not in used_ids:
+                available.append({
+                    "id": int(pid),
+                    "given_name": person["Given Name"],
+                    "family_name": person["Family Name"]
+                })
+
+        legal_entities = []
+        
+        for le in list:
+            assoc_id = le["associated_id"]
+            legal_entities.append({
+                "id": le["id"],
+                "name": le["name"],
+                "associated": assoc_id is not None,
+                "natural_person": (
+                    {
+                        "id": assoc_id,
+                        "given_name": data[assoc_id]["Given Name"],
+                        "family_name": data[assoc_id]["Family Name"],
+                        "date_of_birth": data[assoc_id]["Date of Birth"],
+                        "place_of_birth": data[assoc_id]["Place of Birth"]
+                    } if assoc_id and assoc_id in data else None
+                )
+            })
+            
+        return {
+            "status": "success",
+            "code": 200,
+            "message": "Legal entities and natural persons retrieved successfully.",
+            "data": {
+                "legal_entities": legal_entities,
+                "natural_persons": natural_persons
+            }
+        }, 200
 
 @rpr.route('/legal_person/create_person', methods=['GET','POST'])
 def create_legal_person():
@@ -497,22 +681,66 @@ def create_legal_person():
 @rpr.route('/legal_person/add_legal_person_db', methods=['GET','POST'])
 def add_legal_person_db():
 
-    temp_user_id = session['temp_user_id']
-    user = session[temp_user_id]
+    if 'temp_user_id' in session:
+        temp_user_id = session['temp_user_id']
+        user = session[temp_user_id]
 
-    legal_name = request.form.get("Legal Name")
-    established_by_law = request.form.get("Established By Law")
-    lang = request.form.get("Lang")
+        legal_name = request.form.get("Legal Name")
+        established_by_law = request.form.get("Established By Law")
+        lang = request.form.get("Lang")
 
-    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
-    hash_pid = new_user.hash
-    user_id = db.check_user(hash_pid, session["session_id"])
+        new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+        hash_pid = new_user.hash
+        user_id = db.check_user(hash_pid, session["session_id"])
 
-    legalBasis = '[{"lang":"' + lang + '", "legalBasis":"' + established_by_law + '"}]'
+        legalBasis = '[{"lang":"' + lang + '", "legalBasis":"' + established_by_law + '"}]'
 
-    db.insert_user_legalPerson(legal_name, legalBasis, user_id, session["session_id"])
+        db.insert_user_legalPerson(legal_name, legalBasis, user_id, session["session_id"])
 
-    return redirect('/legal_person/list')
+        return redirect('/legal_person/list')
+    
+    else:
+        hash_pid = request.args.get("hash_pid")
+        legal_name= request.args.get("legal_name")
+        established_by_law=request.args.get("established_by_law")
+        lang=request.args.get("lang")
+
+        required_fields = {
+            "hash_pid": hash_pid,
+            "legal_name": legal_name,
+            "established_by_law": established_by_law,
+            "lang": lang
+        }
+
+        missing_fields = [name for name, value in required_fields.items() if not value]
+
+        if missing_fields:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Missing required fields.",
+                "data": {
+                    "missing_fields": missing_fields
+                }
+            }, 400
+
+        
+        session_id = str(uuid.uuid4())
+        user_id = db.check_user(hash_pid, session_id)
+
+        legalBasis = '[{"lang":"' + lang + '", "legalBasis":"' + established_by_law + '"}]'
+
+        id = db.insert_user_legalPerson(legal_name, legalBasis, user_id, session_id)
+
+        return {
+            "status": "success",
+            "code": 201,
+            "message": "Legal Person successfully created.",
+            "data": {
+                "legal_person_id": id
+            }
+        }, 201
+
 
 @rpr.route('/legal_person/update_legal_entities', methods=["GET", "POST"])
 def update_legal_person_entities():
@@ -540,15 +768,88 @@ def update_legal_person_entities():
     
     return redirect('/legal_person/list')
 
-def list_legalPerson():
-    temp_user_id = session['temp_user_id']
-    user = session[temp_user_id]
+@rpr.route('/legal_person/ui_update_legal_entities', methods=["GET", "POST"])
+def ui_update_legal_person_entities():
 
-    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
-    hash_pid = new_user.hash
-    user_id = db.check_user(hash_pid, session["session_id"])
+    data = request.get_json(silent=True)
+
+    if not data:
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+
+    hash_pid = data.get("hash_pid")
+    legal_person = data.get("legal_person")
+    legal_entities_ids = data.get("legal_entities_ids")
+
+    required_fields = {
+        "hash_pid": hash_pid,
+        "legal_person": legal_person,
+        "legal_entities_ids": legal_entities_ids
+    }
+
+    missing_fields = [name for name, value in required_fields.items() if not value]
+
+    if missing_fields:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Missing required fields.",
+            "data": {
+                "missing_fields": missing_fields
+            }
+        }, 400
+
+    if not isinstance(legal_entities_ids, list):
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Legal Entities ids must be a list"
+            }, 400
     
-    person_dict = db.get_legal_person_info(user_id, session["session_id"])
+    session_id = str(uuid.uuid4())
+    user_id = db.check_user(hash_pid, session_id)
+    
+    all_legal_person = db.get_legal_person_info(user_id, session_id)
+    valid_legal_person_ids = {str(p["legalperson_id"]) for p in all_legal_person}
+
+    if str(legal_person) not in valid_legal_person_ids:
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Legal person does not exist or does not belong to this user"
+            }, 400
+    
+    all_legal_entities = db.get_legal_entity_info(user_id, session_id)
+    valid_ids = {int(e["legalentity_id"]) for e in all_legal_entities}
+
+    invalid_ids = [
+        le_id for le_id in legal_entities_ids
+        if int(le_id) not in valid_ids
+    ]
+        
+    if invalid_ids:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Some legal entities do not exist or do not belong to this user",
+            "invalid_legal_entities_ids": invalid_ids
+        }, 400
+
+    for elem_id in legal_entities_ids:
+        db.update_legalPerson_legal_entity(legal_person, elem_id, session_id)
+
+    return {
+        "status": "success",
+        "message": "Associations updated successfully",
+        "updated_count": len(legal_entities_ids)
+    }, 200
+
+def list_legalPerson(user_id, session_id):
+
+    person_dict = db.get_legal_person_info(user_id, session_id)
 
     header_table=[ "Legal Name", "Established By Law"]
     if(person_dict == None):
@@ -565,7 +866,7 @@ def list_legalPerson():
             }
             data.update(data_temp)
 
-    legal_entity_dict = db.get_legal_entity_info(user_id, session["session_id"])
+    legal_entity_dict = db.get_legal_entity_info(user_id, session_id)
     
     list = []
     if(data != {}):
@@ -575,7 +876,7 @@ def list_legalPerson():
                 name = item["identifier"]
                 
                 if(item["legalperson_id"] != None):
-                    person_name = db.get_legal_person_info_le(item["legalperson_id"], session["session_id"])
+                    person_name = db.get_legal_person_info_le(item["legalperson_id"], session_id)
                     
                     new_item = {
                         "id": item["legalentity_id"],
@@ -600,12 +901,62 @@ def list_legalPerson():
 @rpr.route('/legal_person/list')
 def legal_person_list():
 
-    temp_user_id = session['temp_user_id']
-    user = session[temp_user_id]
-        
-    menu, data, header_table, list = list_legalPerson()
+    if 'temp_user_id' in session:
+        temp_user_id = session['temp_user_id']
+        user = session[temp_user_id]
 
-    return render_template("CertificateList.html", h1 = "Legal Person List", list = list, menu = menu, data=data, title="Legal Persons", header_table=header_table, url=cfgserv.service_url +"legal_person", temp_user_id = temp_user_id)
+        new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+        hash_pid = new_user.hash
+        user_id = db.check_user(hash_pid, session["session_id"])
+            
+        menu, data, header_table, list = list_legalPerson(user_id, session["session_id"])
+
+        return render_template("CertificateList.html", h1 = "Legal Person List", list = list, menu = menu, data=data, title="Legal Persons", header_table=header_table, url=cfgserv.service_url +"legal_person", temp_user_id = temp_user_id)
+    
+    else:
+        hash_pid = request.args.get("hash_pid")
+        
+        session_id = str(uuid.uuid4())
+        user_id = db.check_user(hash_pid, session_id)
+        menu, data, header_table, list = list_legalPerson(user_id, session_id)
+        
+        legal_persons = {}
+
+        for lp_id, lp_data in data.items():
+            legal_persons[int(lp_id)] = {
+                "legal_name": lp_data["Legal Name"],
+                "established_by_law": json.loads(lp_data["Established By Law"])
+            }
+
+        legal_entities = []
+
+        for entity in list:
+            associated_id = entity["associated_id"]
+
+            legal_entities.append({
+                "id": entity["id"],
+                "name": entity["name"],
+                "associated": associated_id is not None,
+                "legal_person": (
+                    {
+                        "id": associated_id,
+                        **legal_persons.get(associated_id, {})
+                    }
+                    if associated_id in legal_persons else None
+                )
+            })
+
+        return {
+            "status": "success",
+            "code": 200,
+            "message": "Legal entities and legal persons retrieved successfully.",
+            "data": {
+                "legal_entities": legal_entities,
+                "legal_persons": legal_persons
+            }
+        }, 200
+
+
 
 @rpr.route('/legal_entity/create_person', methods=['GET','POST'])
 def create_legal_entity():                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
@@ -642,25 +993,74 @@ def create_legal_entity():
 
 @rpr.route('/legal_entity/add_legal_entity_db', methods=['GET','POST'])
 def add_legal_entity_db():
-
-    temp_user_id = session['temp_user_id']
-    user = session[temp_user_id]
     
-    type_of_identifier= request.form.get("Type of Identifier")
-    identifier= request.form.get("Identifier")
-    address=request.form.get("address")
-    email=request.form.get("email")
-    phone_number=request.form.get("phone_number")
-    information_URI=request.form.get("Information URI")
-    country=request.form.get("Country")
+    if 'temp_user_id' in session: 
+        temp_user_id = session['temp_user_id']
+        user = session[temp_user_id]
+        
+        type_of_identifier= request.form.get("Type of Identifier")
+        identifier= request.form.get("Identifier")
+        address=request.form.get("address")
+        email=request.form.get("email")
+        phone_number=request.form.get("phone_number")
+        information_URI=request.form.get("Information URI")
+        country=request.form.get("Country")
 
-    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
-    hash_pid = new_user.hash
-    user_id = db.check_user(hash_pid, session["session_id"])
+        new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+        hash_pid = new_user.hash
+        user_id = db.check_user(hash_pid, session["session_id"])
 
-    db.insert_legal_entity(address, country, email, phone_number, information_URI, identifier, type_of_identifier, user_id, session["session_id"]) 
+        db.insert_legal_entity(address, country, email, phone_number, information_URI, identifier, type_of_identifier, user_id, session["session_id"]) 
+        
+        return redirect('/legal_entity/list')
     
-    return redirect('/legal_entity/list')
+    else:
+        hash_pid = request.args.get("hash_pid")
+        type_of_identifier = request.args.get("type_of_identifier")
+        identifier = request.args.get("identifier")
+        address = request.args.get("address")
+        email = request.args.get("email")
+        phone_number = request.args.get("phone_number")
+        information_URI = request.args.get("information_URI")
+        country = request.args.get("country")
+
+        required_fields = {
+            "hash_pid": hash_pid,
+            "type_of_identifier": type_of_identifier,
+            "identifier": identifier,
+            "address": address,
+            "email": email,
+            "phone_number": type_of_identifier,
+            "information_URI": identifier,
+            "country": address
+        }
+
+        missing_fields = [name for name, value in required_fields.items() if not value]
+
+        if missing_fields:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Missing required fields.",
+                "data": {
+                    "missing_fields": missing_fields
+                }
+            }, 400
+        
+        session_id = str(uuid.uuid4())
+        user_id = db.check_user(hash_pid, session_id)
+
+        id = db.insert_legal_entity(address, country, email, phone_number, information_URI, identifier, type_of_identifier, user_id, session["session_id"]) 
+        
+        return {
+            "status": "success",
+            "code": 201,
+            "message": "Legal Entity successfully created.",
+            "data": {
+                "Legal Entity id": id
+            }
+        }, 201
+        
 
 @rpr.route('/legal_entity/edit', methods=["GET", "POST"])
 def legal_entity_edit():
@@ -740,16 +1140,225 @@ def update_RPs():
             return ("err")
 
     return redirect('/legal_entity/list')
+
+@rpr.route('/legal_entity/ui_update_RPs', methods=["GET", "POST"])
+def ui_update_RPs():
+
+    data = request.get_json(silent=True)
+
+    if not data:
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+
+    hash_pid = data.get("hash_pid")
+    legal_entity = data.get("legal_entity")
+    relying_parties = data.get("relying_parties")
+
+    required_fields = {
+        "hash_pid": hash_pid,
+        "legal_entity": legal_entity,
+        "relying_parties": relying_parties
+    }
+
+    missing_fields = [name for name, value in required_fields.items() if not value]
+
+    if missing_fields:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Missing required fields.",
+            "data": {
+                "missing_fields": missing_fields
+            }
+        }, 400
+
+    if not isinstance(relying_parties, list):
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Legal Entities ids must be a list"
+            }, 400
     
-def list_legalEntity():
-    temp_user_id = session['temp_user_id']
-    user = session[temp_user_id]
+    session_id = str(uuid.uuid4())
+    user_id = db.check_user(hash_pid, session_id)
     
-    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
-    hash_pid = new_user.hash
-    user_id = db.check_user(hash_pid, session["session_id"])
+    all_legal_entities = db.get_legal_entity_info(user_id, session_id)
+    valid_legal_person_ids = {str(p["legalentity_id"]) for p in all_legal_entities}
+
+    if str(legal_entity) not in valid_legal_person_ids:
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Legal person does not exist or does not belong to this user"
+            }, 400
     
-    legal_entity_dict = db.get_legal_entity_info(user_id, session["session_id"])
+    all_wrp = db.get_rp_info(user_id, session_id)
+    valid_ids = {int(e["wrp_id"]) for e in all_wrp}
+
+    invalid_ids = [
+        le_id for le_id in relying_parties
+        if int(le_id) not in valid_ids
+    ]
+        
+    if invalid_ids:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Some legal entities do not exist or do not belong to this user",
+            "invalid_relying_parties": invalid_ids
+        }, 400
+
+    for elem_id in relying_parties:
+        db.update_wrp_legal_entity(legal_entity, elem_id, session_id)
+
+    return {
+        "status": "success",
+        "message": "Associations updated successfully",
+        "updated_count": len(relying_parties)
+    }, 200
+
+  
+@rpr.route('/legal_entity/ui_remove_update_natural_person', methods=["GET", "POST"])
+def ui_remove_update_natural_person():
+
+    data = request.get_json(silent=True)
+
+    if not data:
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+
+    hash_pid = data.get("hash_pid")
+    legal_entity = data.get("legal_entity")
+
+    required_fields = {
+        "hash_pid": hash_pid,
+        "legal_entity": legal_entity,
+    }
+
+    missing_fields = [name for name, value in required_fields.items() if not value]
+
+    if missing_fields:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Missing required fields.",
+            "data": {
+                "missing_fields": missing_fields
+            }
+        }, 400
+
+    if not isinstance(legal_entity, list):
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Legal Entities ids must be a list"
+            }, 400
+    
+    session_id = str(uuid.uuid4())
+    user_id = db.check_user(hash_pid, session_id)
+    
+    all_legal_entities = db.get_legal_entity_info(user_id, session_id)
+    valid_legal_person_ids = {p["legalentity_id"] for p in all_legal_entities}
+
+    invalid_ids = [
+        le_id for le_id in legal_entity
+        if int(le_id) not in valid_legal_person_ids
+    ]
+        
+    if invalid_ids:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Some legal entities do not exist or do not belong to this user",
+            "invalid_legal_entities": invalid_ids
+        }, 400
+
+    for elem_id in legal_entity:
+        db.update_naturalPerson_legal_entity(None, elem_id, session_id)
+
+    return {
+        "status": "success",
+        "message": "Associations updated successfully",
+        "updated_count": len(legal_entity)
+    }, 200
+  
+
+@rpr.route('/legal_entity/ui_remove_update_legal_person', methods=["GET", "POST"])
+def ui_remove_update_legal_person():
+
+    data = request.get_json(silent=True)
+
+    if not data:
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+
+    hash_pid = data.get("hash_pid")
+    legal_entity = data.get("legal_entity")
+
+    required_fields = {
+        "hash_pid": hash_pid,
+        "legal_entity": legal_entity,
+    }
+
+    missing_fields = [name for name, value in required_fields.items() if not value]
+
+    if missing_fields:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Missing required fields.",
+            "data": {
+                "missing_fields": missing_fields
+            }
+        }, 400
+
+    if not isinstance(legal_entity, list):
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Legal Entities ids must be a list"
+            }, 400
+    
+    session_id = str(uuid.uuid4())
+    user_id = db.check_user(hash_pid, session_id)
+    
+    all_legal_entities = db.get_legal_entity_info(user_id, session_id)
+    valid_legal_person_ids = {p["legalentity_id"] for p in all_legal_entities}
+
+    invalid_ids = [
+        le_id for le_id in legal_entity
+        if int(le_id) not in valid_legal_person_ids
+    ]
+        
+    if invalid_ids:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Some legal entities do not exist or do not belong to this user",
+            "invalid_legal_entities": invalid_ids
+        }, 400
+
+    for elem_id in legal_entity:
+        db.update_legalPerson_legal_entity(None, elem_id, session_id)
+
+    return {
+        "status": "success",
+        "message": "Associations updated successfully",
+        "updated_count": len(legal_entity)
+    }, 200
+  
+def list_legalEntity(user_id, session_id):
+
+    legal_entity_dict = db.get_legal_entity_info(user_id, session_id)
     
     header_table=[ "Identifier","Postal Address","Country","E-mail","Phone","Information URI"]
     
@@ -771,7 +1380,7 @@ def list_legalEntity():
             }
             data.update(data_temp)
     
-    RP_dict = db.get_rp_info(user_id, session["session_id"])
+    RP_dict = db.get_rp_info(user_id, session_id)
     
     list = []
     if(data != {}):
@@ -781,7 +1390,7 @@ def list_legalEntity():
                 name_txt = item["tradeName"]
 
                 if(item["supervisorAuthority"] != None):    
-                    legal_entity_name = db.get_legal_entity_info_rp(item["supervisorAuthority"], session["session_id"])
+                    legal_entity_name = db.get_legal_entity_info_rp(item["supervisorAuthority"], session_id)
                     
                     new_item = {
                         "id": item["wrp_id"],
@@ -805,13 +1414,65 @@ def list_legalEntity():
 
 @rpr.route('/legal_entity/list')
 def legal_entity_list():
+    
+    if 'temp_user_id' in session:
+        temp_user_id = session['temp_user_id']
+        user = session[temp_user_id]
 
-    temp_user_id = session['temp_user_id']
-    user = session[temp_user_id]
-
-    menu, data, header_table, list = list_legalEntity()
+        new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+        hash_pid = new_user.hash
+        user_id = db.check_user(hash_pid, session["session_id"])
             
-    return render_template("CertificateList.html", h1 = "Legal Entity List", menu = menu, data=data, title="Legal Entities", list= list, header_table=header_table, url=cfgserv.service_url +"legal_entity", temp_user_id = temp_user_id)
+        menu, data, header_table, list = list_legalEntity(user_id, session["session_id"])
+                
+        return render_template("CertificateList.html", h1 = "Legal Entity List", menu = menu, data=data, title="Legal Entities", list= list, header_table=header_table, url=cfgserv.service_url +"legal_entity", temp_user_id = temp_user_id)
+
+    else:
+        hash_pid = request.args.get("hash_pid")
+        
+        session_id = str(uuid.uuid4())
+        user_id = db.check_user(hash_pid, session_id)
+        
+        menu, data, header_table, list = list_legalEntity(user_id, session_id)
+        
+        legal_entities = []
+        for rp_id, rp in data.items():
+            legal_entities.append({
+                "id": int(rp_id),
+                "country": rp["Country"],
+                "email": rp["E-mail"],
+                "identifier": rp["Identifier"],
+                "info_uri": rp["Information URI"],
+                "phone": rp["Phone"],
+                "postal_address": rp["Postal Address"]
+            })
+
+        relying_parties = []
+        for le in list:
+            relying_parties.append({
+                "id": le["id"],
+                "name": le["name"],
+                "associated": le["associated_id"] is not None,
+                "associated_rp": (
+                    {
+                        "id": le["associated_id"],
+                        "name": le["ass_name"][0] if le["ass_name"] else None
+                    }
+                    if le["associated_id"] else None
+                )
+            })
+
+        return {
+            "status": "success",
+            "code": 200,
+            "message": "Relying Parties and Legal Entities retrieved successfully.",
+            "data": {
+                "relying_parties": relying_parties,
+                "legal_entities": legal_entities
+            }
+        }, 200
+
+
 
 
 @rpr.route('/RP/create_person', methods=['GET','POST'])
@@ -867,28 +1528,81 @@ def RP_create():
 @rpr.route('/RP/add_RP_db', methods=['GET','POST'])
 def add_RP_db():
 
-    temp_user_id = session['temp_user_id']
-    user = session[temp_user_id]
+    if 'temp_user_id' in session:  
+        temp_user_id = session['temp_user_id']
+        user = session[temp_user_id]
 
-    trade_name= request.form.get("Trade Name")
-    support_URI= request.form.get("Support URI")
-    srvDescription_lang=request.form.get("Lang")
-    srvDescription=request.form.get("Services Description")
-    entitlement= request.form.get("Entitlement")
-    registry_uri=request.form.get("Registry URI")
-    type_of_policy=request.form.get("Type of Policy")
-    policy_uri=request.form.get("Policy URI")
-    x5c=request.form.get("x5c")
+        trade_name= request.form.get("Trade Name")
+        support_URI= request.form.get("Support URI")
+        srvDescription_lang=request.form.get("Lang")
+        srvDescription=request.form.get("Services Description")
+        entitlement= request.form.get("Entitlement")
+        registry_uri=request.form.get("Registry URI")
+        type_of_policy=request.form.get("Type of Policy")
+        policy_uri=request.form.get("Policy URI")
+        x5c=request.form.get("x5c")
+        
+        srvDescription = '[{"lang":"' + srvDescription_lang + '", "srvDescription":"' + srvDescription + '"}]'
+        
+        new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+        hash_pid = new_user.hash
+        user_id = db.check_user(hash_pid, session["session_id"])
+
+        db.insert_RP(trade_name, support_URI, srvDescription, entitlement, registry_uri, type_of_policy, policy_uri, x5c, user_id, session["session_id"])
+
+        return redirect('/RP/list')
     
-    srvDescription = '[{"lang":"' + srvDescription_lang + '", "srvDescription":"' + srvDescription + '"}]'
-    
-    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
-    hash_pid = new_user.hash
-    user_id = db.check_user(hash_pid, session["session_id"])
+    else:
+        hash_pid = request.args.get("hash_pid")
+        trade_name = request.args.get("trade_name")
+        support_URI = request.args.get("support_URI")
+        srvDescription_lang = request.args.get("srvDescription_lang")
+        srvDescription = request.args.get("srvDescription")
+        entitlement = request.args.get("entitlement")
+        registry_uri = request.args.get("registry_uri")
+        type_of_policy = request.args.get("type_of_policy")
+        policy_uri = request.args.get("policy_uri")
+        x5c = request.args.get("x5c")
 
-    db.insert_RP(trade_name, support_URI, srvDescription, entitlement, registry_uri, type_of_policy, policy_uri, x5c, user_id, session["session_id"])
+        required_fields = {
+            "hash_pid": hash_pid,
+            "trade_name": trade_name,
+            "support_URI": support_URI,
+            "srvDescription_lang": srvDescription_lang,
+            "srvDescription": srvDescription,
+            "entitlement": entitlement,
+            "registry_uri": registry_uri,
+            "type_of_policy": type_of_policy,
+            "policy_uri": policy_uri,
+            "x5c": x5c
+        }
 
-    return redirect('/RP/list')
+        missing_fields = [name for name, value in required_fields.items() if not value]
+
+        if missing_fields:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Missing required fields.",
+                "data": {
+                    "missing_fields": missing_fields
+                }
+            }, 400
+        
+        session_id = str(uuid.uuid4())
+        user_id = db.check_user(hash_pid, session_id)
+
+        id = db.insert_RP(trade_name, support_URI, srvDescription, entitlement, registry_uri, type_of_policy, policy_uri, x5c, user_id, session["session_id"])
+
+        return {
+            "status": "success",
+            "code": 201,
+            "message": "Relying Party successfully created.",
+            "data": {
+                "Relying Party id": id
+            }
+        }, 201
+
 
 @rpr.route('/RP/edit', methods=["GET", "POST"])
 def RP_edit():
@@ -941,15 +1655,9 @@ def RP_edit_db():
     else:
         return redirect('/RP/list')
 
-def wallet_rp_list():
-    temp_user_id = session['temp_user_id']
-    user = session[temp_user_id]
+def wallet_rp_list(user_id, session_id):
 
-    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
-    hash_pid = new_user.hash
-    user_id = db.check_user(hash_pid, session["session_id"])
-    
-    RP_dict = db.get_rp_info(user_id, session["session_id"])
+    RP_dict = db.get_rp_info(user_id, session_id)
     
     header_table=[ "Trade Name","Support URIs","Description","Entitlement","Provides Attestations","Supervisory Authority","Registry URI"]
     
@@ -972,7 +1680,7 @@ def wallet_rp_list():
             }
             data.update(data_temp)
     
-    iu_dict = db.get_intended_use_info(user_id, session["session_id"])
+    iu_dict = db.get_intended_use_info(user_id, session_id)
 
     list = []
     if(data != {}):
@@ -982,7 +1690,7 @@ def wallet_rp_list():
                 name_txt = item["intendedUseIdentifier"]
                 
                 if(item["wrp"] != None):
-                    wrp_name = db.get_iu_info_rp(item["wrp"], session["session_id"])
+                    wrp_name = db.get_iu_info_rp(item["wrp"], session_id)
                     
                     new_item = {
                         "id": item["intendeduse_id"],
@@ -1009,16 +1717,70 @@ def wallet_rp_list():
 @rpr.route('/RP/list', methods=['GET','POST'])
 def RP_list():
     
-    temp_user_id = session['temp_user_id']
-    user = session[temp_user_id]
+    if 'temp_user_id' in session:
+        temp_user_id = session['temp_user_id']
+        user = session[temp_user_id]
+        
+        new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+        hash_pid = new_user.hash
+        user_id = db.check_user(hash_pid, session["session_id"])
 
-    menu, data, header_table, list = wallet_rp_list()
-    return render_template("CertificateList.html", h1 = "Relying Party List", menu = menu, data=data, title="Relying Parties", header_table=header_table, list= list, url=cfgserv.service_url +"RP", temp_user_id = temp_user_id)
+        menu, data, header_table, list = wallet_rp_list(user_id, session["session_id"])
+
+        return render_template("CertificateList.html", h1 = "Relying Party List", menu = menu, data=data, title="Relying Parties", header_table=header_table, list= list, url=cfgserv.service_url +"RP", temp_user_id = temp_user_id)
+
+    else:
+        hash_pid = request.args.get("hash_pid")
+        
+        session_id = str(uuid.uuid4())
+        user_id = db.check_user(hash_pid, session_id)
+        menu, data, header_table, list = wallet_rp_list(user_id, session_id)
+
+        wrp = {}
+
+        for lp_id, lp_data in data.items():
+            wrp[int(lp_id)] = {
+                "entitlement": lp_data["Entitlement"],
+                "description": json.loads(lp_data["Description"]),
+                "provides_attestations": lp_data["Provides Attestations"],
+                "registry_URI": lp_data["Registry URI"],
+                "supervisory_authority": lp_data["Supervisory Authority"],
+                "support_URIs": lp_data["Support URIs"],
+                "trade_name": lp_data["Trade Name"]
+            }
+        
+        intended_use = []
+
+        for entity in list:
+            associated_id = entity["associated_id"]
+
+            intended_use.append({
+                "id": entity["id"],
+                "name": entity["name"],
+                "associated": associated_id is not None,
+                "wallet_relying_party": (
+                    {
+                        "id": associated_id,
+                        **wrp.get(associated_id, {})
+                    }
+                    if associated_id in wrp else None
+                )
+            })
+
+        return {
+            "status": "success",
+            "code": 200,
+            "message": "Wallet Relying Party and Intended Use retrieved successfully.",
+            "data": {
+                "relying_parties": wrp,
+                "intended_uses": intended_use
+            }
+        }, 200
+
 
 @rpr.route('/RP/update_intended_use', methods=["GET", "POST"])
 def update_iu_rp():
     
-    print("\n\n\n\n\nentrou")
     rp_id = request.args.get("id")
     RPs = ast.literal_eval(request.args.get("checks"))
     temp_user_id = session['temp_user_id']
@@ -1042,6 +1804,152 @@ def update_iu_rp():
     
     return redirect('/RP/list')
 
+
+@rpr.route('/RP/ui_update_intended_use', methods=["GET", "POST"])
+def ui_update_intended_use():
+
+    data = request.get_json(silent=True)
+
+    if not data:
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+
+    hash_pid = data.get("hash_pid")
+    relying_party = data.get("relying_party")
+    intended_uses = data.get("intended_uses")
+
+    required_fields = {
+        "hash_pid": hash_pid,
+        "relying_party": relying_party,
+        "intended_uses": intended_uses
+    }
+
+    missing_fields = [name for name, value in required_fields.items() if not value]
+
+    if missing_fields:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Missing required fields.",
+            "data": {
+                "missing_fields": missing_fields
+            }
+        }, 400
+
+    if not isinstance(intended_uses, list):
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Relying Party ids must be a list"
+            }, 400
+    
+    session_id = str(uuid.uuid4())
+    user_id = db.check_user(hash_pid, session_id)
+    
+    all_relying_party = db.get_rp_info(user_id, session_id)
+    valid_relying_party_ids = {str(p["wrp_id"]) for p in all_relying_party}
+
+    if str(relying_party) not in valid_relying_party_ids:
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Relying Party does not exist or does not belong to this user"
+            }, 400
+    
+    all_iu = db.get_intended_use_info(user_id, session_id)
+    valid_ids = {int(e["intendeduse_id"]) for e in all_iu}
+
+    invalid_ids = [
+        le_id for le_id in intended_uses
+        if int(le_id) not in valid_ids
+    ]
+        
+    if invalid_ids:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Some Intended Uses do not exist or do not belong to this user",
+            "invalid_intended_uses": invalid_ids
+        }, 400
+
+    for elem_id in intended_uses:
+        db.update_iu_wrp(relying_party, elem_id, session_id)
+
+    return {
+        "status": "success",
+        "message": "Associations updated successfully",
+        "updated_count": len(intended_uses)
+    }, 200
+
+@rpr.route('/RP/ui_remove_update_legal_entity', methods=["GET", "POST"])
+def ui_remove_update_legal_entity():
+
+    data = request.get_json(silent=True)
+
+    if not data:
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+
+    hash_pid = data.get("hash_pid")
+    relying_party = data.get("relying_party")
+
+    required_fields = {
+        "hash_pid": hash_pid,
+        "relying_party": relying_party,
+    }
+
+    missing_fields = [name for name, value in required_fields.items() if not value]
+
+    if missing_fields:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Missing required fields.",
+            "data": {
+                "missing_fields": missing_fields
+            }
+        }, 400
+
+    if not isinstance(relying_party, list):
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Relying Parties ids must be a list"
+            }, 400
+    
+    session_id = str(uuid.uuid4())
+    user_id = db.check_user(hash_pid, session_id)
+    
+    all_relying_party = db.get_rp_info(user_id, session_id)
+    valid_relying_party_ids = {p["wrp_id"] for p in all_relying_party}
+
+    invalid_ids = [
+        le_id for le_id in relying_party
+        if int(le_id) not in valid_relying_party_ids
+    ]
+        
+    if invalid_ids:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Some Relying Parties do not exist or do not belong to this user",
+            "invalid_legal_entities": invalid_ids
+        }, 400
+
+    for elem_id in relying_party:
+        db.update_wrp_legal_entity(None, elem_id, session_id)
+
+    return {
+        "status": "success",
+        "message": "Associations updated successfully",
+        "updated_count": len(relying_party)
+    }, 200
 
 @rpr.route('/intended_use/create_person', methods=['GET','POST'])
 def intended_use_create():
@@ -1083,26 +1991,74 @@ def intended_use_create():
 @rpr.route('/intended_use/add_intended_use_db', methods=['GET','POST'])
 def add_intended_use_db():
 
-    temp_user_id = session['temp_user_id']
-    user = session[temp_user_id]
- 
-    purpose=request.form.get("Purpose")
-    purpose_lang=request.form.get("Lang")
-    type_policy=request.form.get("Type of Privacy Policy")
-    policy_uri=request.form.get("Privacy Policy URI")
-    createAt=request.form.get("Created at")
-    revokeAt=request.form.get("Revoked at")
-    intendedUseIdentifier=request.form.get("Intended Use Identifier")
+    if 'temp_user_id' in session:
+        temp_user_id = session['temp_user_id']
+        user = session[temp_user_id]
     
-    purpose = '[{"lang":"' + purpose_lang + '", "srvDescription":"' + purpose + '"}]'
+        purpose=request.form.get("Purpose")
+        purpose_lang=request.form.get("Lang")
+        type_policy=request.form.get("Type of Privacy Policy")
+        policy_uri=request.form.get("Privacy Policy URI")
+        createAt=request.form.get("Created at")
+        revokeAt=request.form.get("Revoked at")
+        intendedUseIdentifier=request.form.get("Intended Use Identifier")
+        
+        purpose = '[{"lang":"' + purpose_lang + '", "srvDescription":"' + purpose + '"}]'
+        
+        new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+        hash_pid = new_user.hash
+        user_id = db.check_user(hash_pid, session["session_id"])
+
+        db.insert_intended_use(createAt, revokeAt, intendedUseIdentifier, type_policy, policy_uri, purpose, user_id, session["session_id"])
+
+        return redirect('/intended_use/list')
     
-    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
-    hash_pid = new_user.hash
-    user_id = db.check_user(hash_pid, session["session_id"])
+    else:
+        hash_pid = request.args.get("hash_pid")
+        purpose = request.args.get("purpose")
+        purpose_lang = request.args.get("purpose_lang")
+        type_policy = request.args.get("type_policy")
+        policy_uri = request.args.get("policy_uri")
+        createAt = request.args.get("createAt")
+        revokeAt = request.args.get("revokeAt")
+        intendedUseIdentifier = request.args.get("intendedUseIdentifier")
 
-    db.insert_intended_use(createAt, revokeAt, intendedUseIdentifier, type_policy, policy_uri, purpose, user_id, session["session_id"])
+        required_fields = {
+            "hash_pid": hash_pid,
+            "purpose": purpose,
+            "purpose_lang": purpose_lang,
+            "type_policy": type_policy,
+            "policy_uri": policy_uri,
+            "createAt": createAt,
+            "revokeAt": revokeAt,
+            "intendedUseIdentifier": intendedUseIdentifier
+        }
 
-    return redirect('/intended_use/list')
+        missing_fields = [name for name, value in required_fields.items() if not value]
+
+        if missing_fields:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Missing required fields.",
+                "data": {
+                    "missing_fields": missing_fields
+                }
+            }, 400
+
+        session_id = str(uuid.uuid4())
+        user_id = db.check_user(hash_pid, session_id)
+
+        id = db.insert_intended_use(createAt, revokeAt, intendedUseIdentifier, type_policy, policy_uri, purpose, user_id, session["session_id"])
+
+        return {
+            "status": "success",
+            "code": 201,
+            "message": "Intended Use successfully created.",
+            "data": {
+                "Intended Use id": id
+            }
+        }, 201
 
 @rpr.route('/intended_use/edit', methods=["GET", "POST"])
 def intended_use_edit():
@@ -1155,16 +2111,9 @@ def intended_use_edit_db():
     else:
         return redirect('/intended_use/list')
     
-def list_intended_use():
+def list_intended_use(user_id, session_id):
 
-    temp_user_id = session['temp_user_id']
-    user = session[temp_user_id]
-    
-    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
-    hash_pid = new_user.hash
-    user_id = db.check_user(hash_pid, session["session_id"])
-    
-    intended_use_dict = db.get_intended_use_info(user_id, session["session_id"])
+    intended_use_dict = db.get_intended_use_info(user_id, session_id)
     
     header_table=[ "Identifier","Purpose","Created At","Revoked At","Type of Policy", "Policy URI"]
 
@@ -1189,42 +2138,210 @@ def list_intended_use():
 
     return menu, data, header_table
 
-@rpr.route('/intended_use/update_RPs', methods=["GET", "POST"])
-def update_RPs_iu():
-    
-    iu_id = request.args.get("id")
-    RPs = ast.literal_eval(request.args.get("checks"))
-    
-    temp_user_id = session['temp_user_id']
-
-    check_rp = db.get_check_rp_info_iu(iu_id, session["session_id"]) or []
-
-    previous = { x["wrp_id"] for x in check_rp }
-    current = { int(x) for x in RPs }
-    to_remove = previous - current
-
-    for elem in to_remove:
-        db.remove_iu_wrp(elem, session["session_id"])
-    
-    for elem in RPs:
-        RP_id = int(elem)
-        
-        check = db.update_wrp_iu(iu_id, RP_id, session["session_id"])
-        
-        if check is None:
-            return ("err")
-    
-    return redirect('/intended_use/list')
-
 @rpr.route('/intended_use/list', methods=['GET','POST'])
 def intended_use_list():
 
-    temp_user_id = session['temp_user_id']
-    user = session[temp_user_id]
+    if 'temp_user_id' in session:
+        temp_user_id = session['temp_user_id']
+        user = session[temp_user_id]
 
-    menu, data, header_table = list_intended_use()
+        new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+        hash_pid = new_user.hash
+        user_id = db.check_user(hash_pid, session["session_id"])
+            
+        menu, data, header_table = list_intended_use(user_id, session["session_id"])
 
-    return render_template("CertificateList.html", h1 = "Intended Use List", menu = menu, data=data, title="Intended Uses", header_table=header_table, url=cfgserv.service_url +"intended_use", temp_user_id = temp_user_id)
+        return render_template("CertificateList.html", h1 = "Intended Use List", menu = menu, data=data, title="Intended Uses", header_table=header_table, url=cfgserv.service_url +"intended_use", temp_user_id = temp_user_id)
+
+    else:
+        hash_pid = request.args.get("hash_pid")
+        
+        session_id = str(uuid.uuid4())
+        user_id = db.check_user(hash_pid, session_id)
+             
+        menu, data, header_table = list_intended_use(user_id, session_id)
+
+        intended_use = {}
+
+        for lp_id, lp_data in data.items():
+            intended_use[int(lp_id)] = {
+                "created_at	": lp_data["Created At"],
+                "identifier": lp_data["Identifier"],
+                "policy_URI": lp_data["Policy URI"],
+                "purpose": json.loads(lp_data["Purpose"]),
+                "revoked_at": lp_data["Revoked At"],
+                "type_of_policy": lp_data["Type of Policy"]
+            }
+            
+        return {
+            "status": "success",
+            "code": 200,
+            "message": "Intended Use retrieved successfully.",
+            "data": {
+                "intended_use": intended_use
+            }
+        }, 200
+
+# @rpr.route('/intended_use/update_RPs', methods=["GET", "POST"])
+# def update_RPs_iu():
+    
+#     iu_id = request.args.get("id")
+#     RPs = ast.literal_eval(request.args.get("checks"))
+    
+#     temp_user_id = session['temp_user_id']
+
+#     check_rp = db.get_check_rp_info_iu(iu_id, session["session_id"]) or []
+
+#     previous = { x["wrp_id"] for x in check_rp }
+#     current = { int(x) for x in RPs }
+#     to_remove = previous - current
+
+#     for elem in to_remove:
+#         db.remove_iu_wrp(elem, session["session_id"])
+    
+#     for elem in RPs:
+#         RP_id = int(elem)
+        
+#         check = db.update_wrp_iu(iu_id, RP_id, session["session_id"])
+        
+#         if check is None:
+#             return ("err")
+    
+#     return redirect('/intended_use/list')
+
+@rpr.route('/intended_use/ui_remove_update_relying_party', methods=["GET", "POST"])
+def ui_remove_update_relying_party():
+
+    data = request.get_json(silent=True)
+
+    if not data:
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+
+    hash_pid = data.get("hash_pid")
+    intended_use = data.get("intended_use")
+
+    required_fields = {
+        "hash_pid": hash_pid,
+        "intended_use": intended_use,
+    }
+
+    missing_fields = [name for name, value in required_fields.items() if not value]
+
+    if missing_fields:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Missing required fields.",
+            "data": {
+                "missing_fields": missing_fields
+            }
+        }, 400
+
+    if not isinstance(intended_use, list):
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Intended Use ids must be a list"
+            }, 400
+    
+    session_id = str(uuid.uuid4())
+    user_id = db.check_user(hash_pid, session_id)
+    
+    all_intended_use = db.get_intended_use_info(user_id, session_id)
+    valid_intended_use_ids = {p["intendeduse_id"] for p in all_intended_use}
+
+    invalid_ids = [
+        le_id for le_id in intended_use
+        if int(le_id) not in valid_intended_use_ids
+    ]
+        
+    if invalid_ids:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Some Intended Use do not exist or do not belong to this user",
+            "invalid_legal_entities": invalid_ids
+        }, 400
+
+    for elem_id in intended_use:
+        db.update_iu_wrp(None, elem_id, session_id)
+
+    return {
+        "status": "success",
+        "message": "Associations updated successfully",
+        "updated_count": len(intended_use)
+    }, 200
+
+@rpr.route('/intended_use/ui_remove_update_credential', methods=["GET", "POST"])
+def ui_remove_update_credential():
+
+    data = request.get_json(silent=True)
+
+    if not data:
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+
+    hash_pid = data.get("hash_pid")
+    intended_use = data.get("intended_use")
+
+    required_fields = {
+        "hash_pid": hash_pid,
+        "intended_use": intended_use,
+    }
+
+    missing_fields = [name for name, value in required_fields.items() if not value]
+
+    if missing_fields:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Missing required fields.",
+            "data": {
+                "missing_fields": missing_fields
+            }
+        }, 400
+
+    if not isinstance(intended_use, list):
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Intended Use ids must be a list"
+            }, 400
+    
+    session_id = str(uuid.uuid4())
+    user_id = db.check_user(hash_pid, session_id)
+    
+    all_intended_use = db.get_intended_use_info(user_id, session_id)
+    valid_intended_use_ids = {p["intendeduse_id"] for p in all_intended_use}
+
+    invalid_ids = [
+        le_id for le_id in intended_use
+        if int(le_id) not in valid_intended_use_ids
+    ]
+        
+    if invalid_ids:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Some Intended Use do not exist or do not belong to this user",
+            "invalid_legal_entities": invalid_ids
+        }, 400
+
+    for elem_id in intended_use:
+        db.update_iu_cred(None, elem_id, session_id)
+
+    return {
+        "status": "success",
+        "message": "Associations updated successfully",
+        "updated_count": len(intended_use)
+    }, 200
 
 @rpr.route('/credential/create_person', methods=['GET','POST'])
 def credential_create():
@@ -1255,33 +2372,71 @@ def credential_create():
 @rpr.route('/credential/add_credential_db', methods=['GET','POST'])
 def add_credential_db():
 
-    temp_user_id = session['temp_user_id']
-    user = session[temp_user_id]
+    if 'temp_user_id' in session: 
+        temp_user_id = session['temp_user_id']
+        user = session[temp_user_id]
 
-    name=request.form.get("Name")
-    format=request.form.get("Format")
-    meta=request.form.get("Meta")
-    path=request.form.get("Path")
-    credentialValues=request.form.get("Credential Values")
+        name=request.form.get("Name")
+        format=request.form.get("Format")
+        meta=request.form.get("Meta")
+        path=request.form.get("Path")
+        credentialValues=request.form.get("Credential Values")
+        
+        new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+        hash_pid = new_user.hash
+        user_id = db.check_user(hash_pid, session["session_id"])
+
+        db.insert_credential(name, format, meta, path, credentialValues, user_id, session["session_id"])
+
+        return redirect('/credential/list')
     
-    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
-    hash_pid = new_user.hash
-    user_id = db.check_user(hash_pid, session["session_id"])
+    else:
+        hash_pid = request.args.get("hash_pid")
+        name= request.args.get("name")
+        format=request.args.get("format")
+        meta=request.args.get("meta")
+        path=request.args.get("path")
+        credentialValues=request.form.get("credentialValues")
 
-    db.insert_credential(name, format, meta, path, credentialValues, user_id, session["session_id"])
+        required_fields = {
+            "hash_pid": hash_pid,
+            "name": name,
+            "format": format,
+            "meta": meta,
+            "path": path,
+            "credentialValues": credentialValues
+        }
 
-    return redirect('/credential/list')
+        missing_fields = [name for name, value in required_fields.items() if not value]
 
-def cred_list():
+        if missing_fields:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Missing required fields.",
+                "data": {
+                    "missing_fields": missing_fields
+                }
+            }, 400
+        
+        session_id = str(uuid.uuid4())
+        user_id = db.check_user(hash_pid, session_id)
 
-    temp_user_id = session['temp_user_id']
-    user = session[temp_user_id]
-    
-    new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
-    hash_pid = new_user.hash
-    user_id = db.check_user(hash_pid, session["session_id"])
-    
-    credential_dict = db.get_credential_info(user_id, session["session_id"])
+        id = db.insert_credential(name, format, meta, path, credentialValues, user_id, session["session_id"])
+
+        return {
+            "status": "success",
+            "code": 201,
+            "message": "Credential successfully created.",
+            "data": {
+                "Credential id": id
+            }
+        }, 201
+
+
+def cred_list(user_id, session_id):
+
+    credential_dict = db.get_credential_info(user_id, session_id)
     
     header_table=[ "Name","Format", "Meta", "Path", "Credential Values"]
 
@@ -1303,7 +2458,7 @@ def cred_list():
             }
             data.update(data_temp)
     
-    ie_dict = db.get_intended_use_info(user_id, session["session_id"])
+    ie_dict = db.get_intended_use_info(user_id, session_id)
 
     list = []
     if(data != {}):
@@ -1313,7 +2468,7 @@ def cred_list():
                 name_txt = item["intendedUseIdentifier"]
                 
                 if(item["credential_id"] != None):
-                    credential_name = db.get_iu_info_cred(item["credential_id"], session["session_id"])
+                    credential_name = db.get_iu_info_cred(item["credential_id"], session_id)
                     
                     new_item = {
                         "id": item["intendeduse_id"],
@@ -1337,15 +2492,70 @@ def cred_list():
 
 @rpr.route('/credential/list', methods=['GET','POST'])
 def credential_list():
-    temp_user_id = session['temp_user_id']
+    if 'temp_user_id' in session:
+        temp_user_id = session['temp_user_id']
+        user = session[temp_user_id]
+        
+        new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+        hash_pid = new_user.hash
+        user_id = db.check_user(hash_pid, session["session_id"])
 
-    menu, data, header_table, list = cred_list()
+        menu, data, header_table, list = cred_list(user_id, session["session_id"])
 
-    return render_template("CertificateList.html", h1 = "Credential List", menu = menu, data=data, title="Credentials", list= list, header_table=header_table, url=cfgserv.service_url +"credential", temp_user_id = temp_user_id)
+        return render_template("CertificateList.html", h1 = "Credential List", menu = menu, data=data, title="Credentials", list= list, header_table=header_table, url=cfgserv.service_url +"credential", temp_user_id = temp_user_id)
+
+    else:
+        
+        hash_pid = request.args.get("hash_pid")
+        
+        session_id = str(uuid.uuid4())
+        user_id = db.check_user(hash_pid, session_id)
+        
+        menu, data, header_table, list = cred_list(user_id, session_id)
+
+        credential = {}
+
+        for lp_id, lp_data in data.items():
+            credential[int(lp_id)] = {
+                "format": lp_data["Format"],
+                "neta": lp_data["Meta"],
+                "name": lp_data["Name"],
+                "path": lp_data["Path"],
+                "values": lp_data["Values"]
+            }
+
+        intended_use = []
+
+        for entity in list:
+            associated_id = entity["associated_id"]
+
+            intended_use.append({
+                "id": entity["id"],
+                "name": entity["name"],
+                "associated": associated_id is not None,
+                "Credential": (
+                    {
+                        "id": associated_id,
+                        **credential.get(associated_id, {})
+                    }
+                    if associated_id in credential else None
+                )
+            })
+
+        return {
+            "status": "success",
+            "code": 200,
+            "message": "Credential and Intended Use retrieved successfully.",
+            "data": {
+                "credential": credential,
+                "intended_uses": intended_use
+            }
+        }, 200
+
 
 @rpr.route('/credential/update_intended_uses', methods=["GET", "POST"])
 def update_intended_uses():
-    print("\n\n\n\n\n\n\n entrou \n\n\n\n\n\n")
+    
     cred_id = request.args.get("id")
     iu = ast.literal_eval(request.args.get("checks"))
     
@@ -1369,8 +2579,88 @@ def update_intended_uses():
             return ("err")
 
     return redirect('/credential/list')
-    
 
+
+@rpr.route('/credential/ui_update_intended_uses', methods=["GET", "POST"])
+def ui_update_intended_uses():
+
+    data = request.get_json(silent=True)
+
+    if not data:
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+
+    hash_pid = data.get("hash_pid")
+    credential = data.get("credential")
+    intended_uses = data.get("intended_uses")
+
+    required_fields = {
+        "hash_pid": hash_pid,
+        "credential": credential,
+        "intended_uses": intended_uses
+    }
+
+    missing_fields = [name for name, value in required_fields.items() if not value]
+
+    if missing_fields:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Missing required fields.",
+            "data": {
+                "missing_fields": missing_fields
+            }
+        }, 400
+
+    if not isinstance(intended_uses, list):
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Intended Use ids must be a list"
+            }, 400
+    
+    session_id = str(uuid.uuid4())
+    user_id = db.check_user(hash_pid, session_id)
+    
+    all_credential = db.get_credential_info(user_id, session_id)
+    valid_credential_ids = {str(p["credential_id"]) for p in all_credential}
+
+    if str(credential) not in valid_credential_ids:
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Credential does not exist or does not belong to this user"
+            }, 400
+    
+    all_iu = db.get_intended_use_info(user_id, session_id)
+    valid_ids = {int(e["intendeduse_id"]) for e in all_iu}
+
+    invalid_ids = [
+        le_id for le_id in intended_uses
+        if int(le_id) not in valid_ids
+    ]
+        
+    if invalid_ids:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Some Intended Uses do not exist or do not belong to this user",
+            "invalid_intended_uses": invalid_ids
+        }, 400
+
+    for elem_id in intended_uses:
+        db.update_iu_cred(credential, elem_id, session_id)
+
+    return {
+        "status": "success",
+        "message": "Associations updated successfully",
+        "updated_count": len(intended_uses)
+    }, 200
+
+    
 @rpr.route("/relying_party_registration_request", methods=["GET", "POST"])
 def relying_party_registration():
     
