@@ -52,6 +52,7 @@ import logging
 from logging.handlers import TimedRotatingFileHandler
 import os
 from app_config.database import ConfDataBase
+from flasgger import Swagger
 
 def setup_logger():
     log_dir = cfgserv.log_dir
@@ -197,6 +198,7 @@ def initialize_db():
 def create_app():
 
     app = Flask(__name__, instance_relative_config=True)
+    Swagger(app)
     app.config['SECRET_KEY'] = ConfService.secret_key
 
     #app.register_error_handler(Exception, handle_exception)

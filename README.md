@@ -258,23 +258,67 @@ This route is responsible for creating and storing a new Natural Person in the s
 ```
 
 ### Arguments
-| Name                 | Description                                |
-| -------------------- | ------------------------------------------ |
-| `hash_pid`           | User identifier (from wallet login)        |
-| `legal_name`         | Legal name of the entity                   |
-| `established_by_law` | Legal basis or law establishing the entity |
-| `lang`               | Language of the legal basis                |
+| Name          | Type   | Description                         |
+| ------------- | ------ | ----------------------------------- |
+| `hash_pid`    | string | User identifier (from wallet login) |
+| `given_name`  | string | Given name of the natural person    |
+| `family_name` | string | Family name of the natural person   |
+| `birthdate`   | string | Date of birth (YYYY-MM-DD)          |
+| `birthplace`  | string | Place of birth                      |
+
 
 
 ### Example
 ``` code
-https://dev.registry.serviceproviders.eudiw.dev/natural_person/add_natural_person_db?
-hash_pid=<hash_pid>&
-given_name=<given_name>&
-family_name=<family_name>&
-birthdate=YYYY-MM-DD&
-birthplace= <birthplace>
+{
+  "hash_pid": "<hash_pid>",
+  "given_name": "John",
+  "family_name": "Doe",
+  "birthdate": "1990-05-12",
+  "birthplace": "Lisbon"
+}
+
 ```
+
+### Success Response
+``` code
+{
+  "status": "success",
+  "code": 201,
+  "message": "Natural Person successfully created.",
+  "data": {
+    "Natural Person id": 5
+  }
+}
+```
+
+### Missing required fields
+``` code
+{
+  "status": "error",
+  "code": 400,
+  "message": "Missing required fields.",
+  "data": {
+    "missing_fields": ["birthplace"]
+  }
+}
+```
+
+### Invalid or missing JSON body
+``` code
+{
+  "status": "error",
+  "code": 400,
+  "message": "Invalid or missing JSON body"
+}
+```
+
+### Notes
+  * The hash_pid parameter is mandatory.
+  * All fields must be provided in the JSON body.
+  * The Natural Person is created only if the hash_pid belongs to a valid user.
+  * This endpoint uses POST and modifies persistent data.
+  * Query parameters are not supported for this endpoint.
 
 ## Create a Legal Person
 
@@ -293,15 +337,55 @@ This route is responsible for creating and storing a new Legal Person in the sys
 | `established_by_law` | Legal basis or law establishing the entity |
 | `lang`               | Language of the legal basis                |
 
-
-### Example
+### Example Request
 ``` code
-https://dev.registry.serviceproviders.eudiw.dev/legal_person/add_legal_person_db?
-hash_pid=<hash_pid>&
-legal_name=<legal_name>&
-established_by_law=<established_by_law>&
-lang=<lang>
+{
+  "hash_pid": "<hash_pid>",
+  "legal_name": "ACME Corporation",
+  "established_by_law": "Commercial Law Article 10",
+  "lang": "EN"
+}
 ```
+
+### Success Response
+``` code
+{
+  "status": "success",
+  "code": 201,
+  "message": "Legal Person successfully created.",
+  "data": {
+    "legal_person_id": 12
+  }
+}
+```
+
+### Error Responses
+#### Missing required fields
+``` code
+{
+  "status": "error",
+  "code": 400,
+  "message": "Missing required fields.",
+  "data": {
+    "missing_fields": ["lang"]
+  }
+}
+```
+
+#### Invalid hash_pid
+``` code
+{
+  "status": "error",
+  "code": 400,
+  "message": "Invalid hash_pid"
+}
+```
+
+### Notes
+  * hash_pid is mandatory when calling via API.
+  * All fields must be sent in the JSON body.
+  * The Legal Person will only be created if the hash_pid belongs to a valid user.
+  * The legal basis is internally stored as JSON array:
 
 
 ## Create a Legal Entity
@@ -325,19 +409,61 @@ This route is responsible for creating and storing a new Legal Entity in the sys
 | `information_URI`    | Information URI                     |
 | `country`            | Country code                        |
 
-
-### Example
+### Example Request
 ``` code
-https://dev.registry.serviceproviders.eudiw.dev/legal_entity/add_legal_entity_db?
-hash_pid=<hash_pid>&
-type_of_identifier=<type_of_identifier>&
-identifier=<identifier>&
-address=<address>&
-email=<email>&
-phone_number=<phone_number>&
-information_URI=<information_URI>&
-country=<country>
+{
+  "hash_pid": "<hash_pid>",
+  "type_of_identifier": "VAT",
+  "identifier": "123456789",
+  "address": "123 Main Street, City, Country",
+  "email": "contact@acme.com",
+  "phone_number": "+123456789",
+  "information_URI": "https://acme.com/info",
+  "country": "US"
+}
 ```
+
+### Success Response
+``` code
+{
+  "status": "success",
+  "code": 201,
+  "message": "Legal Entity successfully created.",
+  "data": {
+    "legal_entity_id": 15
+  }
+}
+```
+
+### Error Responses
+#### Missing required fields
+``` code
+{
+  "status": "error",
+  "code": 400,
+  "message": "Missing required fields.",
+  "data": {
+    "missing_fields": ["email", "country"]
+  }
+}
+```
+
+#### Invalid hash_pid
+``` code
+{
+  "status": "error",
+  "code": 400,
+  "message": "Invalid hash_pid",
+  "data": {
+    "hash_pid": "<hash_pid>"
+  }
+}
+```
+
+### Notes
+  * hash_pid is mandatory when calling via API.
+  * All fields must be sent in the JSON body.
+  * The Legal Entity will only be created if the hash_pid belongs to a valid user.
 
 
 ## Create a Relying Party
@@ -364,20 +490,63 @@ This route is responsible for creating and storing a new Relying Party.
 | `x5c`                 | Certificate chain (x5c)             |
 
 
-### Example
+### Example Request
 ``` code
-https://dev.registry.serviceproviders.eudiw.dev/RP/add_RP_db?
-hash_pid=<hash_pid>&
-trade_name=<trade_name>&
-support_URI=<support_URI>&
-srvDescription_lang=<lang>&
-srvDescription=<description>&
-entitlement=<entitlement>&
-registry_uri=<registry_uri>&
-type_of_policy=<type_of_policy>&
-policy_uri=<policy_uri>&
-x5c=<x5c> 
+{
+  "hash_pid": "<hash_pid>",
+  "trade_name": "ACME RP Services",
+  "support_URI": "https://acme.com/support",
+  "srvDescription_lang": "EN",
+  "srvDescription": "Provides authentication services for ACME users.",
+  "entitlement": "full_access",
+  "registry_uri": "https://registry.acme.com",
+  "type_of_policy": "Privacy Policy",
+  "policy_uri": "https://acme.com/policy",
+  "x5c": "MIID...AB"
+}
 ```
+
+### Success Response
+``` code
+{
+  "status": "success",
+  "code": 201,
+  "message": "Relying Party successfully created.",
+  "data": {
+    "relying_party_id": 27
+  }
+}
+```
+
+### Error Responses
+#### Missing required fields
+``` code
+{
+  "status": "error",
+  "code": 400,
+  "message": "Missing required fields.",
+  "data": {
+    "missing_fields": ["trade_name", "x5c"]
+  }
+}
+```
+
+#### Invalid hash_pid
+``` code
+{
+  "status": "error",
+  "code": 400,
+  "message": "Invalid hash_pid",
+  "data": {
+    "hash_pid": "<hash_pid>"
+  }
+}
+```
+
+### Notes
+  * hash_pid is mandatory when calling via API.
+  * All fields must be sent in the JSON body.
+  * The Relying Party will only be created if the hash_pid belongs to a valid user.
 
 ## Create an Intended Use
 
@@ -389,29 +558,72 @@ This route is responsible for creating and storing a new Intended Use.
 ```
 
 ### Arguments
-| Name                    | Description                         |
-| ----------------------- | ----------------------------------- |
-| `hash_pid`              | User identifier (from wallet login) |
-| `purpose`               | Intended use purpose                |
-| `purpose_lang`          | Language of the purpose             |
-| `type_policy`           | Policy type                         |
-| `policy_uri`            | Policy URI                          |
-| `createAt`              | Creation date                       |
-| `revokeAt`              | Revocation date                     |
-| `intendedUseIdentifier` | Intended Use identifier             |
+| Name                    | Description                                     |
+| ----------------------- | ----------------------------------------------- |
+| `hash_pid`              | User identifier (from wallet login)             |
+| `purpose`               | Purpose of the intended use                     |
+| `purpose_lang`          | Language of the purpose description             |
+| `type_policy`           | Type of policy governing the intended use       |
+| `policy_uri`            | URI to the policy document                      |
+| `createAt`              | Timestamp when the intended use was created     |
+| `revokeAt`              | Timestamp when the intended use will be revoked |
+| `intendedUseIdentifier` | Unique identifier for the intended use          |
 
-### Example
-``` code
-https://dev.registry.serviceproviders.eudiw.dev/intended_use/add_intended_use_db?
-hash_pid=<hash_pid>&
-purpose=<purpose>&
-purpose_lang=<lang>&
-type_policy=<type_policy>&
-policy_uri=<policy_uri>&
-createAt=<YYYY-MM-DD>&
-revokeAt=<YYYY-MM-DD>&
-intendedUseIdentifier=<identifier>
+### Example Request
+```code
+{
+  "hash_pid": "<hash_pid>",
+  "purpose": "Data processing for analytics",
+  "purpose_lang": "EN",
+  "type_policy": "Privacy Policy",
+  "policy_uri": "https://acme.com/privacy-policy",
+  "createAt": "2026-02-09T12:00:00Z",
+  "revokeAt": "2026-12-31T23:59:59Z",
+  "intendedUseIdentifier": "intended_use_001"
+}
 ```
+
+### Success Response
+```code
+{
+  "status": "success",
+  "code": 201,
+  "message": "Intended Use successfully created.",
+  "data": {
+    "intended_use_id": 42
+  }
+}
+```
+
+### Error Responses
+#### Missing required fields
+```code
+{
+  "status": "error",
+  "code": 400,
+  "message": "Missing required fields.",
+  "data": {
+    "missing_fields": ["purpose", "policy_uri"]
+  }
+}
+```
+
+#### Invalid hash_pid
+```code
+{
+  "status": "error",
+  "code": 400,
+  "message": "Invalid hash_pid",
+  "data": {
+    "hash_pid": "<hash_pid>"
+  }
+}
+```
+
+### Notes
+  * hash_pid is mandatory when calling via API.
+  * All fields must be sent in the JSON body.
+  * The Intended Use will only be created if the hash_pid belongs to a valid user.
 
 ## Create a Credential
 
@@ -423,33 +635,83 @@ This route is responsible for creating and storing a new Credential.
 ```
 
 ### Arguments
-| Name               | Description                         |
-| ------------------ | ----------------------------------- |
-| `hash_pid`         | User identifier (from wallet login) |
-| `name`             | Credential name                     |
-| `format`           | Credential format                   |
-| `meta`             | Credential metadata                 |
-| `path`             | Credential path                     |
-| `credentialValues` | Credential values                   |
+| Name               | Description                                     |
+| ------------------ | ----------------------------------------------- |
+| `hash_pid`         | User identifier (from wallet login)             |
+| `name`             | Name of the credential                          |
+| `format`           | Format type of the credential                   |
+| `meta`             | Metadata associated with the credential         |
+| `path`             | Path or location where the credential is stored |
+| `credentialValues` | Values contained within the credential          |
 
-### Example
+### Example Request
 ``` code
-https://dev.registry.serviceproviders.eudiw.dev/credential/add_credential_db?
-hash_pid=<hash_pid>&
-name=<name>&
-format=<format>&
-meta=<meta>&
-path=<path>&
-credentialValues=<credentialValues>
-``` 
+{
+  "hash_pid": "<hash_pid>",
+  "name": "Credential name",
+  "format": "JSON",
+  "meta": "meta",
+  "path": "/credentials/cred.json",
+  "credentialValues": "credentialValues"
+}
+```
+
+### Success Response
+``` code
+{
+  "status": "success",
+  "code": 201,
+  "message": "Credential successfully created.",
+  "data": {
+    "credential_id": 101
+  }
+}
+```
+
+### Error Responses
+#### Missing required fields
+``` code
+{
+  "status": "error",
+  "code": 400,
+  "message": "Missing required fields.",
+  "data": {
+    "missing_fields": ["name", "credentialValues"]
+  }
+}
+```
+
+#### Invalid hash_pid
+``` code
+{
+  "status": "error",
+  "code": 400,
+  "message": "Invalid hash_pid",
+  "data": {
+    "hash_pid": "<hash_pid>"
+  }
+}
+```
+
+#### General failure
+``` code
+{
+  "status": "error",
+  "code": 400,
+  "message": "Something went wrong"
+}
+```
+
+### Notes
+  * hash_pid is mandatory when calling via API.
+  * All fields must be sent in the JSON body.
+  * The Credential will only be created if the hash_pid belongs to a valid user.
 
 ## Natural Person – List
 This endpoint retrieves all Natural Persons created by the authenticated user, as well as the Legal Entities associated with each Natural Person.
 
 It is intended to be used to:
-
   * List all Natural Persons owned by the user
-
   * Identify which Legal Entities are associated with each Natural Person
 
 
@@ -466,8 +728,9 @@ It is intended to be used to:
 
 ### Example Request
 ```code
-https://dev.registry.serviceproviders.eudiw.dev/natural_person/list?
-hash_pid=<hash_pid>
+{
+  "hash_pid": "<hash_pid>"
+}
 ```
 
 ### Response Fields
@@ -523,8 +786,9 @@ It is intended to be used to:
 
 ## Example Request
 ``` code
-https://dev.registry.serviceproviders.eudiw.dev/legal_person/list?
-hash_pid=<hash_pid>
+{
+  "hash_pid": "<hash_pid>"
+}
 ```
 ### Response Fields
 #### legal_persons
@@ -584,8 +848,9 @@ It is intended to be used to:
 
 ### Example Request
 ``` code
-https://dev.registry.serviceproviders.eudiw.dev/legal_entity/list?
-hash_pid=<hash_pid>
+{
+  "hash_pid": "<hash_pid>"
+}
 ```
 
 ### Response Fields
@@ -643,8 +908,9 @@ It is intended to be used to:
 
 ### Example Request
 ``` code
-https://dev.registry.serviceproviders.eudiw.dev/RP/list?
-hash_pid=<hash_pid>
+{
+  "hash_pid": "<hash_pid>"
+}
 ```
 
 ### Response Fields
@@ -704,8 +970,9 @@ It is intended to be used to:
 
 ### Example Request
 ``` code
-https://dev.registry.serviceproviders.eudiw.dev/intended_use/list?
-hash_pid=<hash_pid>
+{
+  "hash_pid": "<hash_pid>"
+}
 ```
 
 ### Response Fields
@@ -752,8 +1019,9 @@ It is intended to be used to:
 
 ### Example Request
 ``` code
-https://dev.registry.serviceproviders.eudiw.dev/credential/list?
-hash_pid=<hash_pid>
+{
+  "hash_pid": "<hash_pid>"
+}
 ```
 
 ### Response Fields

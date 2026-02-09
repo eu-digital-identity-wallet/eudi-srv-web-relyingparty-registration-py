@@ -9,3 +9,4 @@ pycose
 cryptography
 pymysql
 requests-pkcs12
+flasgger

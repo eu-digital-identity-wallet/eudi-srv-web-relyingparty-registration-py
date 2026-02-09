@@ -307,9 +307,11 @@ def getpidoid4vp():
     
     if(check_user == None):
         db.insert_user(hash_pid, session["session_id"])
-        return redirect(url_for('RPR.menu_RP_user'))
+        return render_template("user_check_hash.html", hash_pid=hash_pid)
+        # return redirect(url_for('RPR.menu_RP_user'))
     else:
-        return redirect(url_for('RPR.menu_RP_user'))
+        return render_template("user_check_hash.html", hash_pid=hash_pid)
+        # return redirect(url_for('RPR.menu_RP_user'))
     
 
 @rpr.route("/user_auth", methods=["GET", "POST"])
@@ -360,8 +362,91 @@ def create_natural_person():
 
     return render_template("dynamic-form.html",title="Create Natural Person",title_description="Please enter your Natural Person data.", desc = descriptions, countries = cfgserv.eu_countries ,attributes=attributesForm, redirect_url= cfgserv.service_url + "natural_person/add_natural_person_db")
 
-@rpr.route('/natural_person/add_natural_person_db', methods=['GET','POST'])
+@rpr.route('/natural_person/add_natural_person_db', methods=['POST'])
 def add_natural_person_db():
+    """
+    Create a new Natural Person
+    ---
+    tags:
+      - Natural Person
+    consumes:
+      - application/json
+    produces:
+      - application/json
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - hash_pid
+            - given_name
+            - family_name
+            - birthdate
+            - birthplace
+          properties:
+            hash_pid:
+              type: string
+              description: User identifier (from wallet login)
+              example: "abc123hashpid"
+            given_name:
+              type: string
+              example: "John"
+            family_name:
+              type: string
+              example: "Doe"
+            birthdate:
+              type: string
+              format: date
+              example: "1990-01-01"
+            birthplace:
+              type: string
+              example: "Lisbon"
+    responses:
+      201:
+        description: Natural Person successfully created
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: success
+            code:
+              type: integer
+              example: 201
+            message:
+              type: string
+              example: Natural Person successfully created.
+            data:
+              type: object
+              properties:
+                Natural Person id:
+                  type: integer
+                  example: 42
+
+      400:
+        description: Missing or invalid fields
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: error
+            code:
+              type: integer
+              example: 400
+            message:
+              type: string
+              example: Missing required fields
+            data:
+              type: object
+              properties:
+                missing_fields:
+                  type: array
+                  items:
+                    type: string
+    """
 
     if 'temp_user_id' in session:   
         temp_user_id = session['temp_user_id']
@@ -381,11 +466,20 @@ def add_natural_person_db():
         return redirect('/natural_person/list')
 
     else:
-        hash_pid = request.args.get("hash_pid")
-        given_name= request.args.get("given_name")
-        family_name=request.args.get("family_name")
-        birthdate=request.args.get("birthdate")
-        birthplace=request.args.get("birthplace")
+        data = request.get_json(silent=True)
+
+        if not data:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+        
+        hash_pid = data.get("hash_pid")
+        given_name= data.get("given_name")
+        family_name=data.get("family_name")
+        birthdate=data.get("birthdate")
+        birthplace=data.get("birthplace")
 
         required_fields = {
             "hash_pid": hash_pid,
@@ -409,6 +503,17 @@ def add_natural_person_db():
 
         session_id = str(uuid.uuid4())
         user_id = db.check_user(hash_pid, session_id)
+
+        if user_id is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid hash_pid",
+                "data": {
+                    "hash_pid": hash_pid
+                }
+            }, 400
 
         id = db.insert_user_naturalPerson(given_name, family_name, birthdate, birthplace, user_id, session_id) 
    
@@ -450,8 +555,70 @@ def update_legal_entities():
 
     return redirect('/natural_person/list')
 
-@rpr.route('/natural_person/ui_update_legal_entities', methods=["GET", "POST"])
+@rpr.route('/natural_person/ui_update_legal_entities', methods=["POST"])
 def ui_update_legal_entities():
+    """
+    Update associations between a Natural Person and Legal Entities
+    ---
+    tags:
+      - Natural Person
+    consumes:
+      - application/json
+    produces:
+      - application/json
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - hash_pid
+            - natural_person
+            - legal_entities_ids
+          properties:
+            hash_pid:
+              type: string
+              example: "abc123hashpid"
+            natural_person:
+              type: string
+              example: "15"
+            legal_entities_ids:
+              type: array
+              items:
+                type: integer
+              example: [1, 2, 3]
+    responses:
+      200:
+        description: Associations updated successfully
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: success
+            message:
+              type: string
+              example: Associations updated successfully
+            updated_count:
+              type: integer
+              example: 3
+
+      400:
+        description: Invalid request or validation error
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: error
+            code:
+              type: integer
+              example: 400
+            message:
+              type: string
+              example: Missing required fields
+    """
 
     data = request.get_json(silent=True)
 
@@ -583,8 +750,125 @@ def list_naturalPerson(user_id, session_id):
 
     return menu, data, header_table, list 
 
-@rpr.route('/natural_person/list')
+@rpr.route('/natural_person/list', methods=['GET', 'POST'])
 def natural_person_list():
+    """
+List Legal Entities and Natural Persons
+---
+tags:
+  - Natural Person
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: "abc123hashpid"
+
+responses:
+  200:
+    description: Legal entities and natural persons retrieved successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Legal entities and natural persons retrieved successfully.
+        data:
+          type: object
+          properties:
+            legal_entities:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 10
+                  name:
+                    type: string
+                    example: "ACME Corporation"
+                  associated:
+                    type: boolean
+                    example: true
+                  natural_person:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: integer
+                        example: 5
+                      given_name:
+                        type: string
+                        example: "John"
+                      family_name:
+                        type: string
+                        example: "Doe"
+                      date_of_birth:
+                        type: string
+                        example: "1990-05-10"
+                      place_of_birth:
+                        type: string
+                        example: "Lisbon"
+
+            natural_persons:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 5
+                  given_name:
+                    type: string
+                    example: "John"
+                  family_name:
+                    type: string
+                    example: "Doe"
+                  date_of_birth:
+                    type: string
+                    example: "1990-05-10"
+                  place_of_birth:
+                    type: string
+                    example: "Lisbon"
+
+  400:
+    description: Invalid hash_pid
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Invalid hash_pid
+        data:
+          type: object
+          properties:
+            hash_pid:
+              type: string
+              example: "abc123hashpid"
+"""
 
     if 'temp_user_id' in session:
         temp_user_id = session['temp_user_id']
@@ -599,10 +883,46 @@ def natural_person_list():
         return render_template("CertificateList.html", h1 = "Natural Person List", menu = menu, data=data, title="Natural Persons", list= list, header_table=header_table, url=cfgserv.service_url +"natural_person", temp_user_id = temp_user_id)
 
     else:
-        hash_pid = request.args.get("hash_pid")
+        data = request.get_json(silent=True)
+        
+        if not data:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+        
+        hash_pid = data.get("hash_pid")
+
+        required_fields = {
+            "hash_pid": hash_pid
+        }
+        
+        missing_fields = [name for name, value in required_fields.items() if not value]
+
+        if missing_fields:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Missing required fields.",
+                "data": {
+                    "missing_fields": missing_fields
+                }
+            }, 400
         
         session_id = str(uuid.uuid4())
         user_id = db.check_user(hash_pid, session_id)
+
+        if user_id is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid hash_pid",
+                "data": {
+                    "hash_pid": hash_pid
+                }
+            }, 400
         
         menu, data, header_table, list = list_naturalPerson(user_id, session_id)
 
@@ -678,8 +998,92 @@ def create_legal_person():
 
     return render_template("dynamic-form.html",title="Create Legal Person",title_description="Please enter your Legal Person data.", desc = descriptions, countries = cfgserv.eu_countries, lang=cfgserv.eu_languages ,attributes=attributesForm, redirect_url= cfgserv.service_url + "legal_person/add_legal_person_db")
 
-@rpr.route('/legal_person/add_legal_person_db', methods=['GET','POST'])
+@rpr.route('/legal_person/add_legal_person_db', methods=['POST'])
 def add_legal_person_db():
+
+    """
+Create a new Legal Person
+---
+tags:
+  - Legal Person
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+        - legal_name
+        - established_by_law
+        - lang
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: "abc123hashpid"
+        legal_name:
+          type: string
+          description: Legal name of the Legal Person
+          example: "ACME Corporation"
+        established_by_law:
+          type: string
+          description: Legal basis or law establishing the entity
+          example: "Commercial Law Article 10"
+        lang:
+          type: string
+          description: Language of the legal basis
+          example: "EN"
+responses:
+  201:
+    description: Legal Person successfully created
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        code:
+          type: integer
+          example: 201
+        message:
+          type: string
+          example: Legal Person successfully created.
+        data:
+          type: object
+          properties:
+            legal_person_id:
+              type: integer
+              example: 12
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example:
+                - lang
+"""
 
     if 'temp_user_id' in session:
         temp_user_id = session['temp_user_id']
@@ -700,10 +1104,19 @@ def add_legal_person_db():
         return redirect('/legal_person/list')
     
     else:
-        hash_pid = request.args.get("hash_pid")
-        legal_name= request.args.get("legal_name")
-        established_by_law=request.args.get("established_by_law")
-        lang=request.args.get("lang")
+        data = request.get_json(silent=True)
+        
+        if not data:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+
+        hash_pid = data.get("hash_pid")
+        legal_name= data.get("legal_name")
+        established_by_law=data.get("established_by_law")
+        lang=data.get("lang")
 
         required_fields = {
             "hash_pid": hash_pid,
@@ -727,6 +1140,17 @@ def add_legal_person_db():
         
         session_id = str(uuid.uuid4())
         user_id = db.check_user(hash_pid, session_id)
+
+        if user_id is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid hash_pid",
+                "data": {
+                    "hash_pid": hash_pid
+                }
+            }, 400
 
         legalBasis = '[{"lang":"' + lang + '", "legalBasis":"' + established_by_law + '"}]'
 
@@ -898,8 +1322,113 @@ def list_legalPerson(user_id, session_id):
 
     return menu, data, header_table, list
 
-@rpr.route('/legal_person/list')
+@rpr.route('/legal_person/list', methods=['GET', 'POST'])
 def legal_person_list():
+    """
+List Legal Entities and Legal Persons
+---
+tags:
+  - Legal Person
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: "abc123hashpid"
+
+responses:
+  200:
+    description: Legal entities and legal persons retrieved successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Legal entities and legal persons retrieved successfully.
+        data:
+          type: object
+          properties:
+            legal_entities:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 10
+                  name:
+                    type: string
+                    example: "ACME Corporation"
+                  associated:
+                    type: boolean
+                    example: true
+                  legal_person:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: integer
+                        example: 3
+                      legal_name:
+                        type: string
+                        example: "ACME Corporation"
+                      established_by_law:
+                        type: object
+                        example: {"law": "Commercial Law Article 10", "lang": "EN"}
+
+            legal_persons:
+              type: object
+              additionalProperties:
+                type: object
+                properties:
+                  legal_name:
+                    type: string
+                    example: "ACME Corporation"
+                  established_by_law:
+                    type: object
+                    example: {"law": "Commercial Law Article 10", "lang": "EN"}
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example:
+                - hash_pid
+"""
 
     if 'temp_user_id' in session:
         temp_user_id = session['temp_user_id']
@@ -914,10 +1443,47 @@ def legal_person_list():
         return render_template("CertificateList.html", h1 = "Legal Person List", list = list, menu = menu, data=data, title="Legal Persons", header_table=header_table, url=cfgserv.service_url +"legal_person", temp_user_id = temp_user_id)
     
     else:
-        hash_pid = request.args.get("hash_pid")
+        data = request.get_json(silent=True)
+        
+        if not data:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+        
+        hash_pid = data.get("hash_pid")
+        
+        required_fields = {
+            "hash_pid": hash_pid
+        }
+
+        missing_fields = [name for name, value in required_fields.items() if not value]
+
+        if missing_fields:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Missing required fields.",
+                "data": {
+                    "missing_fields": missing_fields
+                }
+            }, 400
         
         session_id = str(uuid.uuid4())
         user_id = db.check_user(hash_pid, session_id)
+
+        if user_id is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid hash_pid",
+                "data": {
+                    "hash_pid": hash_pid
+                }
+            }, 400
+        
         menu, data, header_table, list = list_legalPerson(user_id, session_id)
         
         legal_persons = {}
@@ -991,8 +1557,112 @@ def create_legal_entity():
 
     return render_template("dynamic-form.html", title="Create Legal Entity",title_description="Please enter your Legal Entity data.", desc = descriptions, countries = cfgserv.eu_countries ,attributes=attributesForm, select_dict=select_dict, redirect_url= cfgserv.service_url + "legal_entity/add_legal_entity_db")
 
-@rpr.route('/legal_entity/add_legal_entity_db', methods=['GET','POST'])
+@rpr.route('/legal_entity/add_legal_entity_db', methods=['POST'])
 def add_legal_entity_db():
+    """
+Create a new Legal Entity
+---
+tags:
+  - Legal Entity
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+        - type_of_identifier
+        - identifier
+        - address
+        - email
+        - phone_number
+        - information_URI
+        - country
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: "abc123hashpid"
+        type_of_identifier:
+          type: string
+          description: Type of identifier (e.g., VAT, registration number)
+          example: "VAT"
+        identifier:
+          type: string
+          description: Identifier value of the legal entity
+          example: "123456789"
+        address:
+          type: string
+          description: Legal address of the entity
+          example: "123 Main Street, City, Country"
+        email:
+          type: string
+          description: Contact email of the legal entity
+          example: "contact@acme.com"
+        phone_number:
+          type: string
+          description: Contact phone number
+          example: "+123456789"
+        information_URI:
+          type: string
+          description: URL for more information about the legal entity
+          example: "https://acme.com/info"
+        country:
+          type: string
+          description: Country of registration
+          example: "US"
+responses:
+  201:
+    description: Legal Entity successfully created
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        code:
+          type: integer
+          example: 201
+        message:
+          type: string
+          example: Legal Entity successfully created.
+        data:
+          type: object
+          properties:
+            legal_entity_id:
+              type: integer
+              example: 15
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example:
+                - email
+                - country
+"""
     
     if 'temp_user_id' in session: 
         temp_user_id = session['temp_user_id']
@@ -1015,14 +1685,24 @@ def add_legal_entity_db():
         return redirect('/legal_entity/list')
     
     else:
-        hash_pid = request.args.get("hash_pid")
-        type_of_identifier = request.args.get("type_of_identifier")
-        identifier = request.args.get("identifier")
-        address = request.args.get("address")
-        email = request.args.get("email")
-        phone_number = request.args.get("phone_number")
-        information_URI = request.args.get("information_URI")
-        country = request.args.get("country")
+        
+        data = request.get_json(silent=True)
+        
+        if not data:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+        
+        hash_pid = data.get("hash_pid")
+        type_of_identifier = data.get("type_of_identifier")
+        identifier = data.get("identifier")
+        address = data.get("address")
+        email = data.get("email")
+        phone_number = data.get("phone_number")
+        information_URI = data.get("information_URI")
+        country = data.get("country")
 
         required_fields = {
             "hash_pid": hash_pid,
@@ -1050,7 +1730,18 @@ def add_legal_entity_db():
         session_id = str(uuid.uuid4())
         user_id = db.check_user(hash_pid, session_id)
 
-        id = db.insert_legal_entity(address, country, email, phone_number, information_URI, identifier, type_of_identifier, user_id, session["session_id"]) 
+        if user_id is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid hash_pid",
+                "data": {
+                    "hash_pid": hash_pid
+                }
+            }, 400
+
+        id = db.insert_legal_entity(address, country, email, phone_number, information_URI, identifier, type_of_identifier, user_id, session_id) 
         
         return {
             "status": "success",
@@ -1412,8 +2103,125 @@ def list_legalEntity(user_id, session_id):
 
     return menu, data, header_table, list
 
-@rpr.route('/legal_entity/list')
+@rpr.route('/legal_entity/list', methods=['GET', 'POST'])
 def legal_entity_list():
+    """
+List Relying Parties and Legal Entities
+---
+tags:
+  - Legal Entity
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: "abc123hashpid"
+
+responses:
+  200:
+    description: Relying Parties and Legal Entities retrieved successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Relying Parties and Legal Entities retrieved successfully.
+        data:
+          type: object
+          properties:
+            relying_parties:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 7
+                  name:
+                    type: string
+                    example: "ACME RP Services"
+                  associated:
+                    type: boolean
+                    example: true
+                  associated_rp:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: integer
+                        example: 3
+                      name:
+                        type: string
+                        example: "Main Relying Party"
+
+            legal_entities:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 2
+                  country:
+                    type: string
+                    example: "PT"
+                  email:
+                    type: string
+                    example: "contact@acme.com"
+                  identifier:
+                    type: string
+                    example: "123456789"
+                  info_uri:
+                    type: string
+                    example: "https://acme.com/info"
+                  phone:
+                    type: string
+                    example: "+351900000000"
+                  postal_address:
+                    type: string
+                    example: "Rua Central 123, Porto, Portugal"
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example:
+                - hash_pid
+"""
     
     if 'temp_user_id' in session:
         temp_user_id = session['temp_user_id']
@@ -1428,10 +2236,46 @@ def legal_entity_list():
         return render_template("CertificateList.html", h1 = "Legal Entity List", menu = menu, data=data, title="Legal Entities", list= list, header_table=header_table, url=cfgserv.service_url +"legal_entity", temp_user_id = temp_user_id)
 
     else:
-        hash_pid = request.args.get("hash_pid")
+        data = request.get_json(silent=True)
+        
+        if not data:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+        
+        hash_pid = data.get("hash_pid")
+
+        required_fields = {
+            "hash_pid": hash_pid
+        }
+
+        missing_fields = [name for name, value in required_fields.items() if not value]
+
+        if missing_fields:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Missing required fields.",
+                "data": {
+                    "missing_fields": missing_fields
+                }
+            }, 400
         
         session_id = str(uuid.uuid4())
         user_id = db.check_user(hash_pid, session_id)
+
+        if user_id is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid hash_pid",
+                "data": {
+                    "hash_pid": hash_pid
+                }
+            }, 400
         
         menu, data, header_table, list = list_legalEntity(user_id, session_id)
         
@@ -1525,8 +2369,122 @@ def RP_create():
     
     return render_template("dynamic-form.html",title="Create Relying Party",title_description="Please enter your Relying Party data.", desc = descriptions, countries = cfgserv.eu_countries, lang=cfgserv.eu_languages, attributes=attributesForm, select_dict=select_dict, redirect_url= cfgserv.service_url + "RP/add_RP_db")
 
-@rpr.route('/RP/add_RP_db', methods=['GET','POST'])
+@rpr.route('/RP/add_RP_db', methods=['POST'])
 def add_RP_db():
+    """
+Create a new Relying Party (RP)
+---
+tags:
+  - Relying Party
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+        - trade_name
+        - support_URI
+        - srvDescription_lang
+        - srvDescription
+        - entitlement
+        - registry_uri
+        - type_of_policy
+        - policy_uri
+        - x5c
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: "abc123hashpid"
+        trade_name:
+          type: string
+          description: Trade name of the Relying Party
+          example: "ACME RP Services"
+        support_URI:
+          type: string
+          description: URI for support or help
+          example: "https://acme.com/support"
+        srvDescription_lang:
+          type: string
+          description: Language of the service description
+          example: "EN"
+        srvDescription:
+          type: string
+          description: Service description of the RP
+          example: "Provides authentication services for ACME users."
+        entitlement:
+          type: string
+          description: Entitlement or permissions required
+          example: "full_access"
+        registry_uri:
+          type: string
+          description: Registry URI for the RP
+          example: "https://registry.acme.com"
+        type_of_policy:
+          type: string
+          description: Type of policy applicable
+          example: "Privacy Policy"
+        policy_uri:
+          type: string
+          description: URI to the policy document
+          example: "https://acme.com/policy"
+        x5c:
+          type: string
+          description: Certificate chain (x5c) for the RP
+          example: "MIID...AB"
+responses:
+  201:
+    description: Relying Party successfully created
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        code:
+          type: integer
+          example: 201
+        message:
+          type: string
+          example: Relying Party successfully created.
+        data:
+          type: object
+          properties:
+            relying_party_id:
+              type: integer
+              example: 27
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example:
+                - trade_name
+                - x5c
+"""
 
     if 'temp_user_id' in session:  
         temp_user_id = session['temp_user_id']
@@ -1553,16 +2511,26 @@ def add_RP_db():
         return redirect('/RP/list')
     
     else:
-        hash_pid = request.args.get("hash_pid")
-        trade_name = request.args.get("trade_name")
-        support_URI = request.args.get("support_URI")
-        srvDescription_lang = request.args.get("srvDescription_lang")
-        srvDescription = request.args.get("srvDescription")
-        entitlement = request.args.get("entitlement")
-        registry_uri = request.args.get("registry_uri")
-        type_of_policy = request.args.get("type_of_policy")
-        policy_uri = request.args.get("policy_uri")
-        x5c = request.args.get("x5c")
+        
+        data = request.get_json(silent=True)
+        
+        if not data:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+        
+        hash_pid = data.get("hash_pid")
+        trade_name = data.get("trade_name")
+        support_URI = data.get("support_URI")
+        srvDescription_lang = data.get("srvDescription_lang")
+        srvDescription = data.get("srvDescription")
+        entitlement = data.get("entitlement")
+        registry_uri = data.get("registry_uri")
+        type_of_policy = data.get("type_of_policy")
+        policy_uri = data.get("policy_uri")
+        x5c = data.get("x5c")
 
         required_fields = {
             "hash_pid": hash_pid,
@@ -1591,8 +2559,21 @@ def add_RP_db():
         
         session_id = str(uuid.uuid4())
         user_id = db.check_user(hash_pid, session_id)
+        
+        if user_id is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid hash_pid",
+                "data": {
+                    "hash_pid": hash_pid
+                }
+            }, 400
 
-        id = db.insert_RP(trade_name, support_URI, srvDescription, entitlement, registry_uri, type_of_policy, policy_uri, x5c, user_id, session["session_id"])
+        srvDescription = '[{"lang":"' + srvDescription_lang + '", "srvDescription":"' + srvDescription + '"}]'
+
+        id = db.insert_RP(trade_name, support_URI, srvDescription, entitlement, registry_uri, type_of_policy, policy_uri, x5c, user_id, session_id)
 
         return {
             "status": "success",
@@ -1714,9 +2695,152 @@ def wallet_rp_list(user_id, session_id):
     
     return menu, data, header_table, list
 
-@rpr.route('/RP/list', methods=['GET','POST'])
+@rpr.route('/RP/list', methods=['GET', 'POST'])
 def RP_list():
-    
+    """
+List Wallet Relying Parties and Intended Uses
+---
+tags:
+  - Relying Party
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: "abc123hashpid"
+
+responses:
+  200:
+    description: Wallet Relying Parties and Intended Uses retrieved successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Wallet Relying Party and Intended Use retrieved successfully.
+        data:
+          type: object
+          properties:
+            relying_parties:
+              type: object
+              additionalProperties:
+                type: object
+                properties:
+                  entitlement:
+                    type: string
+                    example: "full_access"
+                  description:
+                    type: object
+                    example:
+                      EN: "Provides authentication services"
+                  provides_attestations:
+                    type: boolean
+                    example: true
+                  registry_URI:
+                    type: string
+                    example: "https://registry.example.com"
+                  supervisory_authority:
+                    type: string
+                    example: "National Authority"
+                  support_URIs:
+                    type: array
+                    items:
+                      type: string
+                    example:
+                      - "https://example.com/support"
+                  trade_name:
+                    type: string
+                    example: "ACME Wallet RP"
+
+            intended_uses:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 12
+                  name:
+                    type: string
+                    example: "Login Authentication"
+                  associated:
+                    type: boolean
+                    example: true
+                  wallet_relying_party:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: integer
+                        example: 3
+                      entitlement:
+                        type: string
+                        example: "full_access"
+                      description:
+                        type: object
+                        example:
+                          EN: "Authentication and identity verification"
+                      provides_attestations:
+                        type: boolean
+                        example: true
+                      registry_URI:
+                        type: string
+                        example: "https://registry.example.com"
+                      supervisory_authority:
+                        type: string
+                        example: "National Authority"
+                      support_URIs:
+                        type: array
+                        items:
+                          type: string
+                        example:
+                          - "https://example.com/support"
+                      trade_name:
+                        type: string
+                        example: "ACME Wallet RP"
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example:
+                - hash_pid
+"""
+
     if 'temp_user_id' in session:
         temp_user_id = session['temp_user_id']
         user = session[temp_user_id]
@@ -1730,10 +2854,47 @@ def RP_list():
         return render_template("CertificateList.html", h1 = "Relying Party List", menu = menu, data=data, title="Relying Parties", header_table=header_table, list= list, url=cfgserv.service_url +"RP", temp_user_id = temp_user_id)
 
     else:
-        hash_pid = request.args.get("hash_pid")
+        data = request.get_json(silent=True)
+        
+        if not data:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+        
+        hash_pid = data.get("hash_pid")
+
+        required_fields = {
+            "hash_pid": hash_pid
+        }
+
+        missing_fields = [name for name, value in required_fields.items() if not value]
+
+        if missing_fields:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Missing required fields.",
+                "data": {
+                    "missing_fields": missing_fields
+                }
+            }, 400
         
         session_id = str(uuid.uuid4())
         user_id = db.check_user(hash_pid, session_id)
+        
+        if user_id is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid hash_pid",
+                "data": {
+                    "hash_pid": hash_pid
+                }
+            }, 400
+        
         menu, data, header_table, list = wallet_rp_list(user_id, session_id)
 
         wrp = {}
@@ -1988,8 +3149,114 @@ def intended_use_create():
     
     return render_template("dynamic-form.html",title="Create Intended Use",title_description="Please enter your Intended Use data.", desc = descriptions, countries = cfgserv.eu_countries ,attributes=attributesForm, select_dict=select_dict, redirect_url= cfgserv.service_url + "/intended_use/add_intended_use_db")
 
-@rpr.route('/intended_use/add_intended_use_db', methods=['GET','POST'])
+@rpr.route('/intended_use/add_intended_use_db', methods=['POST'])
 def add_intended_use_db():
+    """
+Create a new Intended Use
+---
+tags:
+  - Intended Use
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+        - purpose
+        - purpose_lang
+        - type_policy
+        - policy_uri
+        - createAt
+        - revokeAt
+        - intendedUseIdentifier
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: "abc123hashpid"
+        purpose:
+          type: string
+          description: Purpose of the intended use
+          example: "Data processing for analytics"
+        purpose_lang:
+          type: string
+          description: Language of the purpose description
+          example: "EN"
+        type_policy:
+          type: string
+          description: Type of policy governing the intended use
+          example: "Privacy Policy"
+        policy_uri:
+          type: string
+          description: URI to the policy document
+          example: "https://acme.com/privacy-policy"
+        createAt:
+          type: string
+          format: date-time
+          description: Timestamp when the intended use was created
+          example: "2026-02-09 12:00:00"
+        revokeAt:
+          type: string
+          format: date-time
+          description: Timestamp when the intended use will be revoked
+          example: "2026-12-31 23:59:59"
+        intendedUseIdentifier:
+          type: string
+          description: Unique identifier for the intended use
+          example: "intended_use_001"
+responses:
+  201:
+    description: Intended Use successfully created
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        code:
+          type: integer
+          example: 201
+        message:
+          type: string
+          example: Intended Use successfully created.
+        data:
+          type: object
+          properties:
+            intended_use_id:
+              type: integer
+              example: 42
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example:
+                - purpose
+                - policy_uri
+"""
 
     if 'temp_user_id' in session:
         temp_user_id = session['temp_user_id']
@@ -2014,14 +3281,23 @@ def add_intended_use_db():
         return redirect('/intended_use/list')
     
     else:
-        hash_pid = request.args.get("hash_pid")
-        purpose = request.args.get("purpose")
-        purpose_lang = request.args.get("purpose_lang")
-        type_policy = request.args.get("type_policy")
-        policy_uri = request.args.get("policy_uri")
-        createAt = request.args.get("createAt")
-        revokeAt = request.args.get("revokeAt")
-        intendedUseIdentifier = request.args.get("intendedUseIdentifier")
+        data = request.get_json(silent=True)
+        
+        if not data:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+        
+        hash_pid = data.get("hash_pid")
+        purpose = data.get("purpose")
+        purpose_lang = data.get("purpose_lang")
+        type_policy = data.get("type_policy")
+        policy_uri = data.get("policy_uri")
+        createAt = data.get("createAt")
+        revokeAt = data.get("revokeAt")
+        intendedUseIdentifier = data.get("intendedUseIdentifier")
 
         required_fields = {
             "hash_pid": hash_pid,
@@ -2049,7 +3325,27 @@ def add_intended_use_db():
         session_id = str(uuid.uuid4())
         user_id = db.check_user(hash_pid, session_id)
 
-        id = db.insert_intended_use(createAt, revokeAt, intendedUseIdentifier, type_policy, policy_uri, purpose, user_id, session["session_id"])
+        if user_id is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid hash_pid",
+                "data": {
+                    "hash_pid": hash_pid
+                }
+            }, 400
+        
+        purpose = '[{"lang":"' + purpose_lang + '", "srvDescription":"' + purpose + '"}]'
+        
+        id = db.insert_intended_use(createAt, revokeAt, intendedUseIdentifier, type_policy, policy_uri, purpose, user_id, session_id)
+
+        if id is None:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Something went wrong"
+            }, 400
 
         return {
             "status": "success",
@@ -2140,6 +3436,100 @@ def list_intended_use(user_id, session_id):
 
 @rpr.route('/intended_use/list', methods=['GET','POST'])
 def intended_use_list():
+    """
+List Intended Uses
+---
+tags:
+  - Intended Use
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: "abc123hashpid"
+
+responses:
+  200:
+    description: Intended Uses retrieved successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Intended Use retrieved successfully.
+        data:
+          type: object
+          properties:
+            intended_use:
+              type: object
+              additionalProperties:
+                type: object
+                properties:
+                  created_at:
+                    type: string
+                    format: date-time
+                    example: "2026-02-09 12:00:00"
+                  identifier:
+                    type: string
+                    example: "IU-001"
+                  policy_URI:
+                    type: string
+                    example: "https://example.com/policy"
+                  purpose:
+                    type: object
+                    example:
+                      EN: "User authentication"
+                  revoked_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    example: null
+                  type_of_policy:
+                    type: string
+                    example: "Privacy Policy"
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example:
+                - hash_pid
+"""
+
 
     if 'temp_user_id' in session:
         temp_user_id = session['temp_user_id']
@@ -2154,10 +3544,46 @@ def intended_use_list():
         return render_template("CertificateList.html", h1 = "Intended Use List", menu = menu, data=data, title="Intended Uses", header_table=header_table, url=cfgserv.service_url +"intended_use", temp_user_id = temp_user_id)
 
     else:
-        hash_pid = request.args.get("hash_pid")
+        data = request.get_json(silent=True)
+        
+        if not data:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+        
+        hash_pid = data.get("hash_pid")
+        
+        required_fields = {
+            "hash_pid": hash_pid
+        }
+
+        missing_fields = [name for name, value in required_fields.items() if not value]
+
+        if missing_fields:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Missing required fields.",
+                "data": {
+                    "missing_fields": missing_fields
+                }
+            }, 400
         
         session_id = str(uuid.uuid4())
         user_id = db.check_user(hash_pid, session_id)
+        
+        if user_id is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid hash_pid",
+                "data": {
+                    "hash_pid": hash_pid
+                }
+            }, 400
              
         menu, data, header_table = list_intended_use(user_id, session_id)
 
@@ -2369,8 +3795,102 @@ def credential_create():
     
     return render_template("dynamic-form.html",title="Create Intended Use",title_description="Please enter your Intended Use data.", desc = descriptions, countries = cfgserv.eu_countries ,attributes=attributesForm, select_dict=select_dict, redirect_url= cfgserv.service_url + "/credential/add_credential_db")
 
-@rpr.route('/credential/add_credential_db', methods=['GET','POST'])
+@rpr.route('/credential/add_credential_db', methods=['POST'])
 def add_credential_db():
+    """
+Create a new Credential
+---
+tags:
+  - Credential
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+        - name
+        - format
+        - meta
+        - path
+        - credentialValues
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: "abc123hashpid"
+        name:
+          type: string
+          description: Name of the credential
+          example: "Credential name"
+        format:
+          type: string
+          description: Format type of the credential
+          example: "JSON"
+        meta:
+          type: string
+          description: Metadata associated with the credential
+          example: "meta"
+        path:
+          type: string
+          description: Path or location where the credential is stored
+          example: "/credentials/cred.json"
+        credentialValues:
+          type: string
+          description: Values contained within the credential
+          example: "credentialValues"
+responses:
+  201:
+    description: Credential successfully created
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        code:
+          type: integer
+          example: 201
+        message:
+          type: string
+          example: Credential successfully created.
+        data:
+          type: object
+          properties:
+            credential_id:
+              type: integer
+              example: 101
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example:
+                - name
+                - credentialValues
+"""
 
     if 'temp_user_id' in session: 
         temp_user_id = session['temp_user_id']
@@ -2391,12 +3911,21 @@ def add_credential_db():
         return redirect('/credential/list')
     
     else:
-        hash_pid = request.args.get("hash_pid")
-        name= request.args.get("name")
-        format=request.args.get("format")
-        meta=request.args.get("meta")
-        path=request.args.get("path")
-        credentialValues=request.form.get("credentialValues")
+        data = request.get_json(silent=True)
+        
+        if not data:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+        
+        hash_pid = data.get("hash_pid")
+        name= data.get("name")
+        format=data.get("format")
+        meta=data.get("meta")
+        path=data.get("path")
+        credentialValues=data.get("credentialValues")
 
         required_fields = {
             "hash_pid": hash_pid,
@@ -2422,8 +3951,26 @@ def add_credential_db():
         session_id = str(uuid.uuid4())
         user_id = db.check_user(hash_pid, session_id)
 
-        id = db.insert_credential(name, format, meta, path, credentialValues, user_id, session["session_id"])
+        if user_id is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid hash_pid",
+                "data": {
+                    "hash_pid": hash_pid
+                }
+            }, 400
+        
+        id = db.insert_credential(name, format, meta, path, credentialValues, user_id, session_id)
 
+        if id is None:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Something went wrong"
+            }, 400
+        
         return {
             "status": "success",
             "code": 201,
@@ -2492,6 +4039,131 @@ def cred_list(user_id, session_id):
 
 @rpr.route('/credential/list', methods=['GET','POST'])
 def credential_list():
+    """
+List Credentials
+---
+tags:
+  - Credential
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: "abc123hashpid"
+
+responses:
+  200:
+    description: Credential and Intended Use retrieved successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Credential and Intended Use retrieved successfully.
+        data:
+          type: object
+          properties:
+            credential:
+              type: object
+              additionalProperties:
+                type: object
+                properties:
+                  format:
+                    type: string
+                    example: "jwt_vc"
+                  meta:
+                    type: string
+                    description: Metadata JSON stored as string
+                    example: '{"issuer":"example"}'
+                  name:
+                    type: string
+                    example: "UserCredential"
+                  path:
+                    type: string
+                    example: "/credentials/user"
+                  values:
+                    type: string
+                    example: '{"given_name":"John","family_name":"Doe"}'
+
+            intended_uses:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 10
+                  name:
+                    type: string
+                    example: "Login Intended Use"
+                  associated:
+                    type: boolean
+                    example: true
+                  Credential:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: integer
+                        example: 3
+                      format:
+                        type: string
+                        example: "jwt_vc"
+                      meta:
+                        type: string
+                        example: '{"issuer":"example"}'
+                      name:
+                        type: string
+                        example: "UserCredential"
+                      path:
+                        type: string
+                        example: "/credentials/user"
+                      values:
+                        type: string
+                        example: '{"given_name":"John","family_name":"Doe"}'
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example:
+                - hash_pid
+"""
+
     if 'temp_user_id' in session:
         temp_user_id = session['temp_user_id']
         user = session[temp_user_id]
@@ -2505,11 +4177,46 @@ def credential_list():
         return render_template("CertificateList.html", h1 = "Credential List", menu = menu, data=data, title="Credentials", list= list, header_table=header_table, url=cfgserv.service_url +"credential", temp_user_id = temp_user_id)
 
     else:
+        data = request.get_json(silent=True)
         
-        hash_pid = request.args.get("hash_pid")
+        if not data:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+        
+        hash_pid = data.get("hash_pid")
+        
+        required_fields = {
+            "hash_pid": hash_pid
+        }
+
+        missing_fields = [name for name, value in required_fields.items() if not value]
+
+        if missing_fields:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Missing required fields.",
+                "data": {
+                    "missing_fields": missing_fields
+                }
+            }, 400
         
         session_id = str(uuid.uuid4())
         user_id = db.check_user(hash_pid, session_id)
+
+        if user_id is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid hash_pid",
+                "data": {
+                    "hash_pid": hash_pid
+                }
+            }, 400
         
         menu, data, header_table, list = cred_list(user_id, session_id)
 
