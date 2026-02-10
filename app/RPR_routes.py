@@ -660,6 +660,16 @@ def ui_update_legal_entities():
     
     session_id = str(uuid.uuid4())
     user_id = db.check_user(hash_pid, session_id)
+
+    if user_id is None:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Invalid hash_pid",
+            "data": {
+                "hash_pid": hash_pid
+            }
+        }, 400
     
     all_natural_person = db.get_natural_person_info(user_id, session_id)
     valid_natural_person_ids = {str(p["naturalperson_id"]) for p in all_natural_person}
@@ -1136,7 +1146,14 @@ responses:
                     "missing_fields": missing_fields
                 }
             }, 400
-
+        
+        if lang not in cfgserv.eu_countries:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": f"Invalid lang. Must be one of: {', '.join(cfgserv.eu_countries)}",
+                "provided": lang
+            }, 400
         
         session_id = str(uuid.uuid4())
         user_id = db.check_user(hash_pid, session_id)
@@ -1192,8 +1209,125 @@ def update_legal_person_entities():
     
     return redirect('/legal_person/list')
 
-@rpr.route('/legal_person/ui_update_legal_entities', methods=["GET", "POST"])
+@rpr.route('/legal_person/ui_update_legal_entities', methods=["POST"])
 def ui_update_legal_person_entities():
+    """
+Update Legal Person associations with Legal Entities
+---
+tags:
+  - Legal Person
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+        - legal_person
+        - legal_entities_ids
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: abc123hashpid
+
+        legal_person:
+          type: integer
+          description: ID of the Legal Person to associate Legal Entities with
+          example: 8
+
+        legal_entities_ids:
+          type: array
+          description: List of Legal Entity IDs to associate with the Legal Person
+          items:
+            type: integer
+          example: [3, 5, 12]
+
+responses:
+  200:
+    description: Associations updated successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Associations updated successfully
+        updated_count:
+          type: integer
+          example: 3
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example: [legal_entities_ids]
+
+  401:
+    description: Invalid hash_pid
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Invalid hash_pid
+        data:
+          type: object
+          properties:
+            hash_pid:
+              type: string
+              example: abc123hashpid
+
+  422:
+    description: Some Legal Entities are invalid or do not belong to the user
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Some legal entities do not exist or do not belong to this user
+        invalid_legal_entities_ids:
+          type: array
+          items:
+            type: integer
+          example: [99, 120]
+"""
 
     data = request.get_json(silent=True)
 
@@ -1235,6 +1369,17 @@ def ui_update_legal_person_entities():
     
     session_id = str(uuid.uuid4())
     user_id = db.check_user(hash_pid, session_id)
+    
+    if user_id is None:
+        
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Invalid hash_pid",
+            "data": {
+                "hash_pid": hash_pid
+            }
+        }, 400
     
     all_legal_person = db.get_legal_person_info(user_id, session_id)
     valid_legal_person_ids = {str(p["legalperson_id"]) for p in all_legal_person}
@@ -1545,15 +1690,7 @@ def create_legal_entity():
     }
     attributesForm.update(form_items)
 
-    select_dict={
-        "Country":list(cfgserv.eu_countries),
-        "Type of Identifier":["http://data.europa.eu/eudi/id/EORI-No",
-                            "http://data.europa.eu/eudi/id/LEI" ,
-                            "http://data.europa.eu/eudi/id/EUID" ,
-                            "http://data.europa.eu/eudi/id/VATIN"  ,
-                            "http://data.europa.eu/eudi/id/TIN" ,
-                            "http://data.europa.eu/eudi/id/Excise"]
-    }
+    select_dict=cfgserv.legal_entity_type_identifier
 
     return render_template("dynamic-form.html", title="Create Legal Entity",title_description="Please enter your Legal Entity data.", desc = descriptions, countries = cfgserv.eu_countries ,attributes=attributesForm, select_dict=select_dict, redirect_url= cfgserv.service_url + "legal_entity/add_legal_entity_db")
 
@@ -1727,6 +1864,22 @@ responses:
                 }
             }, 400
         
+        if type_of_identifier not in cfgserv.legal_entity_type_identifier["Type of Identifier"]:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": f"Invalid type_of_identifier. Must be one of: {', '.join(cfgserv.legal_entity_type_identifier['Type of Identifier'])}",
+                "provided": type_of_identifier
+            }, 400
+        
+        if country not in cfgserv.eu_countries:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": f"Invalid Country. Must be one of: {', '.join(cfgserv.eu_countries)}",
+                "provided": country
+            }, 400
+        
         session_id = str(uuid.uuid4())
         user_id = db.check_user(hash_pid, session_id)
 
@@ -1832,8 +1985,125 @@ def update_RPs():
 
     return redirect('/legal_entity/list')
 
-@rpr.route('/legal_entity/ui_update_RPs', methods=["GET", "POST"])
+@rpr.route('/legal_entity/ui_update_RPs', methods=["POST"])
 def ui_update_RPs():
+    """
+Update Legal Entity associations with Relying Parties
+---
+tags:
+  - Legal Entity
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+        - legal_entity
+        - relying_parties
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: abc123hashpid
+
+        legal_entity:
+          type: integer
+          description: ID of the Legal Entity to associate Relying Parties with
+          example: 10
+
+        relying_parties:
+          type: array
+          description: List of Relying Party IDs to associate with the Legal Entity
+          items:
+            type: integer
+          example: [3, 5, 9]
+
+responses:
+  200:
+    description: Associations updated successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Associations updated successfully
+        updated_count:
+          type: integer
+          example: 3
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example: [relying_parties]
+
+  401:
+    description: Invalid hash_pid
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Invalid hash_pid
+        data:
+          type: object
+          properties:
+            hash_pid:
+              type: string
+              example: abc123hashpid
+
+  422:
+    description: Some relying parties are invalid or do not belong to the user
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Some legal entities do not exist or do not belong to this user
+        invalid_relying_parties:
+          type: array
+          items:
+            type: integer
+          example: [99, 120]
+"""
 
     data = request.get_json(silent=True)
 
@@ -1876,6 +2146,17 @@ def ui_update_RPs():
     session_id = str(uuid.uuid4())
     user_id = db.check_user(hash_pid, session_id)
     
+    if user_id is None:
+        
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Invalid hash_pid",
+            "data": {
+                "hash_pid": hash_pid
+            }
+        }, 400
+  
     all_legal_entities = db.get_legal_entity_info(user_id, session_id)
     valid_legal_person_ids = {str(p["legalentity_id"]) for p in all_legal_entities}
 
@@ -1883,7 +2164,7 @@ def ui_update_RPs():
         return {
                 "status": "error",
                 "code": 400,
-                "message": "Legal person does not exist or does not belong to this user"
+                "message": "Legal Entity does not exist or does not belong to this user"
             }, 400
     
     all_wrp = db.get_rp_info(user_id, session_id)
@@ -1912,8 +2193,119 @@ def ui_update_RPs():
     }, 200
 
   
-@rpr.route('/legal_entity/ui_remove_update_natural_person', methods=["GET", "POST"])
+@rpr.route('/legal_entity/ui_remove_update_natural_person', methods=["POST"])
 def ui_remove_update_natural_person():
+    """
+Remove Natural Person associations from Legal Entities
+---
+tags:
+  - Legal Entity
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+        - legal_entity
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: abc123hashpid
+
+        legal_entity:
+          type: array
+          description: List of Legal Entity IDs to remove the Natural Person association from
+          items:
+            type: integer
+          example: [3, 7, 12]
+
+responses:
+  200:
+    description: Associations removed successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Associations updated successfully
+        updated_count:
+          type: integer
+          example: 3
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example: [legal_entity]
+
+  401:
+    description: Invalid hash_pid
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Invalid hash_pid
+        data:
+          type: object
+          properties:
+            hash_pid:
+              type: string
+              example: abc123hashpid
+
+  422:
+    description: Some Legal Entities are invalid or do not belong to the user
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Some legal entities do not exist or do not belong to this user
+        invalid_legal_entities:
+          type: array
+          items:
+            type: integer
+          example: [99, 120]
+"""
 
     data = request.get_json(silent=True)
 
@@ -1953,6 +2345,17 @@ def ui_remove_update_natural_person():
     
     session_id = str(uuid.uuid4())
     user_id = db.check_user(hash_pid, session_id)
+    
+    if user_id is None:
+        
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Invalid hash_pid",
+            "data": {
+                "hash_pid": hash_pid
+            }
+        }, 400
     
     all_legal_entities = db.get_legal_entity_info(user_id, session_id)
     valid_legal_person_ids = {p["legalentity_id"] for p in all_legal_entities}
@@ -1975,13 +2378,124 @@ def ui_remove_update_natural_person():
 
     return {
         "status": "success",
-        "message": "Associations updated successfully",
+        "message": "Associations removed successfully",
         "updated_count": len(legal_entity)
     }, 200
   
 
-@rpr.route('/legal_entity/ui_remove_update_legal_person', methods=["GET", "POST"])
+@rpr.route('/legal_entity/ui_remove_update_legal_person', methods=["POST"])
 def ui_remove_update_legal_person():
+    """
+Remove Legal Person associations from Legal Entities
+---
+tags:
+  - Legal Entity
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+        - legal_entity
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: abc123hashpid
+
+        legal_entity:
+          type: array
+          description: List of Legal Entity IDs to remove the Legal Person association from
+          items:
+            type: integer
+          example: [3, 7, 12]
+
+responses:
+  200:
+    description: Associations removed successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Associations updated successfully
+        updated_count:
+          type: integer
+          example: 3
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example: [legal_entity]
+
+  401:
+    description: Invalid hash_pid
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Invalid hash_pid
+        data:
+          type: object
+          properties:
+            hash_pid:
+              type: string
+              example: abc123hashpid
+
+  422:
+    description: Some Legal Entities are invalid or do not belong to the user
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Some legal entities do not exist or do not belong to this user
+        invalid_legal_entities:
+          type: array
+          items:
+            type: integer
+          example: [99, 120]
+"""
 
     data = request.get_json(silent=True)
 
@@ -2021,6 +2535,17 @@ def ui_remove_update_legal_person():
     
     session_id = str(uuid.uuid4())
     user_id = db.check_user(hash_pid, session_id)
+    
+    if user_id is None:
+        
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Invalid hash_pid",
+            "data": {
+                "hash_pid": hash_pid
+            }
+        }, 400
     
     all_legal_entities = db.get_legal_entity_info(user_id, session_id)
     valid_legal_person_ids = {p["legalentity_id"] for p in all_legal_entities}
@@ -2347,25 +2872,7 @@ def RP_create():
 
     attributesForm.update(form_items)
 
-    select_dict={
-        "Entitlement":["http://data.europa.eu/eudi/entitlement/Service_Provider",
-                    "http://data.europa.eu/eudi/entitlement/QEAA_Provider",
-                    "http://data.europa.eu/eudi/entitlement/Non_Q_EAA_Provider",
-                    "http://data.europa.eu/eudi/entitlement/PUB_EAA_Provider",
-                    "http://data.europa.eu/eudi/entitlement/PID_Provider",
-                    "http://data.europa.eu/eudi/entitlement/QCert_for_ESeal_Provider",
-                    "http://data.europa.eu/eudi/entitlement/QCert_for_ESig_Provider",
-                    "http://data.europa.eu/eudi/entitlement/rQSealCDs_Provider",
-                    "http://data.europa.eu/eudi/entitlement/rQSigCDs_Provider",
-                    "http://data.europa.eu/eudi/entitlement/ESig_ESeal_Creation_Provider"],
-
-        "Type of Policy":["http://data.europa.eu/eudi/policy/trust-service-practice-statement ",
-                        "http://data.europa.eu/eudi/policy/terms-and-conditions",
-                        "http://data.europa.eu/eudi/policy/privacy-statement",
-                        "http://data.europa.eu/eudi/policy/privacy-policy",
-                        "http://data.europa.eu/eudi/policy/registration-policy"]
-
-    }
+    select_dict=cfgserv.relying_party
     
     return render_template("dynamic-form.html",title="Create Relying Party",title_description="Please enter your Relying Party data.", desc = descriptions, countries = cfgserv.eu_countries, lang=cfgserv.eu_languages, attributes=attributesForm, select_dict=select_dict, redirect_url= cfgserv.service_url + "RP/add_RP_db")
 
@@ -2555,6 +3062,30 @@ responses:
                 "data": {
                     "missing_fields": missing_fields
                 }
+            }, 400
+        
+        if entitlement not in cfgserv.relying_party["Entitlement"]:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": f"Invalid entitlement. Must be one of: {', '.join(cfgserv.relying_party['Entitlement'])}",
+                "provided": entitlement
+            }, 400
+        
+        if type_of_policy not in cfgserv.relying_party["Type of Policy"]:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": f"Invalid Type of Policy. Must be one of: {', '.join(cfgserv.relying_party['Type of Policy'])}",
+                "provided": type_of_policy
+            }, 400
+        
+        if srvDescription_lang not in cfgserv.eu_countries:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": f"Invalid Type of Policy. Must be one of: {', '.join(cfgserv.eu_countries)}",
+                "provided": srvDescription_lang
             }, 400
         
         session_id = str(uuid.uuid4())
@@ -2966,8 +3497,125 @@ def update_iu_rp():
     return redirect('/RP/list')
 
 
-@rpr.route('/RP/ui_update_intended_use', methods=["GET", "POST"])
+@rpr.route('/RP/ui_update_intended_use', methods=["POST"])
 def ui_update_intended_use():
+    """
+Update Relying Party associations with Intended Uses
+---
+tags:
+  - Relying Party
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+        - relying_party
+        - intended_uses
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: abc123hashpid
+
+        relying_party:
+          type: integer
+          description: ID of the Relying Party to associate Intended Uses with
+          example: 5
+
+        intended_uses:
+          type: array
+          description: List of Intended Use IDs to associate with the Relying Party
+          items:
+            type: integer
+          example: [2, 4, 7]
+
+responses:
+  200:
+    description: Associations updated successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Associations updated successfully
+        updated_count:
+          type: integer
+          example: 3
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example: [intended_uses]
+
+  401:
+    description: Invalid hash_pid
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Invalid hash_pid
+        data:
+          type: object
+          properties:
+            hash_pid:
+              type: string
+              example: abc123hashpid
+
+  422:
+    description: Some Intended Uses are invalid or do not belong to the user
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Some Intended Uses do not exist or do not belong to this user
+        invalid_intended_uses:
+          type: array
+          items:
+            type: integer
+          example: [99, 120]
+"""
 
     data = request.get_json(silent=True)
 
@@ -3010,6 +3658,17 @@ def ui_update_intended_use():
     session_id = str(uuid.uuid4())
     user_id = db.check_user(hash_pid, session_id)
     
+    if user_id is None:
+        
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Invalid hash_pid",
+            "data": {
+                "hash_pid": hash_pid
+            }
+        }, 400
+    
     all_relying_party = db.get_rp_info(user_id, session_id)
     valid_relying_party_ids = {str(p["wrp_id"]) for p in all_relying_party}
 
@@ -3045,8 +3704,119 @@ def ui_update_intended_use():
         "updated_count": len(intended_uses)
     }, 200
 
-@rpr.route('/RP/ui_remove_update_legal_entity', methods=["GET", "POST"])
+@rpr.route('/RP/ui_remove_update_legal_entity', methods=["POST"])
 def ui_remove_update_legal_entity():
+    """
+Remove Legal Entity associations from Relying Parties
+---
+tags:
+  - Relying Party
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+        - relying_party
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: abc123hashpid
+
+        relying_party:
+          type: array
+          description: List of Relying Party IDs to remove the Legal Entity association from
+          items:
+            type: integer
+          example: [2, 5, 9]
+
+responses:
+  200:
+    description: Associations removed successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Associations updated successfully
+        updated_count:
+          type: integer
+          example: 3
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example: [relying_party]
+
+  401:
+    description: Invalid hash_pid
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Invalid hash_pid
+        data:
+          type: object
+          properties:
+            hash_pid:
+              type: string
+              example: abc123hashpid
+
+  422:
+    description: Some Relying Parties are invalid or do not belong to the user
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Some Relying Parties do not exist or do not belong to this user
+        invalid_legal_entities:
+          type: array
+          items:
+            type: integer
+          example: [99, 120]
+"""
 
     data = request.get_json(silent=True)
 
@@ -3086,6 +3856,17 @@ def ui_remove_update_legal_entity():
     
     session_id = str(uuid.uuid4())
     user_id = db.check_user(hash_pid, session_id)
+    
+    if user_id is None:
+        
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Invalid hash_pid",
+            "data": {
+                "hash_pid": hash_pid
+            }
+        }, 400
     
     all_relying_party = db.get_rp_info(user_id, session_id)
     valid_relying_party_ids = {p["wrp_id"] for p in all_relying_party}
@@ -3138,14 +3919,7 @@ def intended_use_create():
 
     attributesForm.update(form_items)
 
-    select_dict={
-        "Type of Privacy Policy":["http://data.europa.eu/eudi/policy/trust-service-practice-statement ",
-                        "http://data.europa.eu/eudi/policy/terms-and-conditions",
-                        "http://data.europa.eu/eudi/policy/privacy-statement",
-                        "http://data.europa.eu/eudi/policy/privacy-policy",
-                        "http://data.europa.eu/eudi/policy/registration-policy"]
-
-    }
+    select_dict=cfgserv.intended_use
     
     return render_template("dynamic-form.html",title="Create Intended Use",title_description="Please enter your Intended Use data.", desc = descriptions, countries = cfgserv.eu_countries ,attributes=attributesForm, select_dict=select_dict, redirect_url= cfgserv.service_url + "/intended_use/add_intended_use_db")
 
@@ -3320,6 +4094,22 @@ responses:
                 "data": {
                     "missing_fields": missing_fields
                 }
+            }, 400
+        
+        if purpose_lang not in cfgserv.eu_countries:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": f"Invalid purpose_lang. Must be one of: {', '.join(cfgserv.eu_countries)}",
+                "provided": purpose_lang
+            }, 400
+        
+        if type_policy not in cfgserv.intended_use["Type of Privacy Policy"]:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": f"Invalid type_policy. Must be one of: {', '.join(cfgserv.intended_use['Type of Privacy Policy'])}",
+                "provided": type_policy
             }, 400
 
         session_id = str(uuid.uuid4())
@@ -3635,8 +4425,119 @@ responses:
     
 #     return redirect('/intended_use/list')
 
-@rpr.route('/intended_use/ui_remove_update_relying_party', methods=["GET", "POST"])
+@rpr.route('/intended_use/ui_remove_update_relying_party', methods=["POST"])
 def ui_remove_update_relying_party():
+    """
+Remove Relying Party associations from Intended Uses
+---
+tags:
+  - Intended Use
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+        - intended_use
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: abc123hashpid
+
+        intended_use:
+          type: array
+          description: List of Intended Use IDs to remove the Relying Party association from
+          items:
+            type: integer
+          example: [2, 5, 9]
+
+responses:
+  200:
+    description: Associations removed successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Associations updated successfully
+        updated_count:
+          type: integer
+          example: 3
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example: [intended_use]
+
+  401:
+    description: Invalid hash_pid
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Invalid hash_pid
+        data:
+          type: object
+          properties:
+            hash_pid:
+              type: string
+              example: abc123hashpid
+
+  422:
+    description: Some Intended Uses are invalid or do not belong to the user
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Some Intended Use do not exist or do not belong to this user
+        invalid_legal_entities:
+          type: array
+          items:
+            type: integer
+          example: [99, 120]
+"""
 
     data = request.get_json(silent=True)
 
@@ -3676,6 +4577,17 @@ def ui_remove_update_relying_party():
     
     session_id = str(uuid.uuid4())
     user_id = db.check_user(hash_pid, session_id)
+    
+    if user_id is None:
+        
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Invalid hash_pid",
+            "data": {
+                "hash_pid": hash_pid
+            }
+        }, 400
     
     all_intended_use = db.get_intended_use_info(user_id, session_id)
     valid_intended_use_ids = {p["intendeduse_id"] for p in all_intended_use}
@@ -3702,8 +4614,119 @@ def ui_remove_update_relying_party():
         "updated_count": len(intended_use)
     }, 200
 
-@rpr.route('/intended_use/ui_remove_update_credential', methods=["GET", "POST"])
+@rpr.route('/intended_use/ui_remove_update_credential', methods=["POST"])
 def ui_remove_update_credential():
+    """
+Remove Credential associations from Intended Uses
+---
+tags:
+  - Intended Use
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+        - intended_use
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: abc123hashpid
+
+        intended_use:
+          type: array
+          description: List of Intended Use IDs to remove the Credential association from
+          items:
+            type: integer
+          example: [3, 7, 15]
+
+responses:
+  200:
+    description: Associations removed successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Associations updated successfully
+        updated_count:
+          type: integer
+          example: 3
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example: [intended_use]
+
+  401:
+    description: Invalid hash_pid
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Invalid hash_pid
+        data:
+          type: object
+          properties:
+            hash_pid:
+              type: string
+              example: abc123hashpid
+
+  422:
+    description: Some Intended Uses are invalid or do not belong to the user
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Some Intended Use do not exist or do not belong to this user
+        invalid_legal_entities:
+          type: array
+          items:
+            type: integer
+          example: [99, 120]
+"""
 
     data = request.get_json(silent=True)
 
@@ -3743,6 +4766,17 @@ def ui_remove_update_credential():
     
     session_id = str(uuid.uuid4())
     user_id = db.check_user(hash_pid, session_id)
+    
+    if user_id is None:
+        
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Invalid hash_pid",
+            "data": {
+                "hash_pid": hash_pid
+            }
+        }, 400
     
     all_intended_use = db.get_intended_use_info(user_id, session_id)
     valid_intended_use_ids = {p["intendeduse_id"] for p in all_intended_use}
@@ -4288,8 +5322,132 @@ def update_intended_uses():
     return redirect('/credential/list')
 
 
-@rpr.route('/credential/ui_update_intended_uses', methods=["GET", "POST"])
+@rpr.route('/credential/ui_update_intended_uses', methods=["POST"])
 def ui_update_intended_uses():
+    """
+Update Credential associations with Intended Uses
+---
+tags:
+  - Credential
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+        - credential
+        - intended_uses
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: "abc123hashpid"
+
+        credential:
+          type: integer
+          description: ID of the Credential to associate Intended Uses with
+          example: 8
+
+        intended_uses:
+          type: array
+          description: List of Intended Use IDs to associate with the Credential
+          items:
+            type: integer
+          example:
+            - 2
+            - 5
+            - 9
+
+responses:
+  200:
+    description: Associations updated successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Associations updated successfully
+        updated_count:
+          type: integer
+          example: 3
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example:
+                - intended_uses
+
+  400_invalid_hash_pid:
+    description: Invalid hash_pid
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Invalid hash_pid
+        data:
+          type: object
+          properties:
+            hash_pid:
+              type: string
+              example: abc123hashpid
+
+  400_invalid_ids:
+    description: Some Intended Uses are invalid or do not belong to the user
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Some Intended Uses do not exist or do not belong to this user
+        invalid_intended_uses:
+          type: array
+          items:
+            type: integer
+          example:
+            - 99
+            - 120
+"""
+
 
     data = request.get_json(silent=True)
 
@@ -4331,6 +5489,17 @@ def ui_update_intended_uses():
     
     session_id = str(uuid.uuid4())
     user_id = db.check_user(hash_pid, session_id)
+
+    if user_id is None:
+        
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Invalid hash_pid",
+            "data": {
+                "hash_pid": hash_pid
+            }
+        }, 400
     
     all_credential = db.get_credential_info(user_id, session_id)
     valid_credential_ids = {str(p["credential_id"]) for p in all_credential}

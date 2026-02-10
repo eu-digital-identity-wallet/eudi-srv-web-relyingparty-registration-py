@@ -57,6 +57,42 @@ class ConfService:
         "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL",
         "PL", "PT", "RO", "SK", "SI", "ES", "SE","UT", "EU"]
     
+    legal_entity_type_identifier={
+        "Country":list(eu_countries),
+        "Type of Identifier":["http://data.europa.eu/eudi/id/EORI-No",
+                            "http://data.europa.eu/eudi/id/LEI" ,
+                            "http://data.europa.eu/eudi/id/EUID" ,
+                            "http://data.europa.eu/eudi/id/VATIN"  ,
+                            "http://data.europa.eu/eudi/id/TIN" ,
+                            "http://data.europa.eu/eudi/id/Excise"]
+    }
+
+    relying_party={
+        "Entitlement":["http://data.europa.eu/eudi/entitlement/Service_Provider",
+                    "http://data.europa.eu/eudi/entitlement/QEAA_Provider",
+                    "http://data.europa.eu/eudi/entitlement/Non_Q_EAA_Provider",
+                    "http://data.europa.eu/eudi/entitlement/PUB_EAA_Provider",
+                    "http://data.europa.eu/eudi/entitlement/PID_Provider",
+                    "http://data.europa.eu/eudi/entitlement/QCert_for_ESeal_Provider",
+                    "http://data.europa.eu/eudi/entitlement/QCert_for_ESig_Provider",
+                    "http://data.europa.eu/eudi/entitlement/rQSealCDs_Provider",
+                    "http://data.europa.eu/eudi/entitlement/rQSigCDs_Provider",
+                    "http://data.europa.eu/eudi/entitlement/ESig_ESeal_Creation_Provider"],
+
+        "Type of Policy":["http://data.europa.eu/eudi/policy/trust-service-practice-statement",
+                        "http://data.europa.eu/eudi/policy/terms-and-conditions",
+                        "http://data.europa.eu/eudi/policy/privacy-statement",
+                        "http://data.europa.eu/eudi/policy/privacy-policy",
+                        "http://data.europa.eu/eudi/policy/registration-policy"]
+    }
+
+    intended_use={
+        "Type of Privacy Policy":["http://data.europa.eu/eudi/policy/trust-service-practice-statement",
+                        "http://data.europa.eu/eudi/policy/terms-and-conditions",
+                        "http://data.europa.eu/eudi/policy/privacy-statement",
+                        "http://data.europa.eu/eudi/policy/privacy-policy",
+                        "http://data.europa.eu/eudi/policy/registration-policy"]
+    }
 
     # log_dir = "/tmp/log"
     # #log_dir = "../../log"

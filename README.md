@@ -324,7 +324,7 @@ This route is responsible for creating and storing a new Natural Person in the s
 
 This route is responsible for creating and storing a new Legal Person in the system.
 
-### Route
+### Endpoint
 ``` code
 /legal_person/add_legal_person_db
 ```
