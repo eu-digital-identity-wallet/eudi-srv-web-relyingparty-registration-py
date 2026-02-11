@@ -93,6 +93,8 @@ class ConfService:
                         "http://data.europa.eu/eudi/policy/privacy-policy",
                         "http://data.europa.eu/eudi/policy/registration-policy"]
     }
+    sca_signer_url="http://localhost:8086"
+    
 
     # log_dir = "/tmp/log"
     # #log_dir = "../../log"
