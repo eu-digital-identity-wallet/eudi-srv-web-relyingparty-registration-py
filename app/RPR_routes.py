@@ -71,10 +71,6 @@ from cryptojwt.jwk.ec import ECKey
 from cryptojwt.jwk.ec import import_private_ec_key_from_file
 
 import urllib3
-from Crypto.Signature import pkcs1_15
-from Crypto.PublicKey import RSA, ECC
-from Crypto.Hash import SHA256
-from Crypto.Signature import DSS
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
@@ -3187,26 +3183,26 @@ def relying_party_access_certificate():
     RP_id = request.args.get("id")
 
     #dados da RP
-    RP=get_RP_data()
+    RP=db.get_rp_info()
     #commonName
-    tradeName=RP["trade_name"]
+    tradeName=RP["tradeName"]
     #uniformResourceIdentifier
     supportURI=RP["supportURI"]
 
     #se user for legal person
     #dados da legal person
-    user=get_user()
+    user=db.get_legal_person_info()
     #organizationName
     legalName=user["legalName"]
 
     #se user for natural person
-    user=get_user()
+    user=db.get_natural_person_info()
     givenName=user["givenName"]
     #surname
     surname=user["familyName"]
 
     #dados da legalEntity
-    legal_entity=get_legal_entity()
+    legal_entity=db.get_legal_entity_info()
     #caso for natural person é serialNumber no caso de uma legal person organizationIdentifier
     identifier=legal_entity["identifier"]
     country= legal_entity["country"]
