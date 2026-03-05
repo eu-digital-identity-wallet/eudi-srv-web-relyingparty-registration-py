@@ -2847,9 +2847,6 @@ responses:
             }
         }, 200
 
-
-
-
 @rpr.route('/RP/create_person', methods=['GET','POST'])
 def RP_create():
 
@@ -3176,104 +3173,288 @@ def RP_edit_db():
 @rpr.route("/RP/certificate", methods=["GET", "POST"])
 def relying_party_access_certificate():
 
-    modulus=crypto.key_size
-    exponent=crypto.exponent
-    priv_key = ec.generate_private_key(ec.SECP256R1(), default_backend() )
-
-    RP_id = request.args.get("id")
-
-    #dados da RP
-    RP=db.get_rp_info()
-    #commonName
-    tradeName=RP["tradeName"]
-    #uniformResourceIdentifier
-    supportURI=RP["supportURI"]
-
-    #se user for legal person
-    #dados da legal person
-    user=db.get_legal_person_info()
-    #organizationName
-    legalName=user["legalName"]
-
-    #se user for natural person
-    user=db.get_natural_person_info()
-    givenName=user["givenName"]
-    #surname
-    surname=user["familyName"]
-
-    #dados da legalEntity
-    legal_entity=db.get_legal_entity_info()
-    #caso for natural person é serialNumber no caso de uma legal person organizationIdentifier
-    identifier=legal_entity["identifier"]
-    country= legal_entity["country"]
-    email= legal_entity["email"]
-    phone= legal_entity["phone"]
-
-
-    #como as TSLs, ex: lang en, description=test  
-    servicesDescription=request.form.get("Services Description")#como as TSLs, ex: lang en, description=test  
-    entitlement=request.form.get("Entitlement")
-    # verificar legal entity se é pertence ao sector público, se sim True, se não False
-    isPSB= False
-    password=request.form.get("Password")
-
-
-    certificateRequest= generateCertificateRequest(priv_key, commonName, countryName, organizationName, registration_number, email,dns_Name)
     
-    certificateRequestString = "-----BEGIN CERTIFICATE REQUEST-----\n"+ base64.b64encode(certificateRequest).decode("utf-8") + "\n"+ "-----END CERTIFICATE REQUEST-----"
-    certificateAuthorityName = getCertificateAuthorityName(countryName)
-    certificateRequestBody = getJsonBody(certificateRequestString, certificateAuthorityName, countryName)
-    postUrl = "https://" + ejbca.cahost + "/ejbca/ejbca-rest-api/v1" + ejbca.endpoint
+    if 'temp_user_id' in session:  
+        temp_user_id = session['temp_user_id']
+        user = session[temp_user_id]
+ 
+        new_user = get_hash_user_pid.User(user["family_name"], user["given_name"], user["birth_date"], user["issuing_country"], user["issuing_authority"])
+        hash_pid = new_user.hash
+        user_id = db.check_user(hash_pid, session["session_id"])
 
-    headers ={
-        "Content-Type": "application/json",
-        'Authorization': 'Bearer test',
-    }
+        modulus=crypto.key_size
+        exponent=crypto.exponent
+        priv_key = ec.generate_private_key(ec.SECP256R1(), default_backend() )
 
-    clientP12ArchiveFilepath = ejbca.clientP12ArchiveFilepath
-    clientP12ArchivePassword = ejbca.clientP12ArchivePassword
-    ManagementCA = ejbca.managementCA
+        RP_id = request.args.get("id")
 
-    trustCA= getTrustManagerOfCACertificate(ManagementCA)
+        #dados da RP
+        
+        RP=db.get_rp_certificate(RP_id, session["session_id"])
 
-    response = http_post_requests_with_custom_ssl_context(ManagementCA, clientP12ArchiveFilepath, clientP12ArchivePassword, postUrl,certificateRequestBody, headers)
+        return RP
+        #commonName
+        tradeName=RP["tradeName"]
+        #uniformResourceIdentifier
+        supportURI=RP["supportURI"]
 
-    response = response.json()
+        #se user for legal person
+        #dados da legal person
+        user=db.get_legal_person_info()
+        #organizationName
+        legalName=user["legalName"]
+
+        #se user for natural person
+        user=db.get_natural_person_info()
+        givenName=user["givenName"]
+        #surname
+        surname=user["familyName"]
+
+        #dados da legalEntity
+        legal_entity=db.get_legal_entity_info()
+        #caso for natural person é serialNumber no caso de uma legal person organizationIdentifier
+        identifier=legal_entity["identifier"]
+        country= legal_entity["country"]
+        email= legal_entity["email"]
+        phone= legal_entity["phone"]
+
+
+        #como as TSLs, ex: lang en, description=test  
+        servicesDescription=RP["srvDescription"]#como as TSLs, ex: lang en, description=test  
+        entitlement=RP["entitlement"]
+        # verificar legal entity se é pertence ao sector público, se sim True, se não False
+        isPSB= False
+
+        return str(tradeName, givenName, phone)
+        password=request.form.get("Password")
+
+
+        certificateRequest= generateCertificateRequest(priv_key, commonName, countryName, organizationName, registration_number, email, dns_Name)
+        
+        certificateRequestString = "-----BEGIN CERTIFICATE REQUEST-----\n"+ base64.b64encode(certificateRequest).decode("utf-8") + "\n"+ "-----END CERTIFICATE REQUEST-----"
+        certificateAuthorityName = getCertificateAuthorityName(countryName)
+        certificateRequestBody = getJsonBody(certificateRequestString, certificateAuthorityName, countryName)
+        postUrl = "https://" + ejbca.cahost + "/ejbca/ejbca-rest-api/v1" + ejbca.endpoint
+
+        headers ={
+            "Content-Type": "application/json",
+            'Authorization': 'Bearer test',
+        }
+
+        clientP12ArchiveFilepath = ejbca.clientP12ArchiveFilepath
+        clientP12ArchivePassword = ejbca.clientP12ArchivePassword
+        ManagementCA = ejbca.managementCA
+
+        trustCA= getTrustManagerOfCACertificate(ManagementCA)
+
+        response = http_post_requests_with_custom_ssl_context(ManagementCA, clientP12ArchiveFilepath, clientP12ArchivePassword, postUrl,certificateRequestBody, headers)
+
+        response = response.json()
+        
+        certificate_bytes=base64.b64decode(response["certificate"])
+
+        certificate = x509.load_der_x509_certificate(certificate_bytes, default_backend())
+
+        serial_number=response["serial_number"]
+
+        user_relying_party_db(user,request.form, serial_number, certificate,response["certificate"], session["session_id"])
+
+        p12=pkcs12.serialize_key_and_certificates(
+            name=commonName.encode("utf-8"),key=priv_key,cert=certificate, cas=list().append(trustCA),
+            encryption_algorithm=serialization.BestAvailableEncryption(password.encode("utf-8"))
+        )
+
+        tag = uuid.uuid4()
+
+        file_name = commonName + "_" + str(tag)
+
+        p12_temp.update({file_name:{"response": p12, "expires":datetime.now() + timedelta(minutes=cfgserv.deffered_expiry)}})
+
+        cert = certificate.subject.rfc4514_string().split(",")
+        dic = {parte.split("=")[0]: parte for parte in cert}
+        order = [dic.get("C"), dic.get("O"), dic.get("CN")]
+        aux = [v for k, v in dic.items() if k not in ["C", "O", "CN"]]
+
+        cert_subject_rfc4514_string = ",".join(order + aux)
+
+        certificate_presentation={
+            "certificate_issuer":certificate.issuer.rfc4514_string(),
+            "certificate_distinguished_name":cert_subject_rfc4514_string,
+            "validity_from":certificate.not_valid_before_utc,
+            "validity_to":certificate.not_valid_after_utc,
+        }
+
+        return render_template('downloadPage.html', attributes=certificate_presentation, download_url= "/Download/"+ file_name)
     
-    certificate_bytes=base64.b64decode(response["certificate"])
+    else:
+        
+        data = request.get_json(silent=True)
 
-    certificate = x509.load_der_x509_certificate(certificate_bytes, default_backend())
+        if not data:
+            return {
+                    "status": "error",
+                    "code": 400,
+                    "message": "Invalid or missing JSON body"
+                }, 400
 
-    serial_number=response["serial_number"]
+        hash_pid = data.get("hash_pid")
+        relying_party = data.get("relying_party")
 
-    user_relying_party_db(user,request.form, serial_number, certificate,response["certificate"], session["session_id"])
+        required_fields = {
+            "hash_pid": hash_pid,
+            "relying_party": relying_party,
+        }
 
-    p12=pkcs12.serialize_key_and_certificates(
-        name=commonName.encode("utf-8"),key=priv_key,cert=certificate, cas=list().append(trustCA),
-        encryption_algorithm=serialization.BestAvailableEncryption(password.encode("utf-8"))
-    )
+        missing_fields = [name for name, value in required_fields.items() if not value]
 
-    tag = uuid.uuid4()
+        if missing_fields:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Missing required fields.",
+                "data": {
+                    "missing_fields": missing_fields
+                }
+            }, 400
+        
+        session_id = str(uuid.uuid4())
+        user_id = db.check_user(hash_pid, session_id)
+        
+        if user_id is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid hash_pid",
+                "data": {
+                    "hash_pid": hash_pid
+                }
+            }, 400
+        
+        RP=db.get_rp_certificate(relying_party, session_id)
 
-    file_name = commonName + "_" + str(tag)
+        if RP is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Relying Parties do not Exist",
+                "data": {
+                    "relying_party": relying_party
+                }
+            }, 400
+        
+        if RP[0]["user_id"] is not user_id:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Relying Parties do not belong to this User.",
+                "data": {
+                    "relying_party": relying_party
+                }
+            }, 400
 
-    p12_temp.update({file_name:{"response": p12, "expires":datetime.now() + timedelta(minutes=cfgserv.deffered_expiry)}})
+        modulus=crypto.key_size
+        exponent=crypto.exponent
+        priv_key = ec.generate_private_key(ec.SECP256R1(), default_backend() )
 
-    cert = certificate.subject.rfc4514_string().split(",")
-    dic = {parte.split("=")[0]: parte for parte in cert}
-    order = [dic.get("C"), dic.get("O"), dic.get("CN")]
-    aux = [v for k, v in dic.items() if k not in ["C", "O", "CN"]]
+        #dados da RP
 
-    cert_subject_rfc4514_string = ",".join(order + aux)
+        #commonName
+        tradeName=RP[0]["tradeName"]
+        #uniformResourceIdentifier
+        supportURI=RP[0]["supportURI"]
+        legal_entity = db.get_legal_entity(RP[0]["supervisorAuthority"], session_id)
+        
+        if legal_entity[0]["legalperson_id"] is None:
+            natural_person = db.get_natural_person(legal_entity[0]["naturalperson_id"], session_id)
+            #se user for natural person
+            givenName=natural_person[0]["givenName"]
+            #surname
+            surname=natural_person[0]["familyName"]
+            
+        else:
+            legal_person = db.get_legal_person(legal_entity[0]["legalperson_id"], session_id)
+            #se user for legal person
+            #dados da legal person
+            #organizationName
+            legalName=legal_person[0]["legalName"]
 
-    certificate_presentation={
-        "certificate_issuer":certificate.issuer.rfc4514_string(),
-        "certificate_distinguished_name":cert_subject_rfc4514_string,
-        "validity_from":certificate.not_valid_before_utc,
-        "validity_to":certificate.not_valid_after_utc,
-    }
 
-    return render_template('downloadPage.html', attributes=certificate_presentation, download_url= "/Download/"+ file_name)
+        #dados da legalEntity
+        #caso for natural person é serialNumber no caso de uma legal person organizationIdentifier
+        identifier=legal_entity[0]["identifier"]
+        country= legal_entity[0]["country"]
+        email= legal_entity[0]["email"]
+        phone= legal_entity[0]["phone"]
+
+
+        #como as TSLs, ex: lang en, description=test  
+        servicesDescription=RP[0]["srvDescription"]#como as TSLs, ex: lang en, description=test  
+        entitlement=RP[0]["entitlement"]
+        # verificar legal entity se é pertence ao sector público, se sim True, se não False
+        isPSB= False
+#### ------
+        password=request.form.get("Password")
+
+
+        certificateRequest= generateCertificateRequest(priv_key, commonName, countryName, organizationName, registration_number, email, dns_Name)
+        
+        certificateRequestString = "-----BEGIN CERTIFICATE REQUEST-----\n"+ base64.b64encode(certificateRequest).decode("utf-8") + "\n"+ "-----END CERTIFICATE REQUEST-----"
+        certificateAuthorityName = getCertificateAuthorityName(countryName)
+        certificateRequestBody = getJsonBody(certificateRequestString, certificateAuthorityName, countryName)
+        postUrl = "https://" + ejbca.cahost + "/ejbca/ejbca-rest-api/v1" + ejbca.endpoint
+
+        headers ={
+            "Content-Type": "application/json",
+            'Authorization': 'Bearer test',
+        }
+
+        clientP12ArchiveFilepath = ejbca.clientP12ArchiveFilepath
+        clientP12ArchivePassword = ejbca.clientP12ArchivePassword
+        ManagementCA = ejbca.managementCA
+
+        trustCA= getTrustManagerOfCACertificate(ManagementCA)
+
+        response = http_post_requests_with_custom_ssl_context(ManagementCA, clientP12ArchiveFilepath, clientP12ArchivePassword, postUrl,certificateRequestBody, headers)
+
+        response = response.json()
+        
+        certificate_bytes=base64.b64decode(response["certificate"])
+
+        certificate = x509.load_der_x509_certificate(certificate_bytes, default_backend())
+
+        serial_number=response["serial_number"]
+
+        user_relying_party_db(user,request.form, serial_number, certificate,response["certificate"], session["session_id"])
+
+        p12=pkcs12.serialize_key_and_certificates(
+            name=commonName.encode("utf-8"),key=priv_key,cert=certificate, cas=list().append(trustCA),
+            encryption_algorithm=serialization.BestAvailableEncryption(password.encode("utf-8"))
+        )
+
+        tag = uuid.uuid4()
+
+        file_name = commonName + "_" + str(tag)
+
+        p12_temp.update({file_name:{"response": p12, "expires":datetime.now() + timedelta(minutes=cfgserv.deffered_expiry)}})
+
+        cert = certificate.subject.rfc4514_string().split(",")
+        dic = {parte.split("=")[0]: parte for parte in cert}
+        order = [dic.get("C"), dic.get("O"), dic.get("CN")]
+        aux = [v for k, v in dic.items() if k not in ["C", "O", "CN"]]
+
+        cert_subject_rfc4514_string = ",".join(order + aux)
+
+        certificate_presentation={
+            "certificate_issuer":certificate.issuer.rfc4514_string(),
+            "certificate_distinguished_name":cert_subject_rfc4514_string,
+            "validity_from":certificate.not_valid_before_utc,
+            "validity_to":certificate.not_valid_after_utc,
+        }
+
+        return render_template('downloadPage.html', attributes=certificate_presentation, download_url= "/Download/"+ file_name)
 
 
 def wallet_rp_list(user_id, session_id):
@@ -4309,23 +4490,92 @@ def intended_use_edit_db():
 @rpr.route("/intended_use/certificate", methods=["GET", "POST"])
 def intended_use_registration_certificate():
 
+    if 'temp_user_id' in session:  
+        return "test"
+    
+    else:
+
+        data = request.get_json(silent=True)
+
+        if not data:
+            return {
+                    "status": "error",
+                    "code": 400,
+                    "message": "Invalid or missing JSON body"
+                }, 400
+
+        hash_pid = data.get("hash_pid")
+        intended_use = data.get("intended_use")
+
+        required_fields = {
+            "hash_pid": hash_pid,
+            "intended_use": intended_use,
+        }
+
+        missing_fields = [name for name, value in required_fields.items() if not value]
+
+        if missing_fields:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Missing required fields.",
+                "data": {
+                    "missing_fields": missing_fields
+                }
+            }, 400
+        
+        session_id = str(uuid.uuid4())
+        user_id = db.check_user(hash_pid, session_id)
+        
+        if user_id is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid hash_pid",
+                "data": {
+                    "hash_pid": hash_pid
+                }
+            }, 400
+        
+        intended_use_data=db.get_intended_use(intended_use, session_id)
+
+        if intended_use_data is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Intended Use do not Exist",
+                "data": {
+                    "intended_use": intended_use
+                }
+            }, 400
+        
+        if intended_use_data[0]["user_id"] is not user_id:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Intended Use do not belong to this User.",
+                "data": {
+                    "intended_use": intended_use
+                }
+            }, 400
+        
     # RP_data=get_RP_db_data()
     # intended_use_data= get_intended_use_data()
     # legal_entity_data= get_legal_entity_data()
     # credentials_data=get_credential_data()
+
+        RP_data = db.get_rp_certificate(intended_use_data[0]["wrp"], session_id)
+        legal_entity_data = db.get_legal_entity(RP_data[0]["supervisorAuthority"], session_id)
+        credentials_data = db.get_credential(intended_use_data[0]["credential_id"], session_id)
 
     # #if legal person
     # legal_person_data=get_legal_person_data()
 
     # #if natural person
     # natural_person_data= get_natural_person_data()
-
-    iat= int(time.time())
-
-    # name=RP_data["tradeName"]
-    # purpose=intended_use_data["purpose"]
-    # info_uri=legal_entity_data["info_uri"]
-    # country=legal_entity_data["country"]
     
     # #if legal_person
     # legal_name=legal_person_data["legal_name"]
@@ -4334,8 +4584,38 @@ def intended_use_registration_certificate():
     # given_name=natural_person_data["given_name"]
     # family_name=natural_person_data["family_name"]
 
+    
+        if legal_entity_data[0]["legalperson_id"] is None:
+            natural_person = db.get_natural_person(legal_entity_data[0]["naturalperson_id"], session_id)
+            #se user for natural person
+            givenName=natural_person[0]["givenName"]
+            #surname
+            surname=natural_person[0]["familyName"]
+            
+        else:
+            legal_person = db.get_legal_person(legal_entity_data[0]["legalperson_id"], session_id)
+            #se user for legal person
+            #dados da legal person
+            #organizationName
+            legalName=legal_person[0]["legalName"]
+
+        iat= int(time.time())
+
+    # name=RP_data["tradeName"]
+    # purpose=intended_use_data["purpose"]
+    # info_uri=legal_entity_data["info_uri"]
+    # country=legal_entity_data["country"]
+
+        name=RP_data[0]["tradeName"]
+        purpose=intended_use_data[0]["purpose"]
+        info_uri=legal_entity_data[0]["infoURI"]
+        country=legal_entity_data[0]["country"]
+    
     # id=legal_entity_data["identifier"]
     # privacy_policy=intended_use_data["privacyPolicy"]
+
+    id=legal_entity_data[0]["identifier"]
+    privacy_policy=intended_use_data[0]["type_policy"]
 
     # # definir de acordo com os dados do certificado
     # # policy_id=certificate_policy_id
@@ -4345,6 +4625,13 @@ def intended_use_registration_certificate():
     # providesAttestations=RP_data["providesAttestations"]
     # public_body=RP_data["isPSB"]
     # service=RP_data["srvDescription"]
+
+    entitlement=RP_data[0]["entitlement"]
+    providesAttestations=RP_data[0]["providesAttestations"]
+    public_body=RP_data[0]["isPSB"]
+    service=RP_data[0]["srvDescription"]
+
+    return "bangers"
     # #A URI to a status list presenting information about validity of the WRPRC. 
     # #status=
 
@@ -6062,65 +6349,66 @@ def request_RP_data():
 
     #ter dados em memória ou ficheiro para não fazer chamadas á BD. Atualizar de x em x tempo 
 
-    # registration_number= request.args.get("registration_number")
-    # name=request.args.get("name")
-    # privacy_policy_url=request.args.get("privacy_policy_url")
-    # entitlement=request.args.get("entitlement")
-    # intermediary_association=request.args.get("intermediary_association")
-    # acting_on_behalf_of=request.args.get("acting_on_behalf_of")
-    # limit=request.args.get("limit", default=20, type=int)
+    registration_number= request.args.get("registration_number")
+    name=request.args.get("name")
+    privacy_policy_url=request.args.get("privacy_policy_url")
+    entitlement=request.args.get("entitlement")
+    intermediary_association=request.args.get("intermediary_association")
+    acting_on_behalf_of=request.args.get("acting_on_behalf_of")
+    limit=request.args.get("limit", default=20, type=int)
 
-    # results=RPs_BD
+    # todas as rps da bd
+    results=db.get_all_rp_inf()
     
-    # if name:
-    #     name_lower = name.lower()
-    #     results = [
-    #         u for u in results
-    #         if name_lower in u["name"].lower()
-    #     ]
+    if name:
+        name_lower = name.lower()
+        results = [
+            u for u in results
+            if name_lower in u["tradeName"].lower()
+        ]
+    #
+    if registration_number:
 
-    # if registration_number:
-
-    #     results = [
-    #         u for u in results
-    #         if registration_number in u["registration_number"]
-    #     ]
+        results = [
+            u for u in results
+            if registration_number in u["registration_number"]
+        ]
     
-    # if privacy_policy_url:
+    if privacy_policy_url:
 
-    #     results = [
-    #         u for u in results
-    #         if registration_number in u["registration_number"]
-    #     ]
+        results = [
+            u for u in results
+            if registration_number in u["policyURI"]
+        ]
 
-    # if entitlement:
+    if entitlement:
 
-    #     results = [
-    #         u for u in results
-    #         if registration_number in u["registration_number"]
-    #     ]
+        results = [
+            u for u in results
+            if registration_number in u["entitlement"]
+        ]
+    #
+    if intermediary_association:
 
-    # if intermediary_association:
+        intermediary_association_lower = intermediary_association.lower()
+        results = [
+            u for u in results
+            if intermediary_association_lower in u["intermediary_association"].lower()
+        ]
+    #
+    if acting_on_behalf_of:
 
-    #     intermediary_association_lower = intermediary_association.lower()
-    #     results = [
-    #         u for u in results
-    #         if intermediary_association_lower in u["intermediary_association"].lower()
-    #     ]
+        acting_on_behalf_of_lower = acting_on_behalf_of.lower()
+        results = [
+            u for u in results
+            if acting_on_behalf_of_lower in u["acting_on_behalf_of"].lower()
+        ]
 
-    # if acting_on_behalf_of:
+    results = results[:limit]
 
-    #     acting_on_behalf_of_lower = acting_on_behalf_of.lower()
-    #     results = [
-    #         u for u in results
-    #         if acting_on_behalf_of_lower in u["acting_on_behalf_of"].lower()
-    #     ]
-
-    # results = results[:limit]
-
-    results={
-        "teste":"test"
-    }
+    # results={
+    #     "teste":"test"
+    # }
 
     final_result= json.dumps(results)
 

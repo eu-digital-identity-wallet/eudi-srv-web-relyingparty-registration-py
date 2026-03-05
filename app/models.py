@@ -392,7 +392,7 @@ def get_rp_info(user_id, log_id):
             
             if result: 
                 rp_data = [
-                    {"wrp_id": row[0], "tradeName": row[1], "supportURI": row[2], "srvDescription": row[3], "intended_use": row[4], "isPSB": row[5], "entitlement": row[6], "providesAttestations": row[7], "supervisorAuthority": row[8], "isIntermediary": row[9], "usesIntermediary": row[10], "registryURI": row[11], "providerType": row[12], "x5c": row[13], "typePolicy": row[14], "policyURI": row[15], "legalEntity": row[15]} 
+                    {"wrp_id": row[0], "tradeName": row[1], "supportURI": row[2], "srvDescription": row[3], "intended_use": row[4], "isPSB": row[5], "entitlement": row[6], "providesAttestations": row[7], "supervisorAuthority": row[8], "isIntermediary": row[9], "usesIntermediary": row[10], "registryURI": row[11], "providerType": row[12], "x5c": row[13], "typePolicy": row[14], "policyURI": row[15], "legalEntity": row[16]} 
                     for row in result
                 ]
                 extra = {'code': log_id} 
@@ -1444,6 +1444,292 @@ def update_iu_edit(grouped, iu_id, log_id):
         extra = {'code': log_id} 
         logger.error(f"Error updating Intended Use: {e}", extra=extra)
         print(f"Error updating Intended Use: {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+   
+def get_all_rp_inf():
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            select_query = """
+                SELECT wrp_id, tradeName, supportURI, srvDescription, intended_use, isPSB, entitlement, providesAttestations, supervisorAuthority, isIntermediary, usesIntermediary, registryURI, providerType, x5c, typePolicy, policyURI, legalEntity
+                FROM walletrelyingparty
+            """
+            
+            cursor.execute(select_query, ())
+            result = cursor.fetchall()
+            
+            if result: 
+                rp_data = [
+                    {"wrp_id": row[0], "tradeName": row[1], "supportURI": row[2], "srvDescription": row[3], "intended_use": row[4], "isPSB": row[5], "entitlement": row[6], "providesAttestations": row[7], "supervisorAuthority": row[8], "isIntermediary": row[9], "usesIntermediary": row[10], "registryURI": row[11], "providerType": row[12], "x5c": row[13], "typePolicy": row[14], "policyURI": row[15], "legalEntity": row[16]} 
+                    for row in result
+                ]
+                extra = {'code'} 
+                logger.info(f"All RP found", extra=extra)
+                return rp_data
+            else:
+                extra = {'code'}
+                logger.info("Not all RP found.", extra=extra)
+                print("Not all RP found.")
+                return None
+        else:
+            return None
+    except pymysql.MySQLError as e:
+        extra = {'code'}
+        logger.error(f"Error checking: {e}", extra=extra)
+        print(f"Error checking: {e}")
+        return None
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+
+def get_rp_certificate(rp_id, log_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            select_query = """
+                SELECT wrp_id, tradeName, supportURI, srvDescription, intended_use, isPSB, entitlement, providesAttestations, supervisorAuthority, isIntermediary, usesIntermediary, registryURI, providerType, x5c, typePolicy, policyURI, legalEntity, user_id
+                FROM walletrelyingparty
+                WHERE wrp_id = %s
+            """
+            
+            cursor.execute(select_query, (rp_id,))
+            result = cursor.fetchall()
+            
+            if result: 
+                rp_data = [
+                    {"wrp_id": row[0], "tradeName": row[1], "supportURI": row[2], "srvDescription": row[3], "intended_use": row[4], "isPSB": row[5], "entitlement": row[6], "providesAttestations": row[7], "supervisorAuthority": row[8], "isIntermediary": row[9], "usesIntermediary": row[10], "registryURI": row[11], "providerType": row[12], "x5c": row[13], "typePolicy": row[14], "policyURI": row[15], "legalEntity": row[16], "user_id": row[17]} 
+                    for row in result
+                ]
+                extra = {'code': log_id} 
+                logger.info(f"RP {rp_id} found", extra=extra)
+                return rp_data
+            else:
+                extra = {'code': log_id} 
+                logger.info("Not all RP found.", extra=extra)
+                print("Not all RP found.")
+                return None
+        else:
+            return None
+    except pymysql.MySQLError as e:
+        extra = {'code': log_id} 
+        logger.error(f"Error checking: {e}", extra=extra)
+        print(f"Error checking: {e}")
+        return None
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+
+def get_legal_person(legalperson_id, log_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            select_query = """
+                SELECT legalperson_id, legalBasis, legalName, user_id
+                FROM legalperson
+                WHERE legalperson_id = %s
+            """
+            
+            cursor.execute(select_query, (legalperson_id,))
+            result = cursor.fetchall()
+            
+            if result: 
+                legal_person_data = [
+                    {"legalperson_id": row[0], "legalBasis": row[1], "legalName": row[2], "user_id": row[3]} 
+                    for row in result
+                ]
+                extra = {'code': log_id} 
+                logger.info(f"legal person {legalperson_id} found", extra=extra)
+                return legal_person_data
+            else:
+                extra = {'code': log_id} 
+                logger.info("No Legal Person found.", extra=extra)
+                return None
+        else:
+            return None
+    except pymysql.MySQLError as e:
+        extra = {'code': log_id} 
+        logger.error(f"Error checking: {e}", extra=extra)
+        print(f"Error checking: {e}")
+        return None
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+
+def get_legal_entity(le_id, log_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            select_query = """
+                SELECT legalentity_id, legalperson_id, naturalperson_id, postalAddress, country, email, phone, infoURI, identifier,identifierType, user_id
+                FROM legalentity
+                WHERE legalentity_id = %s
+            """
+            
+            cursor.execute(select_query, (le_id,))
+            result = cursor.fetchall()
+            
+            if result: 
+                legal_entity_data = [
+                    {"legalentity_id": row[0], "legalperson_id": row[1], "naturalperson_id": row[2], "postalAddress": row[3], "country": row[4], "email": row[5], "phone": row[6], "infoURI": row[7], "identifier": row[8], "identifierType": row[9], "user_id": row[10]} 
+                    for row in result
+                ]
+                extra = {'code': log_id} 
+                logger.info(f"Legal Entity found: {le_id}", extra=extra)
+                return legal_entity_data
+            else:
+                extra = {'code': log_id}
+                logger.info("Legal Entity not found.", extra=extra)
+                print("Legal Entity not found.")
+                return None
+        else:
+            return None
+
+    except pymysql.MySQLError as e:
+        extra = {'code': log_id}
+        logger.error(f"Error checking legal Entity: {e}", extra=extra)
+        print(f"Error checking legal Entity: {e}")
+        return None
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def get_natural_person(natural_person, log_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            select_query = """
+                SELECT naturalperson_id, givenName, familyName, dateOfBirth, placeOfBirth, user_id
+                FROM naturalperson
+                WHERE naturalperson_id = %s
+            """
+            
+            cursor.execute(select_query, (natural_person,))
+            result = cursor.fetchall()
+            
+            if result: 
+                natural_person_data = [
+                    {"naturalperson_id": row[0], "givenName": row[1], "familyName": row[2], "dateOfBirth": row[3], "placeOfBirth": row[4], "user_id": row[5]} 
+                    for row in result
+                ]
+                extra = {'code': log_id} 
+                logger.info(f"Natural Person found: {natural_person}", extra=extra)
+                return natural_person_data
+            else:
+                extra = {'code': log_id}
+                logger.info("Natural Person not found.", extra=extra)
+                print("Natural Person not found.")
+                return None
+        else:
+            return None
+
+    except pymysql.MySQLError as e:
+        extra = {'code': log_id}
+        logger.error(f"Error checking Natural Person: {e}", extra=extra)
+        print(f"Error checking Natural Person: {e}")
+        return None
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+
+def get_intended_use(intendeduse_id, log_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            select_query = """
+                SELECT *
+                FROM intendeduse
+                WHERE intendeduse_id = %s
+            """
+            
+            cursor.execute(select_query, (intendeduse_id,))
+            result = cursor.fetchall()
+            
+            if result: 
+                intended_use_data = [
+                    {"intendeduse_id": row[0], "createdAt": row[1], "revokedAt": row[2], "intendedUseIdentifier": row[3], "type_policy": row[4], "policy_uri": row[5], "purpose": row[6], "credential_id": row[7], "user_id": row[8], "wrp": row[9]} 
+                    for row in result
+                ]
+                extra = {'code': log_id} 
+                logger.info(f"Intended Use found: {intendeduse_id}", extra=extra)
+                return intended_use_data
+            else:
+                extra = {'code': log_id}
+                logger.info("Intended Use not found.", extra=extra)
+                print("Intended Use not found.")
+                return None
+        else:
+            return None
+
+    except pymysql.MySQLError as e:
+        extra = {'code': log_id}
+        logger.error(f"Error checking user: {e}", extra=extra)
+        print(f"Error checking user: {e}")
+        return None
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def get_credential(cred_id, log_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            select_query = """
+                SELECT *
+                FROM credential
+                WHERE credential_id = %s
+            """
+            
+            cursor.execute(select_query, (cred_id,))
+            result = cursor.fetchall()
+            
+            if result: 
+                credential_data = [
+                    {"credential_id": row[0], "name": row[1], "format": row[2], "meta": row[3], "path": row[4], "credentialValues": row[5], "user_id": row[6]} 
+                    for row in result
+                ]
+                extra = {'code': log_id} 
+                logger.info(f"Credentail found: {cred_id}", extra=extra)
+                return credential_data
+            else:
+                extra = {'code': log_id}
+                logger.info("Credentail not found.", extra=extra)
+                print("Credentail not found.")
+                return None
+        else:
+            return None
+
+    except pymysql.MySQLError as e:
+        extra = {'code': log_id}
+        logger.error(f"Error checking user: {e}", extra=extra)
+        print(f"Error checking user: {e}")
+        return None
     finally:
         if connection:
             cursor.close()
