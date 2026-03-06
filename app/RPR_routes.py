@@ -6347,23 +6347,63 @@ def request_RP_data():
 
     #ter dados em memória ou ficheiro para não fazer chamadas á BD. Atualizar de x em x tempo 
 
-    registration_number= request.args.get("registration_number")
-    name=request.args.get("name")
-    privacy_policy_url=request.args.get("privacy_policy_url")
-    entitlement=request.args.get("entitlement")
-    intermediary_association=request.args.get("intermediary_association")
-    acting_on_behalf_of=request.args.get("acting_on_behalf_of")
-    limit=request.args.get("limit", default=20, type=int)
+    # registration_number= request.args.get("registration_number")
+    # name=request.args.get("name")
+    # privacy_policy_url=request.args.get("privacy_policy_url")
+    # entitlement=request.args.get("entitlement")
+    # intermediary_association=request.args.get("intermediary_association")
+    # acting_on_behalf_of=request.args.get("acting_on_behalf_of")
+    # limit=request.args.get("limit", default=20, type=int)
+
+    data = request.get_json(silent=True)
+
+    if not data:
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+
+    registration_number = data.get("registration_number")
+    name = data.get("name")
+    privacy_policy_url = data.get("privacy_policy_url")
+    entitlement = data.get("entitlement")
+    intermediary_association = data.get("intermediary_association")
+    acting_on_behalf_of = data.get("acting_on_behalf_of")
+    limit = data.get("limit")
+
+    required_fields = {
+        "registration_number": registration_number,
+        "name": name,
+        "privacy_policy_url": privacy_policy_url,
+        "entitlement": entitlement,
+        "intermediary_association": intermediary_association,
+        "acting_on_behalf_of": acting_on_behalf_of,
+        "limit": limit
+    }
+
+    missing_fields = [name for name, value in required_fields.items() if not value]
+
+    if missing_fields:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Missing required fields.",
+            "data": {
+                "missing_fields": missing_fields
+            }
+        }, 400
 
     # todas as rps da bd
     results=db.get_all_rp_inf()
-    
+
     if name:
         name_lower = name.lower()
         results = [
             u for u in results
             if name_lower in u["tradeName"].lower()
         ]
+        print(results)
     #
     if registration_number:
 

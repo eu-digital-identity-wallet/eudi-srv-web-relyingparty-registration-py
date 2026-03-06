@@ -1366,17 +1366,17 @@ def get_all_rp_inf():
                     for row in result
                 ]
                 extra = {'code'} 
-                logger.info(f"All RP found", extra=extra)
+                logger.info(f"All RP found")
                 return rp_data
             else:
                 extra = {'code'}
-                logger.info("Not all RP found.", extra=extra)
+                logger.info("Not all RP found.")
                 return None
         else:
             return None
     except pymysql.MySQLError as e:
         extra = {'code'}
-        logger.error(f"Error checking: {e}", extra=extra)
+        logger.error(f"Error checking: {e}")
         return None
     finally:
         if connection:
