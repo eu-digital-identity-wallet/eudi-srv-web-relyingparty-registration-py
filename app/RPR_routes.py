@@ -3501,7 +3501,6 @@ def wallet_rp_list(user_id, session_id):
                         "ass_name": wrp_name
                     }
                 else:
-                    print("\n\n\n\n teste \n\n\n\n")
                     new_item = {
                         "id": item["intendeduse_id"],
                         "name": name_txt,
@@ -4631,7 +4630,6 @@ def intended_use_registration_certificate():
     public_body=RP_data[0]["isPSB"]
     service=RP_data[0]["srvDescription"]
 
-    return "bangers"
     # #A URI to a status list presenting information about validity of the WRPRC. 
     # #status=
 
