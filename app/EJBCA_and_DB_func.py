@@ -159,16 +159,18 @@ def http_post_requests_with_custom_ssl_context(trust_manager, key_manager_filepa
 
     return response
 
-def generateCertificateRequest(priv_key, commomName, countryName, organizationName, registration_number, email,dns_Name):
+def generateCertificateRequest(priv_key, commomName, countryName, uniformResourceIdentifier):
 
     subject = x509.Name([
         x509.NameAttribute(NameOID.COMMON_NAME, commomName),
         x509.NameAttribute(NameOID.COUNTRY_NAME, countryName),
-        x509.NameAttribute(NameOID.ORGANIZATION_NAME, organizationName),
-        x509.NameAttribute(NameOID.SERIAL_NUMBER, registration_number),
+        # x509.NameAttribute(NameOID.ORGANIZATION_NAME, organizationName),
+        # x509.NameAttribute(NameOID.SERIAL_NUMBER, registration_number),
     ])
 
-    alt_name_extension = x509.SubjectAlternativeName([x509.RFC822Name(email),x509.DNSName(dns_Name)])
+    #alt_name_extension = x509.SubjectAlternativeName([x509.RFC822Name(email),x509.DNSName(dns_Name)])
+
+    alt_name_extension = x509.SubjectAlternativeName([x509.UniformResourceIdentifier(uniformResourceIdentifier)])
 
     cri = x509.CertificateSigningRequestBuilder().add_extension(alt_name_extension, critical=False).subject_name(subject).sign(priv_key,hashes.SHA256())
 

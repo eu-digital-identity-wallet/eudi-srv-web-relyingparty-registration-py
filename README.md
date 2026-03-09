@@ -246,7 +246,29 @@ Description: Name of the End Entity Profile defined in the EJBCA application
 
 # User Interface (HTTP Requests)
 
-This project also provides a simple HTTP-based user interface, allowing the service to be used through direct requests instead of a graphical UI.
+This project also provides a simple HTTP-based user interface, allowing the service to be used through direct requests instead of a graphical user interface.
+
+To facilitate the interaction with the available endpoints, the project includes Swagger API documentation, which can be accessed through the following route:
+
+``` code
+/apidocs/
+```
+
+The Swagger interface provides detailed information about all available endpoints, including:
+  * Endpoint descriptions
+  * Required parameters
+  * Request body structure
+  * Example requests and responses
+
+This allows developers and users to easily explore and test the API.
+
+Additionally, a usage guide will be available at the following route:
+
+``` code
+/guide
+```
+
+This page will contain an explanation on how to correctly use the different endpoints, including recommended request formats and practical examples.
 
 ## Create a Natural Person
 

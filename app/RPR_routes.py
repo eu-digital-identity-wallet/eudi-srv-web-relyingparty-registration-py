@@ -1053,7 +1053,7 @@ parameters:
         lang:
           type: string
           description: Language of the legal basis
-          example: "EN"
+          example: "EU"
 responses:
   201:
     description: Legal Person successfully created
@@ -1733,8 +1733,8 @@ parameters:
           example: "abc123hashpid"
         type_of_identifier:
           type: string
-          description: Type of identifier (e.g., VAT, registration number)
-          example: "VAT"
+          description: Type of identifier
+          example: "http://data.europa.eu/eudi/id/EORI-No"
         identifier:
           type: string
           description: Identifier value of the legal entity
@@ -1758,7 +1758,7 @@ parameters:
         country:
           type: string
           description: Country of registration
-          example: "US"
+          example: "EU"
 responses:
   201:
     description: Legal Entity successfully created
@@ -2923,7 +2923,7 @@ parameters:
         srvDescription_lang:
           type: string
           description: Language of the service description
-          example: "EN"
+          example: "EU"
         srvDescription:
           type: string
           description: Service description of the RP
@@ -2931,7 +2931,7 @@ parameters:
         entitlement:
           type: string
           description: Entitlement or permissions required
-          example: "full_access"
+          example: "http://data.europa.eu/eudi/entitlement/Service_Provider"
         registry_uri:
           type: string
           description: Registry URI for the RP
@@ -2939,7 +2939,7 @@ parameters:
         type_of_policy:
           type: string
           description: Type of policy applicable
-          example: "Privacy Policy"
+          example: "http://data.europa.eu/eudi/policy/trust-service-practice-statement"
         policy_uri:
           type: string
           description: URI to the policy document
@@ -3087,7 +3087,7 @@ responses:
             return {
                 "status": "error",
                 "code": 400,
-                "message": f"Invalid Type of Policy. Must be one of: {', '.join(cfgserv.eu_countries)}",
+                "message": f"Invalid srvDescription_lang. Must be one of: {', '.join(cfgserv.eu_countries)}",
                 "provided": srvDescription_lang
             }, 400
         
@@ -3173,7 +3173,6 @@ def RP_edit_db():
 @rpr.route("/RP/certificate", methods=["GET", "POST"])
 def relying_party_access_certificate():
 
-    
     if 'temp_user_id' in session:  
         temp_user_id = session['temp_user_id']
         user = session[temp_user_id]
@@ -3192,7 +3191,6 @@ def relying_party_access_certificate():
         
         RP=db.get_rp_certificate(RP_id, session["session_id"])
 
-        return RP
         #commonName
         tradeName=RP["tradeName"]
         #uniformResourceIdentifier
@@ -3225,15 +3223,13 @@ def relying_party_access_certificate():
         # verificar legal entity se é pertence ao sector público, se sim True, se não False
         isPSB= False
 
-        return str(tradeName, givenName, phone)
         password=request.form.get("Password")
 
+        certificateRequest= generateCertificateRequest(priv_key, tradeName, country, identifier)
 
-        certificateRequest= generateCertificateRequest(priv_key, commonName, countryName, organizationName, registration_number, email, dns_Name)
-        
         certificateRequestString = "-----BEGIN CERTIFICATE REQUEST-----\n"+ base64.b64encode(certificateRequest).decode("utf-8") + "\n"+ "-----END CERTIFICATE REQUEST-----"
-        certificateAuthorityName = getCertificateAuthorityName(countryName)
-        certificateRequestBody = getJsonBody(certificateRequestString, certificateAuthorityName, countryName)
+        certificateAuthorityName = getCertificateAuthorityName(country)
+        certificateRequestBody = getJsonBody(certificateRequestString, certificateAuthorityName, country)
         postUrl = "https://" + ejbca.cahost + "/ejbca/ejbca-rest-api/v1" + ejbca.endpoint
 
         headers ={
@@ -3260,13 +3256,13 @@ def relying_party_access_certificate():
         user_relying_party_db(user,request.form, serial_number, certificate,response["certificate"], session["session_id"])
 
         p12=pkcs12.serialize_key_and_certificates(
-            name=commonName.encode("utf-8"),key=priv_key,cert=certificate, cas=list().append(trustCA),
+            name=tradeName.encode("utf-8"),key=priv_key,cert=certificate, cas=list().append(trustCA),
             encryption_algorithm=serialization.BestAvailableEncryption(password.encode("utf-8"))
         )
 
         tag = uuid.uuid4()
 
-        file_name = commonName + "_" + str(tag)
+        file_name = tradeName + "_" + str(tag)
 
         p12_temp.update({file_name:{"response": p12, "expires":datetime.now() + timedelta(minutes=cfgserv.deffered_expiry)}})
 
@@ -3396,14 +3392,14 @@ def relying_party_access_certificate():
         # verificar legal entity se é pertence ao sector público, se sim True, se não False
         isPSB= False
 #### ------
-        password=request.form.get("Password")
+        # password=request.form.get("Password")
+        password = "test"
 
+        certificateRequest= generateCertificateRequest(priv_key, tradeName, country, supportURI)
 
-        certificateRequest= generateCertificateRequest(priv_key, commonName, countryName, organizationName, registration_number, email, dns_Name)
-        
         certificateRequestString = "-----BEGIN CERTIFICATE REQUEST-----\n"+ base64.b64encode(certificateRequest).decode("utf-8") + "\n"+ "-----END CERTIFICATE REQUEST-----"
-        certificateAuthorityName = getCertificateAuthorityName(countryName)
-        certificateRequestBody = getJsonBody(certificateRequestString, certificateAuthorityName, countryName)
+        certificateAuthorityName = getCertificateAuthorityName(country)
+        certificateRequestBody = getJsonBody(certificateRequestString, certificateAuthorityName, country)
         postUrl = "https://" + ejbca.cahost + "/ejbca/ejbca-rest-api/v1" + ejbca.endpoint
 
         headers ={
@@ -3427,22 +3423,24 @@ def relying_party_access_certificate():
 
         serial_number=response["serial_number"]
 
-        user_relying_party_db(user,request.form, serial_number, certificate,response["certificate"], session["session_id"])
+        # user_relying_party_db(user,request.form, serial_number, certificate,response["certificate"], session["session_id"])
 
         p12=pkcs12.serialize_key_and_certificates(
-            name=commonName.encode("utf-8"),key=priv_key,cert=certificate, cas=list().append(trustCA),
+            name=tradeName.encode("utf-8"),key=priv_key,cert=certificate, cas=list().append(trustCA),
             encryption_algorithm=serialization.BestAvailableEncryption(password.encode("utf-8"))
         )
 
         tag = uuid.uuid4()
 
-        file_name = commonName + "_" + str(tag)
+        file_name = tradeName + "_" + str(tag)
 
         p12_temp.update({file_name:{"response": p12, "expires":datetime.now() + timedelta(minutes=cfgserv.deffered_expiry)}})
 
         cert = certificate.subject.rfc4514_string().split(",")
         dic = {parte.split("=")[0]: parte for parte in cert}
-        order = [dic.get("C"), dic.get("O"), dic.get("CN")]
+        order = [dic.get("C"),
+                #dic.get("O"),
+                dic.get("CN")]
         aux = [v for k, v in dic.items() if k not in ["C", "O", "CN"]]
 
         cert_subject_rfc4514_string = ",".join(order + aux)
@@ -3454,6 +3452,10 @@ def relying_party_access_certificate():
             "validity_to":certificate.not_valid_after_utc,
         }
 
+        
+        return base64.urlsafe_b64encode(p12) 
+        send_file(io.BytesIO(p12),download_name=file_name,as_attachment=True)
+        
         return render_template('downloadPage.html', attributes=certificate_presentation, download_url= "/Download/"+ file_name)
 
 
@@ -4250,11 +4252,11 @@ parameters:
         purpose_lang:
           type: string
           description: Language of the purpose description
-          example: "EN"
+          example: "EU"
         type_policy:
           type: string
           description: Type of policy governing the intended use
-          example: "Privacy Policy"
+          example: "http://data.europa.eu/eudi/policy/trust-service-practice-statement"
         policy_uri:
           type: string
           description: URI to the policy document
@@ -4613,8 +4615,8 @@ def intended_use_registration_certificate():
     # id=legal_entity_data["identifier"]
     # privacy_policy=intended_use_data["privacyPolicy"]
 
-    id=legal_entity_data[0]["identifier"]
-    privacy_policy=intended_use_data[0]["type_policy"]
+        id=legal_entity_data[0]["identifier"]
+        privacy_policy=intended_use_data[0]["type_policy"]
 
     # # definir de acordo com os dados do certificado
     # # policy_id=certificate_policy_id
@@ -4625,10 +4627,10 @@ def intended_use_registration_certificate():
     # public_body=RP_data["isPSB"]
     # service=RP_data["srvDescription"]
 
-    entitlement=RP_data[0]["entitlement"]
-    providesAttestations=RP_data[0]["providesAttestations"]
-    public_body=RP_data[0]["isPSB"]
-    service=RP_data[0]["srvDescription"]
+        entitlement=RP_data[0]["entitlement"]
+        providesAttestations=RP_data[0]["providesAttestations"]
+        public_body=RP_data[0]["isPSB"]
+        service=RP_data[0]["srvDescription"]
 
     # #A URI to a status list presenting information about validity of the WRPRC. 
     # #status=
@@ -4636,171 +4638,205 @@ def intended_use_registration_certificate():
     # #se utiliza intermediário
     # #act
 
-    json_header = { "typ": "rc-wrp+jwt",
+        json_header = { "typ": "rc-wrp+jwt",
                     "alg": "ES256", 
                     "b64": "true", 
                     "cty": ["b64"], "x5c": [],}
     
-    json_payload = { "name": "Example GmbH",
-                     "purpose": [ { "lang": "en-US", "value": "Required for checking the minimum age" }, { "lang": "de-DE", "value": "Benötigt für die Überprüfung des Mindestalters" } ], 
-                     "info_uri": "https://example.com",
-                    "country": "DE",
-                    "sub": { "legal_name": "Example GmbH",
-                                "id": "LEIXG-529900T8BM49AURSDO55" },
-                    "privacy_policy": "https://example-company.com/en/privacy-policy", 
-                    "policy_id": [ "0.4.0.19475.3.1" ], 
-                    "certificate_policy": "https://registrat.example.com/certificate-policy", 
-                    "iat": iat, 
-                    "credentials": [
-                        { "format": "dc+sd-jwt", "meta": { "vct_values": [ "https://credentials.example.com/identity_credential" ] }, "claims": [ { "path": ["given_name"] }, { "path": ["family_name"] }, { "path": ["address", "street_address"] } ] },
-                        { "format": "dc+sd-jwt", "meta": { "vct_values": [ "https://othercredentials.example/mdl" ] }, "claims": [ { "path": ["given_name"] }, { "path": ["family_name"] }, { "path": ["address", "street_address"] } ] } ],
-                    "entitlements": [ "https://uri.etsi.org/19475/Entitlement/Non_Q_EAA_Provider" ],
-                    "provided_attestations": [ { "format": "dc+sd-jwt", "meta": { "vct_values": [ "" ] } } ],
-                    "public_body": False,
-                    "service": [[ { "lang": "en-US", "value": "Bundesagentur für Sprunginnovationen" }, { "lang": "de-DE", "value": "Federal Agency for Breakthrough Innovations" } ]],
-                    "status": { "status_list": { "idx": 0, "uri": "https://example.com/statuslists/1" } }, 
-                    "act": { "sub":{ "id":"DE:EX-987654381" } }
-                    }
+    # json_payload = { "name": "Example GmbH",
+    #                  "purpose": [ { "lang": "en-US", "value": "Required for checking the minimum age" }, { "lang": "de-DE", "value": "Benötigt für die Überprüfung des Mindestalters" } ], 
+    #                  "info_uri": "https://example.com",
+    #                 "country": "DE",
+    #                 "sub": { "legal_name": "Example GmbH",
+    #                             "id": "LEIXG-529900T8BM49AURSDO55" },
+    #                 "privacy_policy": "https://example-company.com/en/privacy-policy", 
+    #                 "policy_id": [ "0.4.0.19475.3.1" ], 
+    #                 "certificate_policy": "https://registrat.example.com/certificate-policy", 
+    #                 "iat": iat, 
+    #                 "credentials": [
+    #                     { "format": "dc+sd-jwt", "meta": { "vct_values": [ "https://credentials.example.com/identity_credential" ] }, "claims": [ { "path": ["given_name"] }, { "path": ["family_name"] }, { "path": ["address", "street_address"] } ] },
+    #                     { "format": "dc+sd-jwt", "meta": { "vct_values": [ "https://othercredentials.example/mdl" ] }, "claims": [ { "path": ["given_name"] }, { "path": ["family_name"] }, { "path": ["address", "street_address"] } ] } ],
+    #                 "entitlements": [ "https://uri.etsi.org/19475/Entitlement/Non_Q_EAA_Provider" ],
+    #                 "provided_attestations": [ { "format": "dc+sd-jwt", "meta": { "vct_values": [ "" ] } } ],
+    #                 "public_body": False,
+    #                 "service": [[ { "lang": "en-US", "value": "Bundesagentur für Sprunginnovationen" }, { "lang": "de-DE", "value": "Federal Agency for Breakthrough Innovations" } ]],
+    #                 "status": { "status_list": { "idx": 0, "uri": "https://example.com/statuslists/1" } }, 
+    #                 "act": { "sub":{ "id":"DE:EX-987654381" } }
+    #                 }
     
-    with open("app/EJBCA/ecdsa_cert.pem", "rb") as f:
-       cert = x509.load_pem_x509_certificate(f.read(), default_backend())
-
-    base64_cert = base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode("utf-8")
-    
-    #Jades with b-b profile
-
-    # base64_header=base64.b64encode(json.dumps(json_header).encode()).decode("utf-8")
-
-    with open("naoAssinado.json", "w", encoding="utf-8") as f:
-        json.dump(
-            json_payload,
-            f,
-    )
-
-    with open("naoAssinado.json", "rb") as f:
-        file_bytes = f.read()
-    
-    # digest = hashes.Hash(hashes.SHA256())
-    # digest.update(file_bytes)
-    # hash_value = digest.finalize()
-
-    base64_payload=base64.b64encode(file_bytes).decode("utf-8")
-
-    #print(document)
-    payload=json.dumps({
-
-            "documents":[{
-
-                "document": base64_payload,
-                "signature_format": "J",
-                "conformance_level":"Ades-B-B",
-                "signed_envelope_property": "ENVELOPING",
-                "container": "No"
-
-            } ],
-        "endEntityCertificate": base64_cert,
-        "certificateChain": [
-        ],
-        "hashAlgorithmOID": "2.16.840.1.101.3.4.2.1"
-
-    })
-
-    headers={
-        'Content-Type': 'application/json'
-    }
-
-    calculate_hash=requests.post(url=cfgserv.sca_signer_url+"/signatures/calculate_hash",headers=headers, data=payload)
-
-    #print(calculate_hash.json())
-    #print(calculate_hash.json()["hashes"])
-
-    hashes1 = calculate_hash.json()["hashes"]
-
-    #print(hashes1[0])
-
-    base64_string = urllib.parse.unquote(hashes1[0])
-
-    data_to_be_signed = base64.b64decode(base64_string)
-
-    print(data_to_be_signed)
-
-    #print(data_to_be_signed)
-    # hash = base64.urlsafe_b64decode(hashes[0]).
-    # base64.b64decode
-
-    signature_date = calculate_hash.json()["signature_date"]
-
-    with open("app/EJBCA/ecdsa_key.pem", "rb") as f:
-        private_key = serialization.load_pem_private_key(
-        f.read(),
-        password=None,
-        backend=default_backend()
-    )
-
-    # key=ECC.import_key(private_key)
-
-    # signature = DSS.new(key).sign(data_to_be_signed)
-    signature = private_key.sign(
-        data_to_be_signed,
-        ec.ECDSA(utils.Prehashed(hashes.SHA256()))
-    )
-
-    base64_signature= base64.b64encode(signature).decode()
-    #print(base64_signature)
-
-    payload = json.dumps({
-        "documents": [
-            {
-                "document": base64_payload,
-                "signature_format": "J",
-                "conformance_level":"Ades-B-B",
-                "signed_envelope_property": "ENVELOPING",
-                "container": "No"
-            }
-        ],
-        "hashAlgorithmOID": "2.16.840.1.101.3.4.2.1",
-        "returnValidationInfo": False,
-        "endEntityCertificate": base64_cert,
-        "certificateChain": [
-        ],
-        "signatures":[base64_signature],
-        "date": signature_date
-    }).encode()
-
-    obtain_signed_document=requests.post(url=cfgserv.sca_signer_url+"/signatures/obtain_signed_doc",headers=headers, data=payload)
-    
-    document_with_signature=obtain_signed_document.json()["documentWithSignature"][0]
-
-    # data=json.loads(base64.b64decode(document_with_signature).decode("utf-8"))
-
-    # jwt_payload=data["payload"]
-    # jwt_header=data["signatures"][0]["protected"]
-    # jwt_signature=data["signatures"][0]["signature"]
-
-    # jwt = jwt_header + "." + jwt_payload + "." + jwt_signature
-
-    output_file ="teste.json"
-
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(
-            json.loads(base64.b64decode(document_with_signature).decode()),
-            f,
-        )
+        json_payload = { 
+                        "name": name,
+                        "purpose": purpose, 
+                        "info_uri": info_uri,
+                        "country": country,
+                        "sub": { 
+                                "legal_name": legalName,
+                                "id": id 
+                        },
+                        "privacy_policy": privacy_policy, 
+                        "policy_id": [ "0.4.0.19475.3.1" ], 
+                        "certificate_policy": "https://registrat.example.com/certificate-policy", 
+                        "iat": iat, 
+                        "credentials": credentials_data,
+                        "entitlements": entitlement,
+                        "provided_attestations": [ { 
+                                                    "format": "dc+sd-jwt", "meta": { "vct_values": [ "" ] } 
+                        } ],
+                        "public_body": False,
+                        "service": service,
+                        "status": { 
+                            "status_list": { 
+                                            "idx": 0, "uri": "https://example.com/statuslists/1" 
+                            } 
+                        }, 
+                        "act": { 
+                            "sub":{ 
+                                "id":"DE:EX-987654381" 
+                            } 
+                        }
+        }
         
-    #cbor
+        return json_payload
+        
+        with open("app/EJBCA/ecdsa_cert.pem", "rb") as f:
+            cert = x509.load_pem_x509_certificate(f.read(), default_backend())
 
-    cbor_data= cbor2.dumps(json_payload)
+        base64_cert = base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode("utf-8")
+        
+        #Jades with b-b profile
 
-    msg = Sign1Message(phdr={Algorithm: Es256},uhdr={KID: b"key1"},payload=cbor_data)
+        # base64_header=base64.b64encode(json.dumps(json_header).encode()).decode("utf-8")
 
-    with open("app/EJBCA/private_key.pem", "rb") as f:
-        pem_bytes = f.read()
+        with open("naoAssinado.json", "w", encoding="utf-8") as f:
+            json.dump(
+                json_payload,
+                f,
+        )
 
-    cose_key = CoseKey.from_pem_private_key(pem_bytes.decode())
-    msg.key = cose_key
-    cose_bytes = msg.encode()
+        with open("naoAssinado.json", "rb") as f:
+            file_bytes = f.read()
+        
+        # digest = hashes.Hash(hashes.SHA256())
+        # digest.update(file_bytes)
+        # hash_value = digest.finalize()
 
-    return cose_bytes.hex()
+        base64_payload=base64.b64encode(file_bytes).decode("utf-8")
+
+        #print(document)
+        payload=json.dumps({
+
+                "documents":[{
+
+                    "document": base64_payload,
+                    "signature_format": "J",
+                    "conformance_level":"Ades-B-B",
+                    "signed_envelope_property": "ENVELOPING",
+                    "container": "No"
+
+                } ],
+            "endEntityCertificate": base64_cert,
+            "certificateChain": [
+            ],
+            "hashAlgorithmOID": "2.16.840.1.101.3.4.2.1"
+
+        })
+
+        headers={
+            'Content-Type': 'application/json'
+        }
+
+        calculate_hash=requests.post(url=cfgserv.sca_signer_url+"/signatures/calculate_hash",headers=headers, data=payload)
+
+        #print(calculate_hash.json())
+        #print(calculate_hash.json()["hashes"])
+
+        hashes1 = calculate_hash.json()["hashes"]
+
+        #print(hashes1[0])
+
+        base64_string = urllib.parse.unquote(hashes1[0])
+
+        data_to_be_signed = base64.b64decode(base64_string)
+
+        print(data_to_be_signed)
+
+        #print(data_to_be_signed)
+        # hash = base64.urlsafe_b64decode(hashes[0]).
+        # base64.b64decode
+
+        signature_date = calculate_hash.json()["signature_date"]
+
+        with open("app/EJBCA/ecdsa_key.pem", "rb") as f:
+            private_key = serialization.load_pem_private_key(
+            f.read(),
+            password=None,
+            backend=default_backend()
+        )
+
+        # key=ECC.import_key(private_key)
+
+        # signature = DSS.new(key).sign(data_to_be_signed)
+        signature = private_key.sign(
+            data_to_be_signed,
+            ec.ECDSA(utils.Prehashed(hashes.SHA256()))
+        )
+
+        base64_signature= base64.b64encode(signature).decode()
+        #print(base64_signature)
+
+        payload = json.dumps({
+            "documents": [
+                {
+                    "document": base64_payload,
+                    "signature_format": "J",
+                    "conformance_level":"Ades-B-B",
+                    "signed_envelope_property": "ENVELOPING",
+                    "container": "No"
+                }
+            ],
+            "hashAlgorithmOID": "2.16.840.1.101.3.4.2.1",
+            "returnValidationInfo": False,
+            "endEntityCertificate": base64_cert,
+            "certificateChain": [
+            ],
+            "signatures":[base64_signature],
+            "date": signature_date
+        }).encode()
+
+        obtain_signed_document=requests.post(url=cfgserv.sca_signer_url+"/signatures/obtain_signed_doc",headers=headers, data=payload)
+        
+        document_with_signature=obtain_signed_document.json()["documentWithSignature"][0]
+
+        # data=json.loads(base64.b64decode(document_with_signature).decode("utf-8"))
+
+        # jwt_payload=data["payload"]
+        # jwt_header=data["signatures"][0]["protected"]
+        # jwt_signature=data["signatures"][0]["signature"]
+
+        # jwt = jwt_header + "." + jwt_payload + "." + jwt_signature
+
+        output_file ="teste.json"
+
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(
+                json.loads(base64.b64decode(document_with_signature).decode()),
+                f,
+            )
+            
+        #cbor
+
+        cbor_data= cbor2.dumps(json_payload)
+
+        msg = Sign1Message(phdr={Algorithm: Es256},uhdr={KID: b"key1"},payload=cbor_data)
+
+        with open("app/EJBCA/private_key.pem", "rb") as f:
+            pem_bytes = f.read()
+
+        cose_key = CoseKey.from_pem_private_key(pem_bytes.decode())
+        msg.key = cose_key
+        cose_bytes = msg.encode()
+
+        return cose_bytes.hex()
     
 def list_intended_use(user_id, session_id):
 
@@ -6223,6 +6259,9 @@ def relying_party_registration():
         "validity_to":certificate.not_valid_after_utc,
     }
 
+    final_name = file_name.split("_")[0] + ".p12"
+    return send_file(io.BytesIO(p12),download_name=final_name,as_attachment=True)
+
     return render_template('downloadPage.html', attributes=certificate_presentation, download_url= "/Download/"+ file_name)
 
 @rpr.route("/Download/<name>", methods=["GET", "POST"])
@@ -6372,27 +6411,27 @@ def request_RP_data():
     acting_on_behalf_of = data.get("acting_on_behalf_of")
     limit = data.get("limit")
 
-    required_fields = {
-        "registration_number": registration_number,
-        "name": name,
-        "privacy_policy_url": privacy_policy_url,
-        "entitlement": entitlement,
-        "intermediary_association": intermediary_association,
-        "acting_on_behalf_of": acting_on_behalf_of,
-        "limit": limit
-    }
+    # required_fields = {
+    #     "registration_number": registration_number,
+    #     "name": name,
+    #     "privacy_policy_url": privacy_policy_url,
+    #     "entitlement": entitlement,
+    #     "intermediary_association": intermediary_association,
+    #     "acting_on_behalf_of": acting_on_behalf_of,
+    #     "limit": limit
+    # }
 
-    missing_fields = [name for name, value in required_fields.items() if not value]
+    # missing_fields = [name for name, value in required_fields.items() if not value]
 
-    if missing_fields:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": missing_fields
-            }
-        }, 400
+    # if missing_fields:
+    #     return {
+    #         "status": "error",
+    #         "code": 400,
+    #         "message": "Missing required fields.",
+    #         "data": {
+    #             "missing_fields": missing_fields
+    #         }
+    #     }, 400
 
     # todas as rps da bd
     results=db.get_all_rp_inf()
@@ -6403,14 +6442,13 @@ def request_RP_data():
             u for u in results
             if name_lower in u["tradeName"].lower()
         ]
-        print(results)
-    #
-    if registration_number:
+        
+    # if registration_number:
 
-        results = [
-            u for u in results
-            if registration_number in u["registration_number"]
-        ]
+    #     results = [
+    #         u for u in results
+    #         if registration_number in u["registration_number"]
+    #     ]
     
     if privacy_policy_url:
 
@@ -6425,21 +6463,21 @@ def request_RP_data():
             u for u in results
             if registration_number in u["entitlement"]
         ]
-    #
+
     if intermediary_association:
 
         intermediary_association_lower = intermediary_association.lower()
         results = [
             u for u in results
-            if intermediary_association_lower in u["intermediary_association"].lower()
+            if intermediary_association_lower in u["usesIntermediary"].lower()
         ]
-    #
+
     if acting_on_behalf_of:
 
         acting_on_behalf_of_lower = acting_on_behalf_of.lower()
         results = [
             u for u in results
-            if acting_on_behalf_of_lower in u["acting_on_behalf_of"].lower()
+            if acting_on_behalf_of_lower in u["isIntermediary"].lower()
         ]
 
     results = results[:limit]
@@ -6469,3 +6507,7 @@ def request_RP_data():
 @rpr.route("/static/swagger.json")
 def swagger_static():
     return send_from_directory("static", "swagger.json")
+
+@rpr.route("/guide")
+def guide():
+    return render_template("guide.html")
