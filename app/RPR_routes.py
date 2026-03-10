@@ -4860,10 +4860,38 @@ def list_intended_use(user_id, session_id):
                 }
             }
             data.update(data_temp)
-    
+
+        cred_dict = db.get_credential_info(user_id, session_id)
+        
+        list = []
+        if(data != {}):
+            if(cred_dict != "err" and cred_dict != None):
+
+                for item in cred_dict:
+                    name_txt = item["name"]
+                    
+                    if(item["intendedUse_id"] != None):
+                        iu_name = db.get_iu_info_cred(item["intendedUse_id"], session_id)
+                        
+                        new_item = {
+                            "id": item["credential_id"],
+                            "name": name_txt,
+                            "associated_id": item["intendedUse_id"],
+                            "ass_name": iu_name
+                        }
+                    else:
+                        new_item = {
+                            "id": item["intendedUse_id"],
+                            "name": name_txt,
+                            "associated_id": item["intendedUse_id"],
+                            "ass_name": ""
+                        }
+                    
+                    list.append(new_item)
+
     menu= cfgserv.service_url + "menu"
 
-    return menu, data, header_table
+    return menu, data, header_table, list
 
 @rpr.route('/intended_use/list', methods=['GET','POST'])
 def intended_use_list():
@@ -4892,7 +4920,7 @@ parameters:
 
 responses:
   200:
-    description: Intended Uses retrieved successfully
+    description: Intended Uses and Credential associations retrieved successfully
     schema:
       type: object
       properties:
@@ -4908,33 +4936,133 @@ responses:
         data:
           type: object
           properties:
+
+            credential:
+              type: array
+              description: List of credentials and their Intended Use associations
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    nullable: true
+                    example: 4
+                  name:
+                    type: string
+                    example: Employee ID
+                  associated:
+                    type: boolean
+                    description: Indicates whether the credential is associated with an Intended Use
+                    example: true
+                  Intended_Use:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: integer
+                        example: 12
+                      created_at:
+                        type: string
+                        format: date-time
+                        example: "2026-02-09T12:00:00Z"
+                      identifier:
+                        type: string
+                        example: intended_use_001
+                      policy_URI:
+                        type: string
+                        example: https://acme.com/privacy-policy
+                      purpose:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            lang:
+                              type: string
+                              example: EN
+                            srvDescription:
+                              type: string
+                              example: Data processing for analytics
+                      revoked_at:
+                        type: string
+                        format: date-time
+                        nullable: true
+                        example: "2026-12-31T23:59:59Z"
+                      type_of_policy:
+                        type: string
+                        example: http://data.europa.eu/eudi/policy/trust-service-practice-statement
+
             intended_use:
               type: object
+              description: Dictionary of all Intended Uses indexed by ID
               additionalProperties:
                 type: object
                 properties:
                   created_at:
                     type: string
                     format: date-time
-                    example: "2026-02-09 12:00:00"
+                    example: "2026-02-09T12:00:00Z"
                   identifier:
                     type: string
-                    example: "IU-001"
+                    example: intended_use_001
                   policy_URI:
                     type: string
-                    example: "https://example.com/policy"
+                    example: https://acme.com/privacy-policy
                   purpose:
-                    type: object
-                    example:
-                      EN: "User authentication"
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        lang:
+                          type: string
+                          example: EN
+                        srvDescription:
+                          type: string
+                          example: Data processing for analytics
                   revoked_at:
                     type: string
                     format: date-time
                     nullable: true
-                    example: null
+                    example: "2026-12-31T23:59:59Z"
                   type_of_policy:
                     type: string
-                    example: "Privacy Policy"
+                    example: Privacy Policy
+
+    examples:
+      application/json:
+        status: success
+        code: 200
+        message: Intended Use retrieved successfully.
+        data:
+          credential:
+            - id: 4
+              name: Employee ID
+              associated: true
+              Intended_Use:
+                id: 12
+                created_at: "2026-02-09T12:00:00Z"
+                identifier: intended_use_001
+                policy_URI: https://acme.com/privacy-policy
+                purpose:
+                  - lang: EN
+                    srvDescription: Data processing for analytics
+                revoked_at: "2026-12-31T23:59:59Z"
+                type_of_policy: http://data.europa.eu/eudi/policy/trust-service-practice-statement
+
+            - id: 7
+              name: Access Credential
+              associated: false
+              Intended_Use: null
+
+          intended_use:
+            "12":
+              created_at: "2026-02-09T12:00:00Z"
+              identifier: intended_use_001
+              policy_URI: https://acme.com/privacy-policy
+              purpose:
+                - lang: EN
+                  srvDescription: Data processing for analytics
+              revoked_at: "2026-12-31T23:59:59Z"
+              type_of_policy: Privacy Policy
 
   400:
     description: Invalid request or validation error
@@ -5016,7 +5144,7 @@ responses:
                 }
             }, 400
              
-        menu, data, header_table = list_intended_use(user_id, session_id)
+        menu, data, header_table, list = list_intended_use(user_id, session_id)
 
         intended_use = {}
 
@@ -5029,13 +5157,32 @@ responses:
                 "revoked_at": lp_data["Revoked At"],
                 "type_of_policy": lp_data["Type of Policy"]
             }
+         
+        cred = []
+        
+        for entity in list:
+            associated_id = entity["associated_id"]
+
+            cred.append({
+                "id": entity["id"],
+                "name": entity["name"],
+                "associated": associated_id is not None,
+                "Intended_Use": (
+                    {
+                        "id": associated_id,
+                        **intended_use.get(associated_id, {})
+                    }
+                    if associated_id in intended_use else None
+                )
+            })
             
         return {
             "status": "success",
             "code": 200,
             "message": "Intended Use retrieved successfully.",
             "data": {
-                "intended_use": intended_use
+                "intended_use": intended_use,
+                "credential": cred
             }
         }, 200
 
@@ -5255,13 +5402,13 @@ responses:
         "updated_count": len(intended_use)
     }, 200
 
-@rpr.route('/intended_use/ui_remove_update_credential', methods=["POST"])
+@rpr.route('/credential/ui_remove_update_credential', methods=["POST"])
 def ui_remove_update_credential():
     """
 Remove Credential associations from Intended Uses
 ---
 tags:
-  - Intended Use
+  - Credential
 consumes:
   - application/json
 produces:
@@ -5274,19 +5421,19 @@ parameters:
       type: object
       required:
         - hash_pid
-        - intended_use
+        - credentials
       properties:
         hash_pid:
           type: string
           description: User identifier obtained from wallet login
           example: abc123hashpid
 
-        intended_use:
+        credentials:
           type: array
-          description: List of Intended Use IDs to remove the Credential association from
+          description: List of Credential IDs to remove their Intended Use associations
           items:
             type: integer
-          example: [3, 7, 15]
+          example: [4, 5, 6, 7]
 
 responses:
   200:
@@ -5297,12 +5444,16 @@ responses:
         status:
           type: string
           example: success
+        code:
+          type: integer
+          example: 200
         message:
           type: string
-          example: Associations updated successfully
+          example: Associations removed successfully
         updated_count:
           type: integer
-          example: 3
+          description: Number of Credentials updated
+          example: 4
 
   400:
     description: Invalid request or validation error
@@ -5325,7 +5476,7 @@ responses:
               type: array
               items:
                 type: string
-              example: [intended_use]
+              example: [credentials]
 
   401:
     description: Invalid hash_pid
@@ -5337,7 +5488,7 @@ responses:
           example: error
         code:
           type: integer
-          example: 400
+          example: 401
         message:
           type: string
           example: Invalid hash_pid
@@ -5349,7 +5500,7 @@ responses:
               example: abc123hashpid
 
   422:
-    description: Some Intended Uses are invalid or do not belong to the user
+    description: Some Credentials are invalid or do not belong to the user
     schema:
       type: object
       properties:
@@ -5358,11 +5509,11 @@ responses:
           example: error
         code:
           type: integer
-          example: 400
+          example: 422
         message:
           type: string
-          example: Some Intended Use do not exist or do not belong to this user
-        invalid_legal_entities:
+          example: Some Credentials do not exist or do not belong to this user
+        invalid_credentials:
           type: array
           items:
             type: integer
@@ -5379,11 +5530,11 @@ responses:
             }, 400
 
     hash_pid = data.get("hash_pid")
-    intended_use = data.get("intended_use")
+    credentials = data.get("credentials")
 
     required_fields = {
         "hash_pid": hash_pid,
-        "intended_use": intended_use,
+        "credentials": credentials,
     }
 
     missing_fields = [name for name, value in required_fields.items() if not value]
@@ -5398,11 +5549,11 @@ responses:
             }
         }, 400
 
-    if not isinstance(intended_use, list):
+    if not isinstance(credentials, list):
         return {
                 "status": "error",
                 "code": 400,
-                "message": "Intended Use ids must be a list"
+                "message": "Credentials ids must be a list"
             }, 400
     
     session_id = str(uuid.uuid4())
@@ -5419,29 +5570,29 @@ responses:
             }
         }, 400
     
-    all_intended_use = db.get_intended_use_info(user_id, session_id)
-    valid_intended_use_ids = {p["intendeduse_id"] for p in all_intended_use}
+    all_cred = db.get_credential_info(user_id, session_id)
+    valid_cred_ids = {p["credential_id"] for p in all_cred}
 
     invalid_ids = [
-        le_id for le_id in intended_use
-        if int(le_id) not in valid_intended_use_ids
+        le_id for le_id in credentials
+        if int(le_id) not in valid_cred_ids
     ]
         
     if invalid_ids:
         return {
             "status": "error",
             "code": 400,
-            "message": "Some Intended Use do not exist or do not belong to this user",
+            "message": "Some Credentials do not exist or do not belong to this user",
             "invalid_legal_entities": invalid_ids
         }, 400
 
-    for elem_id in intended_use:
+    for elem_id in credentials:
         db.update_iu_cred(None, elem_id, session_id)
 
     return {
         "status": "success",
         "message": "Associations updated successfully",
-        "updated_count": len(intended_use)
+        "updated_count": len(credentials)
     }, 200
 
 @rpr.route('/credential/create_person', methods=['GET','POST'])
@@ -5680,37 +5831,9 @@ def cred_list(user_id, session_id):
             }
             data.update(data_temp)
     
-    ie_dict = db.get_intended_use_info(user_id, session_id)
-
-    list = []
-    if(data != {}):
-        if(ie_dict != "err" and ie_dict != None):
-
-            for item in ie_dict:
-                name_txt = item["intendedUseIdentifier"]
-                
-                if(item["credential_id"] != None):
-                    credential_name = db.get_iu_info_cred(item["credential_id"], session_id)
-                    
-                    new_item = {
-                        "id": item["intendeduse_id"],
-                        "name": name_txt,
-                        "associated_id": item["credential_id"],
-                        "ass_name": credential_name
-                    }
-                else:
-                    new_item = {
-                        "id": item["intendeduse_id"],
-                        "name": name_txt,
-                        "associated_id": item["credential_id"],
-                        "ass_name": ""
-                    }
-                
-                list.append(new_item)
-   
     menu= cfgserv.service_url + "menu"
 
-    return menu, data, header_table, list
+    return menu, data, header_table
 
 @rpr.route('/credential/list', methods=['GET','POST'])
 def credential_list():
@@ -5893,7 +6016,7 @@ responses:
                 }
             }, 400
         
-        menu, data, header_table, list = cred_list(user_id, session_id)
+        menu, data, header_table = cred_list(user_id, session_id)
 
         credential = {}
 
@@ -5906,31 +6029,12 @@ responses:
                 "values": lp_data["Values"]
             }
 
-        intended_use = []
-
-        for entity in list:
-            associated_id = entity["associated_id"]
-
-            intended_use.append({
-                "id": entity["id"],
-                "name": entity["name"],
-                "associated": associated_id is not None,
-                "Credential": (
-                    {
-                        "id": associated_id,
-                        **credential.get(associated_id, {})
-                    }
-                    if associated_id in credential else None
-                )
-            })
-
         return {
             "status": "success",
             "code": 200,
-            "message": "Credential and Intended Use retrieved successfully.",
+            "message": "Credential retrieved successfully.",
             "data": {
-                "credential": credential,
-                "intended_uses": intended_use
+                "credential": credential
             }
         }, 200
 
@@ -5963,13 +6067,13 @@ def update_intended_uses():
     return redirect('/credential/list')
 
 
-@rpr.route('/credential/ui_update_intended_uses', methods=["POST"])
+@rpr.route('/intended_use/ui_update_intended_uses', methods=["POST"])
 def ui_update_intended_uses():
     """
-Update Credential associations with Intended Uses
+Update Intended Use associations with Credentials
 ---
 tags:
-  - Credential
+  - Intended Use
 consumes:
   - application/json
 produces:
@@ -5982,27 +6086,27 @@ parameters:
       type: object
       required:
         - hash_pid
-        - credential
-        - intended_uses
+        - intended_use
+        - credentials
       properties:
         hash_pid:
           type: string
           description: User identifier obtained from wallet login
           example: "abc123hashpid"
 
-        credential:
+        intended_use:
           type: integer
-          description: ID of the Credential to associate Intended Uses with
-          example: 8
+          description: ID of the Intended Use to associate Credentials with
+          example: 12
 
-        intended_uses:
+        credentials:
           type: array
-          description: List of Intended Use IDs to associate with the Credential
+          description: List of Credential IDs to associate with the Intended Use
           items:
             type: integer
           example:
-            - 2
             - 5
+            - 6
             - 9
 
 responses:
@@ -6014,11 +6118,15 @@ responses:
         status:
           type: string
           example: success
+        code:
+          type: integer
+          example: 200
         message:
           type: string
           example: Associations updated successfully
         updated_count:
           type: integer
+          description: Number of Credentials successfully associated
           example: 3
 
   400:
@@ -6043,7 +6151,7 @@ responses:
               items:
                 type: string
               example:
-                - intended_uses
+                - credentials
 
   400_invalid_hash_pid:
     description: Invalid hash_pid
@@ -6067,7 +6175,7 @@ responses:
               example: abc123hashpid
 
   400_invalid_ids:
-    description: Some Intended Uses are invalid or do not belong to the user
+    description: Some Credentials are invalid or do not belong to the user
     schema:
       type: object
       properties:
@@ -6079,8 +6187,8 @@ responses:
           example: 400
         message:
           type: string
-          example: Some Intended Uses do not exist or do not belong to this user
-        invalid_intended_uses:
+          example: Some Credentials do not exist or do not belong to this user
+        invalid_credentials:
           type: array
           items:
             type: integer
@@ -6088,7 +6196,6 @@ responses:
             - 99
             - 120
 """
-
 
     data = request.get_json(silent=True)
 
@@ -6100,13 +6207,13 @@ responses:
             }, 400
 
     hash_pid = data.get("hash_pid")
-    credential = data.get("credential")
-    intended_uses = data.get("intended_uses")
+    credentials = data.get("credentials")
+    intended_use = data.get("intended_use")
 
     required_fields = {
         "hash_pid": hash_pid,
-        "credential": credential,
-        "intended_uses": intended_uses
+        "credentials": credentials,
+        "intended_use": intended_use
     }
 
     missing_fields = [name for name, value in required_fields.items() if not value]
@@ -6121,7 +6228,7 @@ responses:
             }
         }, 400
 
-    if not isinstance(intended_uses, list):
+    if not isinstance(credentials, list):
         return {
                 "status": "error",
                 "code": 400,
@@ -6142,21 +6249,21 @@ responses:
             }
         }, 400
     
-    all_credential = db.get_credential_info(user_id, session_id)
-    valid_credential_ids = {str(p["credential_id"]) for p in all_credential}
+    all_intended_use = db.get_intended_use_info(user_id, session_id)
+    valid_intended_use_ids = {str(p["intendeduse_id"]) for p in all_intended_use}
 
-    if str(credential) not in valid_credential_ids:
+    if str(intended_use) not in valid_intended_use_ids:
         return {
                 "status": "error",
                 "code": 400,
-                "message": "Credential does not exist or does not belong to this user"
+                "message": "Intended Use does not exist or does not belong to this user"
             }, 400
     
-    all_iu = db.get_intended_use_info(user_id, session_id)
-    valid_ids = {int(e["intendeduse_id"]) for e in all_iu}
+    all_cred = db.get_credential_info(user_id, session_id)
+    valid_ids = {int(e["credential_id"]) for e in all_cred}
 
     invalid_ids = [
-        le_id for le_id in intended_uses
+        le_id for le_id in credentials
         if int(le_id) not in valid_ids
     ]
         
@@ -6164,17 +6271,17 @@ responses:
         return {
             "status": "error",
             "code": 400,
-            "message": "Some Intended Uses do not exist or do not belong to this user",
+            "message": "Some Crendentials do not exist or do not belong to this user",
             "invalid_intended_uses": invalid_ids
         }, 400
 
-    for elem_id in intended_uses:
-        db.update_iu_cred(credential, elem_id, session_id)
+    for elem_id in credentials:
+        db.update_iu_cred(intended_use, elem_id, session_id)
 
     return {
         "status": "success",
         "message": "Associations updated successfully",
-        "updated_count": len(intended_uses)
+        "updated_count": len(credentials)
     }, 200
 
     

@@ -469,7 +469,7 @@ def get_credential_info(user_id, log_id):
             
             if result: 
                 credential_data = [
-                    {"credential_id": row[0], "name": row[1], "format": row[2], "meta": row[3], "path": row[4], "credentialValues": row[5], "user_id": row[6]} 
+                    {"credential_id": row[0], "name": row[1], "format": row[2], "meta": row[3], "path": row[4], "credentialValues": row[5], "user_id": row[6], "intendedUse_id": row[7]} 
                     for row in result
                 ]
                 extra = {'code': log_id} 
@@ -1026,9 +1026,9 @@ def get_iu_info_cred(user_id, log_id):
             cursor = connection.cursor()
 
             select_query = """
-                SELECT name
-                FROM credential
-                WHERE credential_id = %s
+                SELECT intendedUseIdentifier
+                FROM intendeduse
+                WHERE intendeduse_id = %s
             """
             
             cursor.execute(select_query, (user_id,))
@@ -1036,11 +1036,11 @@ def get_iu_info_cred(user_id, log_id):
             
             if result:
                 extra = {'code': log_id} 
-                logger.info(f"Legal Entity found for the user_id: {user_id}", extra=extra)
+                logger.info(f"intendeduse found for the user_id: {user_id}", extra=extra)
                 return result
             else:
                 extra = {'code': log_id}
-                logger.info("Legal Entity with user_id not found.", extra=extra)
+                logger.info("intendeduse with user_id not found.", extra=extra)
                 return None
         else:
             return None
@@ -1093,28 +1093,28 @@ def get_check_cred_info(user_id, log_id):
             cursor.close()
             connection.close()
 
-def update_iu_cred(le, wrp, log_id):
+def update_iu_cred(iu, cred, log_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
             insert_query = """
-                                UPDATE intendeduse 
-                                SET credential_id = %s
-                                WHERE intendeduse_id = %s
+                                UPDATE credential 
+                                SET intendedUse_id = %s
+                                WHERE credential_id = %s
                             """
-            cursor.execute(insert_query, (le, wrp,))
+            cursor.execute(insert_query, (iu, cred,))
             
             connection.commit()
             
             extra = {'code': log_id} 
-            logger.info(f"iu successfully updated: {id}", extra=extra)
+            logger.info(f"Credential successfully updated: {id}", extra=extra)
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code': log_id} 
-        logger.error(f"Error updating iu: {e}", extra=extra)
+        logger.error(f"Error updating Credential: {e}", extra=extra)
     finally:
         if connection:
             cursor.close()

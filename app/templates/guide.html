@@ -516,9 +516,9 @@
         </p>
     </div>
     <div class="step">
-        <h2>Step 13 - Listing Credentials and Associated Intended Uses</h2>
+        <h2>Step 13 - Listing Intended Uses and Associated Credentials</h2>
         <p>
-            After creating credentials, you can list all credentials and see which Intended Uses they are associated with using the endpoint <b>/credential/list</b>.
+            After creating credentials, you can list all Intended Uses and see which credentials they are associated with using the endpoint <b>/intended_use/list</b>.
         </p>
 
         <p>
@@ -535,18 +535,18 @@
         <ul>
             <li><b>credential id</b>: the ID of the credential you want to use</li>
             <li><b>intended_use id</b>: the IDs of the Intended Uses you want to associate</li>
-            <li><b>associations</b>: which Intended Uses are already linked to each Credential</li>
+            <li><b>associations</b>: which Credential are already linked to each Intended Uses</li>
         </ul>
 
         <p>
-            Note that a credential may already be associated with one or more Intended Uses.<br>
-            If you associate a credential with an Intended Use that already has its <b>associated</b> field set to True, the previous association will be replaced with the new one.
+            Note that an Intended Uses may already be associated with one or more credential.<br>
+            If you associate a Intended Use with a credential that already has its <b>associated</b> field set to True, the previous association will be replaced with the new one.
         </p>
     </div>
     <div class="step">
-        <h2>Step 14 - Associating Credentials with Intended Uses</h2>
+        <h2>Step 14 - Associating Intended Uses with  Credentials</h2>
         <p>
-            After listing your credentials and the available Intended Uses in Step 13, you can associate a credential with one or more Intended Uses using the endpoint <b>/credential/ui_update_intended_uses</b>.
+            After listing your Intended Uses and the available credentials in Step 13, you can associate an Intended Use with one or more credential using the endpoint <b>/intended_use/ui_update_intended_uses</b>.
         </p>
 
         <p>
@@ -556,20 +556,20 @@
         <pre><code>
             {
                 "hash_pid": "&lt;hash_pid from step 1&gt;",
-                "credential": 1,
-                "intended_uses": [1]
+                "credentials": [1],
+                "intended_use": 1
             }
         </code></pre>
 
         <p>
             <b>Notes:</b><br>
-            - Only <b>one credential</b> can be specified in the <b>credential</b> field.<br>
-            - The <b>intended_uses</b> field must always be an array <code>[]</code>, even if you are associating only one Intended Use.<br>
-            - To associate multiple Intended Uses with a credential, include all IDs inside the array, separated by commas, like this:
+            - Only <b>one Intended Use</b> can be specified in the <b>intended_use</b> field.<br>
+            - The <b>credential</b> field must always be an array <code>[]</code>, even if you are associating only one credential.<br>
+            - To associate multiple credentials with an Intended Uses, include all IDs inside the array, separated by commas, like this:
         </p>
 
         <pre><code>
-            "intended_uses": [1, 2, 3, 4]
+            "credentials": [1, 2, 3, 4]
         </code></pre>
 
         <p>
