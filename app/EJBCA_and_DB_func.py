@@ -159,20 +159,45 @@ def http_post_requests_with_custom_ssl_context(trust_manager, key_manager_filepa
 
     return response
 
-def generateCertificateRequest(priv_key, commomName, countryName, uniformResourceIdentifier):
 
-    subject = x509.Name([
-        x509.NameAttribute(NameOID.COMMON_NAME, commomName),
-        x509.NameAttribute(NameOID.COUNTRY_NAME, countryName),
-        # x509.NameAttribute(NameOID.ORGANIZATION_NAME, organizationName),
-        # x509.NameAttribute(NameOID.SERIAL_NUMBER, registration_number),
-    ])
+def generateCertificateRequest(priv_key, commonName, countryName, uniformResourceIdentifier, organizationIdentifier=None, organizationName=None, organizationalUnit=None, email=None, phone=None, givenName=None,surname=None, serialNumber=None ):
 
-    #alt_name_extension = x509.SubjectAlternativeName([x509.RFC822Name(email),x509.DNSName(dns_Name)])
+    #PHONE_OID = ObjectIdentifier("2.5.4.20")
+    #encoded_phone = phone.encode('utf-8')
 
-    alt_name_extension = x509.SubjectAlternativeName([x509.UniformResourceIdentifier(uniformResourceIdentifier)])
+    subject =[
+       x509.NameAttribute(NameOID.COMMON_NAME, commonName),
+       x509.NameAttribute(NameOID.COUNTRY_NAME, countryName),
+    ]
 
-    cri = x509.CertificateSigningRequestBuilder().add_extension(alt_name_extension, critical=False).subject_name(subject).sign(priv_key,hashes.SHA256())
+    alt_name_extension = x509.SubjectAlternativeName([])
+
+    optional_subject=[
+       (NameOID.GIVEN_NAME, givenName),
+       (NameOID.SURNAME, surname),
+       (NameOID.ORGANIZATION_NAME, organizationName),
+        #x509.NameAttribute(NameOID.ORGANIZATION_IDENTIFIER, organizationIdentifier),
+       (NameOID.SERIAL_NUMBER, serialNumber),
+       (NameOID.SERIAL_NUMBER, organizationIdentifier),
+       #(ObjectIdentifier("2.5.4.20"), phone),
+       (NameOID.ORGANIZATIONAL_UNIT_NAME, organizationalUnit)
+    ]
+
+    for subjects_oid, value in optional_subject:
+
+        if value is not None:
+            subject.append(x509.NameAttribute(subjects_oid,value))
+    
+    final_SubjectAlternativename=[]
+    
+    if email:
+        final_SubjectAlternativename.append(x509.RFC822Name(email))
+
+    final_SubjectAlternativename.append(x509.UniformResourceIdentifier(uniformResourceIdentifier))
+    
+    final_subject=x509.Name(subject)
+    alt_name_extension = x509.SubjectAlternativeName(final_SubjectAlternativename)
+    cri = x509.CertificateSigningRequestBuilder().add_extension(alt_name_extension, critical=False).subject_name(final_subject).sign(priv_key,hashes.SHA256())
 
     cri_der = cri.public_bytes(serialization.Encoding.DER)
 

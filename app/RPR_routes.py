@@ -3356,27 +3356,19 @@ def relying_party_access_certificate():
         priv_key = ec.generate_private_key(ec.SECP256R1(), default_backend() )
 
         #dados da RP
-
+        TypeIdentifier={
+            "http://data.europa.eu/eudi/id/EORI-No":"EOR",
+            "http://data.europa.eu/eudi/id/LEI":"LEI" ,
+            "http://data.europa.eu/eudi/id/EUID":"NTR" ,
+            "http://data.europa.eu/eudi/id/VATIN":"VAT"  ,
+            "http://data.europa.eu/eudi/id/TIN":"TIN",
+            "http://data.europa.eu/eudi/id/Excise":"EXC"
+        }
         #commonName
         tradeName=RP[0]["tradeName"]
         #uniformResourceIdentifier
         supportURI=RP[0]["supportURI"]
         legal_entity = db.get_legal_entity(RP[0]["supervisorAuthority"], session_id)
-        
-        if legal_entity[0]["legalperson_id"] is None:
-            natural_person = db.get_natural_person(legal_entity[0]["naturalperson_id"], session_id)
-            #se user for natural person
-            givenName=natural_person[0]["givenName"]
-            #surname
-            surname=natural_person[0]["familyName"]
-            
-        else:
-            legal_person = db.get_legal_person(legal_entity[0]["legalperson_id"], session_id)
-            #se user for legal person
-            #dados da legal person
-            #organizationName
-            legalName=legal_person[0]["legalName"]
-
 
         #dados da legalEntity
         #caso for natural person é serialNumber no caso de uma legal person organizationIdentifier
@@ -3385,6 +3377,22 @@ def relying_party_access_certificate():
         email= legal_entity[0]["email"]
         phone= legal_entity[0]["phone"]
 
+        
+        if legal_entity[0]["legalperson_id"] is None:
+            natural_person = db.get_natural_person(legal_entity[0]["naturalperson_id"], session_id)
+            #se user for natural person
+            givenName=natural_person[0]["givenName"]
+            #surname
+            surname=natural_person[0]["familyName"]
+            serial_number=TypeIdentifier[legal_entity[0]["identifierType"]] + identifier
+            
+        else:
+            legal_person = db.get_legal_person(legal_entity[0]["legalperson_id"], session_id)
+            #se user for legal person
+            #dados da legal person
+            #organizationName
+            legalName=legal_person[0]["legalName"]
+            organizationIdentifier= TypeIdentifier[legal_entity[0]["identifierType"]] + identifier
 
         #como as TSLs, ex: lang en, description=test  
         servicesDescription=RP[0]["srvDescription"]#como as TSLs, ex: lang en, description=test  
@@ -3452,8 +3460,26 @@ def relying_party_access_certificate():
             "validity_to":certificate.not_valid_after_utc,
         }
 
-        
+        file_base64 = base64.b64encode(p12).decode()
+
+        return jsonify({
+            "status": "success",
+            "code": 200,
+            "data": {
+                "filename": "document_with_signature.json",
+                "file_base64": file_base64
+            }
+        })
+
+        return send_file(
+            io.BytesIO(p12),
+            mimetype='application/x-pkcs12',
+            as_attachment=True,
+            download_name=file_name
+        )
+    
         return base64.urlsafe_b64encode(p12) 
+    
         send_file(io.BytesIO(p12),download_name=file_name,as_attachment=True)
         
         return render_template('downloadPage.html', attributes=certificate_presentation, download_url= "/Download/"+ file_name)
@@ -4570,7 +4596,7 @@ def intended_use_registration_certificate():
 
         RP_data = db.get_rp_certificate(intended_use_data[0]["wrp"], session_id)
         legal_entity_data = db.get_legal_entity(RP_data[0]["supervisorAuthority"], session_id)
-        credentials_data = db.get_credential(intended_use_data[0]["credential_id"], session_id)
+        credentials_data = db.get_credential(intended_use_data[0]["intendeduse_id"], session_id)
 
     # #if legal person
     # legal_person_data=get_legal_person_data()
@@ -4592,6 +4618,8 @@ def intended_use_registration_certificate():
             givenName=natural_person[0]["givenName"]
             #surname
             surname=natural_person[0]["familyName"]
+            certificate_policy = "itu-t(0) identified-organization(4) etsi(0) eudiwrp(194118) policy-identifiers(1) ncp-natural (1)"
+
             
         else:
             legal_person = db.get_legal_person(legal_entity_data[0]["legalperson_id"], session_id)
@@ -4599,6 +4627,7 @@ def intended_use_registration_certificate():
             #dados da legal person
             #organizationName
             legalName=legal_person[0]["legalName"]
+            certificate_policy = "itu-t(0) identified-organization(4) etsi(0) eudiwrp(194118) policy-identifiers(1) ncp-legal (2)"
 
         iat= int(time.time())
 
@@ -4636,7 +4665,18 @@ def intended_use_registration_certificate():
     # #status=
 
     # #se utiliza intermediário
-    # #act
+    # #act            
+
+        TypeIdentifier={
+            "http://data.europa.eu/eudi/id/EORI-No":"EOR",
+            "http://data.europa.eu/eudi/id/LEI":"LEI" ,
+            "http://data.europa.eu/eudi/id/EUID":"NTR" ,
+            "http://data.europa.eu/eudi/id/VATIN":"VAT"  ,
+            "http://data.europa.eu/eudi/id/TIN":"TIN",
+            "http://data.europa.eu/eudi/id/Excise":"EXC"
+        }
+
+        sub_id = TypeIdentifier[legal_entity_data[0]["identifierType"]] + '-' + id
 
         json_header = { "typ": "rc-wrp+jwt",
                     "alg": "ES256", 
@@ -4663,42 +4703,90 @@ def intended_use_registration_certificate():
     #                 "status": { "status_list": { "idx": 0, "uri": "https://example.com/statuslists/1" } }, 
     #                 "act": { "sub":{ "id":"DE:EX-987654381" } }
     #                 }
-    
-        json_payload = { 
-                        "name": name,
-                        "purpose": purpose, 
-                        "info_uri": info_uri,
-                        "country": country,
-                        "sub": { 
-                                "legal_name": legalName,
-                                "id": id 
-                        },
-                        "privacy_policy": privacy_policy, 
-                        "policy_id": [ "0.4.0.19475.3.1" ], 
-                        "certificate_policy": "https://registrat.example.com/certificate-policy", 
-                        "iat": iat, 
-                        "credentials": credentials_data,
-                        "entitlements": entitlement,
-                        "provided_attestations": [ { 
-                                                    "format": "dc+sd-jwt", "meta": { "vct_values": [ "" ] } 
-                        } ],
-                        "public_body": False,
-                        "service": service,
-                        "status": { 
-                            "status_list": { 
-                                            "idx": 0, "uri": "https://example.com/statuslists/1" 
-                            } 
-                        }, 
-                        "act": { 
-                            "sub":{ 
-                                "id":"DE:EX-987654381" 
-                            } 
-                        }
+
+        headers={
+            "accept": "application/json",
+            "X-API-Key": "test" ,
+            "Content-Type": "application/x-www-form-urlencoded",
         }
+
+        data={
+            "country":"FC",
+            "doctype":"wrprc",
+            "expiry_date":"2030-11-11"
+        }
+
+        response = requests.post(cfgserv.url_statuslist, headers=headers, data=data)
+
+        status=response.json()
+
+        status_idx=status["status_list"]["idx"]
+        status_uri=status["status_list"]["uri"]
+
+        if RP_data[0]["usesIntermediary"] != None:
+            rp_intermediary = db.get_rp_certificate(RP_data[0]["usesIntermediary"], session_id)
+            legalentity_intermediary = db.get_legal_entity_info_edit(rp_intermediary[0]["supervisorAuthority"])
+            aux = TypeIdentifier[legalentity_intermediary[0]['identifierType']] + '-' + legalentity_intermediary[0]['identifier']
+            json_payload = { 
+                            "name": name,
+                            "purpose": purpose, 
+                            "info_uri": info_uri,
+                            "country": country,
+                            "sub": { 
+                                    "legal_name": legalName,
+                                    "id": sub_id
+                            },
+                            "privacy_policy": privacy_policy, 
+                            "policy_id": [ "{ itu-t(0) identified-organization(4) etsi(0) eudiwrpa(19475) policy-identifiers(3) wrprc (1)}" ], 
+                            "certificate_policy": certificate_policy, 
+                            "iat": iat, 
+                            "credentials": credentials_data,
+                            "entitlements": entitlement,
+                            "provided_attestations": [ { 
+                                                        "format": credentials_data[0]["format"], "meta": { "vct_values": [ credentials_data[0]["meta"] ] } 
+                            } ],
+                            "public_body": False,
+                            "service": service,
+                            "status": { 
+                                "status_list": { 
+                                                "idx": status_idx, "uri": status_uri
+                                } 
+                            }, 
+                            "act": { 
+                                "sub":{ 
+                                    "id": aux
+                                } 
+                            }
+            }
+        else: 
+            json_payload = { 
+                            "name": name,
+                            "purpose": purpose, 
+                            "info_uri": info_uri,
+                            "country": country,
+                            "sub": { 
+                                    "legal_name": legalName,
+                                    "id": sub_id
+                            },
+                            "privacy_policy": privacy_policy, 
+                            "policy_id": [ "{ itu-t(0) identified-organization(4) etsi(0) eudiwrpa(19475) policy-identifiers(3) wrprc (1)}" ], 
+                            "certificate_policy": certificate_policy, 
+                            "iat": iat, 
+                            "credentials": credentials_data,
+                            "entitlements": entitlement,
+                            "provided_attestations": [ { 
+                                                        "format": credentials_data[0]["format"], "meta": { "vct_values": [ credentials_data[0]["meta"] ] } 
+                            } ],
+                            "public_body": False,
+                            "service": service,
+                            "status": { 
+                                "status_list": { 
+                                                "idx": status_idx, "uri": status_uri
+                                } 
+                            }
+            }
         
-        return json_payload
-        
-        with open("app/EJBCA/ecdsa_cert.pem", "rb") as f:
+        with open(cfgserv.wrprc_certificate, "rb") as f:
             cert = x509.load_pem_x509_certificate(f.read(), default_backend())
 
         base64_cert = base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode("utf-8")
@@ -4707,14 +4795,13 @@ def intended_use_registration_certificate():
 
         # base64_header=base64.b64encode(json.dumps(json_header).encode()).decode("utf-8")
 
-        with open("naoAssinado.json", "w", encoding="utf-8") as f:
-            json.dump(
-                json_payload,
-                f,
-        )
+        # with open("naoAssinado.json", "w", encoding="utf-8") as f:
+        #     json.dump(
+        #         json_payload,
+        #         f,
+        # )
 
-        with open("naoAssinado.json", "rb") as f:
-            file_bytes = f.read()
+        file_bytes = json.dumps(json_payload).encode()
         
         # digest = hashes.Hash(hashes.SHA256())
         # digest.update(file_bytes)
@@ -4758,7 +4845,7 @@ def intended_use_registration_certificate():
 
         data_to_be_signed = base64.b64decode(base64_string)
 
-        print(data_to_be_signed)
+        #print(data_to_be_signed)
 
         #print(data_to_be_signed)
         # hash = base64.urlsafe_b64decode(hashes[0]).
@@ -4766,7 +4853,7 @@ def intended_use_registration_certificate():
 
         signature_date = calculate_hash.json()["signature_date"]
 
-        with open("app/EJBCA/ecdsa_key.pem", "rb") as f:
+        with open(cfgserv.wrprc_privateKey, "rb") as f:
             private_key = serialization.load_pem_private_key(
             f.read(),
             password=None,
@@ -4814,29 +4901,30 @@ def intended_use_registration_certificate():
         # jwt_signature=data["signatures"][0]["signature"]
 
         # jwt = jwt_header + "." + jwt_payload + "." + jwt_signature
-
-        output_file ="teste.json"
-
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(
-                json.loads(base64.b64decode(document_with_signature).decode()),
-                f,
-            )
-            
         #cbor
 
         cbor_data= cbor2.dumps(json_payload)
 
         msg = Sign1Message(phdr={Algorithm: Es256},uhdr={KID: b"key1"},payload=cbor_data)
 
-        with open("app/EJBCA/private_key.pem", "rb") as f:
+        with open(cfgserv.wrprc_privateKey, "rb") as f:
             pem_bytes = f.read()
 
         cose_key = CoseKey.from_pem_private_key(pem_bytes.decode())
         msg.key = cose_key
         cose_bytes = msg.encode()
 
-        return cose_bytes.hex()
+        file_data = base64.b64decode(document_with_signature)
+
+        return send_file(
+            io.BytesIO(file_data),
+            download_name="document_with_signature.json",
+            as_attachment=True,
+            mimetype='application/json'
+        )
+    
+        cose_base64 = base64.urlsafe_b64encode(cose_bytes).decode()
+        return cose_base64
     
 def list_intended_use(user_id, session_id):
 
@@ -6595,14 +6683,14 @@ def request_RP_data():
 
     final_result= json.dumps(results)
 
-    with open("app/EJBCA/ecdsa_key.pem", "rb") as f:
-        ec_key = serialization.load_pem_private_key(
-        f.read(),
-        password=None,
-        backend=default_backend()
-    )
-        
-    key = import_private_ec_key_from_file('app/EJBCA/ecdsa_key.pem')
+    # with open("app/EJBCA/ecdsa_key.pem", "rb") as f:
+    #   ec_key = serialization.load_pem_private_key(
+    #       f.read(),
+    #       password=None,
+    #       backend=default_backend()
+    #   )
+    
+    key = import_private_ec_key_from_file(cfgserv.wrprc_privateKey)
     ec_key = ECKey(priv_key=key)
 
     jws = JWS(final_result, alg="ES256")

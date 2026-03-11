@@ -93,7 +93,14 @@ class ConfService:
                         "http://data.europa.eu/eudi/policy/privacy-policy",
                         "http://data.europa.eu/eudi/policy/registration-policy"]
     }
+
     sca_signer_url="http://localhost:8086"
+
+    url_statuslist="https://dev.issuer.eudiw.dev/token_status_list/take"
+
+    wrprc_privateKey = "app/EJBCA/ecdsa_key.pem"
+
+    wrprc_certificate = "app/EJBCA/ecdsa_cert.pem"
     
 
     # log_dir = "/tmp/log"

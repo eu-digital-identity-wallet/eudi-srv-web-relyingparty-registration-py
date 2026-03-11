@@ -1580,7 +1580,7 @@ def get_intended_use(intendeduse_id, log_id):
             cursor.close()
             connection.close()
 
-def get_credential(cred_id, log_id):
+def get_credential(iu_id, log_id):
     try:
         connection = conn()
         if connection:
@@ -1589,10 +1589,10 @@ def get_credential(cred_id, log_id):
             select_query = """
                 SELECT *
                 FROM credential
-                WHERE credential_id = %s
+                WHERE intendedUse_id = %s
             """
             
-            cursor.execute(select_query, (cred_id,))
+            cursor.execute(select_query, (iu_id,))
             result = cursor.fetchall()
             
             if result: 
@@ -1601,7 +1601,7 @@ def get_credential(cred_id, log_id):
                     for row in result
                 ]
                 extra = {'code': log_id} 
-                logger.info(f"Credentail found: {cred_id}", extra=extra)
+                logger.info(f"Credentail found: {iu_id}", extra=extra)
                 return credential_data
             else:
                 extra = {'code': log_id}
