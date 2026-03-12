@@ -1429,6 +1429,91 @@ It is intended to be used to:
   * If any Intended Use does not belong to the user, the request will fail.
   * This endpoint updates data by removing the association with the Credential.
 
+## Relying Party – Retrieve Certificate
+
+This endpoint retrieves the certificate file associated with a specific Relying Party.
+
+It is intended to be used to:
+  * Obtain the certificate linked to a Relying Party
+  * Download the certificate for verification or integration purposes
+
+### Endpoint
+``` code
+  /RP/certificate
+```
+
+### Arguments (JSON Body)
+| Name            | Description                         |
+| --------------- | ----------------------------------- |
+| `hash_pid`      | User identifier (from wallet login) |
+| `relying_party` | Relying Party identifier            |
+
+### Example Request
+``` code
+  {
+    "hash_pid": <hash_pid>,
+    "relying_party": 2
+  }
+```
+
+### Notes
+  * The hash_pid parameter is mandatory.
+  * The relying_party field must contain a single Relying Party ID.
+  * The provided Relying Party must belong to the authenticated user (hash_pid).
+  * If the hash_pid is invalid, the request will fail.
+  * If the Relying Party does not exist or does not belong to the user, the request will fail.
+  * If the request is successful, the certificate file associated with the Relying Party will be returned as a downloadable file.
+
+## Intended Use – Retrieve Certificate
+
+This endpoint retrieves the certificate associated with a specific Intended Use.
+
+It is intended to be used to:
+  * Obtain the certificate generated for an Intended Use
+  * Retrieve the signed document and its corresponding COSE signature in Base64 format
+
+### Endpoint
+``` code
+/intended_use/certificate
+``` 
+
+### Arguments (JSON Body)
+| Name           | Description                         |
+| -------------- | ----------------------------------- |
+| `hash_pid`     | User identifier (from wallet login) |
+| `intended_use` | Intended Use id                     |
+
+### Example Request
+``` code
+{
+  "hash_pid": <hash_pid>,
+  "intended_use": 3
+}
+``` 
+
+### Example Response
+``` code 
+{
+  "status": "success",
+  "code": 200,
+  "data": {
+    "filename": "document_with_signature.json",
+    "file_base64": "ewoJImRhdGEiOiAiZXhhbX...",
+    "cose_base64": "eyJhbGciOiAiRVMyNTYifQ..."
+  }
+}
+``` 
+
+### Notes
+  * The hash_pid parameter is mandatory.
+  * The intended_use field must contain a single Intended Use ID. 
+  * The provided Intended Use must belong to the authenticated user (hash_pid).
+  * If the hash_pid is invalid, the request will fail.
+  * If the Intended Use does not exist or does not belong to the user, the request will fail.
+  * If the request is successful, the response will contain the generated document encoded in Base64 and the corresponding COSE signature.
+
+
+
 
 
 ## How to contribute

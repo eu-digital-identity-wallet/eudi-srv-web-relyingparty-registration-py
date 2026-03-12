@@ -60,8 +60,8 @@
     <h1>API Usage Guide</h1>
     
     <div class="buttons">
-        <button onclick="prevStep()">Previous</button>
-        <button onclick="nextStep()">Next</button>
+        <button id="prevBtn" onclick="prevStep()">Previous</button>
+        <button id="nextBtn" onclick="nextStep()">Next</button>
     </div>
 
     <div class="step active">
@@ -577,33 +577,144 @@
             <b>"Associations updated successfully"</b>.
         </p>
     </div>
+    <div class="step">
+        <h2>Step 15 - Retrieve Relying Party Certificate</h2>
 
-    <script>
+        <p>
+            After creating and configuring your Relying Parties, you can retrieve the certificate associated with a specific Relying Party using the endpoint <b>/RP/certificate</b>.
+        </p>
 
-        let currentStep = 0;
-        const steps = document.querySelectorAll(".step");
+        <p>
+            This endpoint returns the generated certificate file associated with the selected Relying Party.
+        </p>
 
-        function showStep(index) {
+        <p>
+            Example JSON body:
+        </p>
 
-            steps.forEach(step => step.classList.remove("active"));
-
-            steps[index].classList.add("active");
-        }
-
-        function nextStep() {
-            if (currentStep < steps.length - 1) {
-                currentStep++;
-                showStep(currentStep);
+        <pre><code>
+            {
+                "hash_pid": "&lt;hash_pid from step 1&gt;",
+                "relying_party": 1
             }
-        }
+        </code></pre>
 
-        function prevStep() {
-            if (currentStep > 0) {
-                currentStep--;
-                showStep(currentStep);
+        <p>
+            <b>Notes:</b><br>
+            - Only <b>one Relying Party</b> can be specified in the <b>relying_party</b> field.<br>
+            - The provided Relying Party must belong to the authenticated user.<br>
+            - If the request is successful, the certificate file associated with the Relying Party will be returned.
+        </p>
+    </div>
+    <div class="step">
+        <h2>Step 16 - Retrieve Intended Use Certificate</h2>
+
+        <p>
+            You can also retrieve the certificate generated for a specific Intended Use using the endpoint <b>/intended_use/certificate</b>.
+        </p>
+
+        <p>
+            This endpoint returns the generated document and its corresponding COSE signature encoded in Base64.
+        </p>
+
+        <p>
+            Example JSON body:
+        </p>
+
+        <pre><code>
+            {
+                "hash_pid": "&lt;hash_pid from step 1&gt;",
+                "intended_use": 1
             }
+        </code></pre>
+
+        <p>
+            If the request is successful, the response will contain:
+        </p>
+
+        <pre><code>
+            {
+                "status": "success",
+                "code": 200,
+                "data": {
+                    "filename": "document_with_signature.json",
+                    "file_base64": "...",
+                    "cose_base64": "..."
+                }
+            }
+        </code></pre>
+
+        <p>
+            <b>Notes:</b><br>
+            - Only <b>one Intended Use</b> can be specified in the <b>intended_use</b> field.<br>
+            - The provided Intended Use must belong to the authenticated user.<br>
+            - The <b>file_base64</b> field contains the generated document encoded in Base64.<br>
+            - The <b>cose_base64</b> field contains the COSE signature of the document.
+        </p>
+    </div>
+
+<script>
+    let currentStep = 0;
+    const steps = document.querySelectorAll(".step");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+
+    function showStep(index) {
+        steps.forEach(step => step.classList.remove("active"));
+        steps[index].classList.add("active");
+
+        if (index === 0) {
+            prevBtn.style.display = "none";
+        } else {
+            prevBtn.style.display = "inline-block";
         }
 
-    </script>
+        if (index === steps.length - 1) {
+            nextBtn.style.display = "none";
+
+            if (!document.getElementById("finalButtons")) {
+                const finalDiv = document.createElement("div");
+                finalDiv.id = "finalButtons";
+                finalDiv.style.marginTop = "10px";
+
+                const homeBtn = document.createElement("button");
+                homeBtn.textContent = "Back to Home";
+                homeBtn.onclick = () => { window.location.href = "/"; };
+                homeBtn.style.marginRight = "10px";
+
+                // const browserBackBtn = document.createElement("button");
+                // browserBackBtn.textContent = "Go Back";
+                // browserBackBtn.onclick = () => { window.history.back(); };
+
+                finalDiv.appendChild(homeBtn);
+                finalDiv.appendChild(browserBackBtn);
+
+                steps[index].appendChild(finalDiv);
+            }
+
+        } else {
+            nextBtn.style.display = "inline-block";
+
+            const finalDiv = document.getElementById("finalButtons");
+            if (finalDiv) finalDiv.remove();
+        }
+    }
+
+    function nextStep() {
+        if (currentStep < steps.length - 1) {
+            currentStep++;
+            showStep(currentStep);
+        }
+    }
+
+    function prevStep() {
+        if (currentStep > 0) {
+            currentStep--;
+            showStep(currentStep);
+        }
+    }
+
+    showStep(currentStep);
+</script>
 </body>
 </html>

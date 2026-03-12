@@ -1353,7 +1353,7 @@ def get_all_rp_inf():
             cursor = connection.cursor()
 
             select_query = """
-                SELECT wrp_id, tradeName, supportURI, srvDescription, intended_use, isPSB, entitlement, providesAttestations, supervisorAuthority, isIntermediary, usesIntermediary, registryURI, providerType, x5c, typePolicy, policyURI, legalEntity
+                SELECT tradeName, supportURI, srvDescription, entitlement, providesAttestations, isIntermediary, usesIntermediary, policyURI
                 FROM walletrelyingparty
             """
             
@@ -1362,7 +1362,7 @@ def get_all_rp_inf():
             
             if result: 
                 rp_data = [
-                    {"wrp_id": row[0], "tradeName": row[1], "supportURI": row[2], "srvDescription": row[3], "intended_use": row[4], "isPSB": row[5], "entitlement": row[6], "providesAttestations": row[7], "supervisorAuthority": row[8], "isIntermediary": row[9], "usesIntermediary": row[10], "registryURI": row[11], "providerType": row[12], "x5c": row[13], "typePolicy": row[14], "policyURI": row[15], "legalEntity": row[16]} 
+                    {"tradeName": row[0], "srvDescription": row[1], "entitlement": row[2], "providesAttestations": row[3], "isIntermediary": row[4], "usesIntermediary": row[5], "policyURI": row[6]} 
                     for row in result
                 ]
                 extra = {'code'} 

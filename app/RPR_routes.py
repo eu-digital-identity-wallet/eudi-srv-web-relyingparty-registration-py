@@ -3170,8 +3170,131 @@ def RP_edit_db():
     else:
         return redirect('/RP/list')
 
-@rpr.route("/RP/certificate", methods=["GET", "POST"])
+@rpr.route("/RP/certificate", methods=["GET"])
 def relying_party_access_certificate():
+    """
+Retrieve Relying Party Certificate
+---
+tags:
+  - Relying Party
+consumes:
+  - application/json
+produces:
+  - application/octet-stream
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+        - relying_party
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: abc123hashpid
+
+        relying_party:
+          type: integer
+          description: ID of the Relying Party whose certificate will be retrieved
+          example: 2
+
+responses:
+  200:
+    description: Certificate file successfully retrieved
+    schema:
+      type: string
+      format: binary
+
+  400_missing_fields:
+    description: Missing required fields
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example:
+                - relying_party
+
+  400_invalid_hash_pid:
+    description: Invalid hash_pid
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Invalid hash_pid
+        data:
+          type: object
+          properties:
+            hash_pid:
+              type: string
+              example: abc123hashpid
+
+  400_rp_not_exist:
+    description: Relying Party does not exist
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Relying Parties do not Exist
+        data:
+          type: object
+          properties:
+            relying_party:
+              type: integer
+              example: 2
+
+  400_rp_not_user:
+    description: Relying Party does not belong to the authenticated user
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Relying Parties do not belong to this User.
+        data:
+          type: object
+          properties:
+            relying_party:
+              type: integer
+              example: 2
+"""
 
     if 'temp_user_id' in session:  
         temp_user_id = session['temp_user_id']
@@ -4514,8 +4637,151 @@ def intended_use_edit_db():
     else:
         return redirect('/intended_use/list')
    
-@rpr.route("/intended_use/certificate", methods=["GET", "POST"])
+@rpr.route("/intended_use/certificate", methods=["GET"])
 def intended_use_registration_certificate():
+    """
+Retrieve Intended Use Certificate
+---
+tags:
+  - Intended Use
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+        - intended_use
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: abc123hashpid
+
+        intended_use:
+          type: integer
+          description: ID of the Intended Use whose certificate will be retrieved
+          example: 3
+
+responses:
+  200:
+    description: Intended Use certificate retrieved successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        code:
+          type: integer
+          example: 200
+        data:
+          type: object
+          properties:
+            filename:
+              type: string
+              example: document_with_signature.json
+            file_base64:
+              type: string
+              description: Base64 encoded file containing the generated document
+              example: ewoJImRhdGEiOiAiZXhhbX...
+            cose_base64:
+              type: string
+              description: Base64 encoded COSE signature of the document
+              example: eyJhbGciOiAiRVMyNTYifQ...
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example:
+                - intended_use
+
+  400_invalid_hash_pid:
+    description: Invalid hash_pid
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Invalid hash_pid
+        data:
+          type: object
+          properties:
+            hash_pid:
+              type: string
+              example: abc123hashpid
+
+  400_invalid_intended_use:
+    description: Intended Use does not exist
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Intended Use do not Exist
+        data:
+          type: object
+          properties:
+            intended_use:
+              type: integer
+              example: 3
+
+  400_not_user:
+    description: Intended Use does not belong to the authenticated user
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Intended Use do not belong to this User.
+        data:
+          type: object
+          properties:
+            intended_use:
+              type: integer
+              example: 3
+"""
 
     if 'temp_user_id' in session:  
         return "test"
@@ -4915,6 +5181,19 @@ def intended_use_registration_certificate():
         cose_bytes = msg.encode()
 
         file_data = base64.b64decode(document_with_signature)
+
+        file_base64 = base64.b64encode(file_data).decode()
+        cose_base64 = base64.urlsafe_b64encode(cose_bytes).decode()
+
+        return jsonify({
+            "status": "success",
+            "code": 200,
+            "data": {
+                "filename": "document_with_signature.json",
+                "file_base64": file_base64,
+                "cose_base64": cose_base64
+            }
+        })
 
         return send_file(
             io.BytesIO(file_data),
