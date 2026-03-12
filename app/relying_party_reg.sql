@@ -16,8 +16,8 @@
 
 
 -- A despejar estrutura da base de dados para relyingparty_reg
-CREATE DATABASE IF NOT EXISTS `relyingparty_reg` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci */;
-USE `relyingparty_reg`;
+CREATE DATABASE IF NOT EXISTS `relyingparty_reg-dev` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci */;
+USE `relyingparty_reg-dev`;
 
 -- A despejar estrutura para tabela relyingparty_reg.api_keys
 CREATE TABLE IF NOT EXISTS `api_keys` (
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS `api_keys` (
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `api_key` (`api_key`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Exportação de dados não seleccionada.
 
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS `credential` (
   KEY `fk_cred_iu` (`intendedUse_id`),
   CONSTRAINT `fk_cred_iu` FOREIGN KEY (`intendedUse_id`) REFERENCES `intendeduse` (`intendeduse_id`) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT `fk_cred_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Exportação de dados não seleccionada.
 
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS `intendeduse` (
   CONSTRAINT `fk_iu_cred` FOREIGN KEY (`credential_id`) REFERENCES `credential` (`credential_id`),
   CONSTRAINT `fk_iu_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`),
   CONSTRAINT `fk_iu_wrp` FOREIGN KEY (`wrp`) REFERENCES `walletrelyingparty` (`wrp_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Exportação de dados não seleccionada.
 
@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS `legalentity` (
   CONSTRAINT `fk_le_legalperson` FOREIGN KEY (`legalperson_id`) REFERENCES `legalperson` (`legalperson_id`),
   CONSTRAINT `fk_le_naturalperson` FOREIGN KEY (`naturalperson_id`) REFERENCES `naturalperson` (`naturalperson_id`),
   CONSTRAINT `fk_le_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Exportação de dados não seleccionada.
 
@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS `legalperson` (
   PRIMARY KEY (`legalperson_id`),
   KEY `fk_legalperson_user` (`user_id`),
   CONSTRAINT `fk_legalperson_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Exportação de dados não seleccionada.
 
@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS `naturalperson` (
   PRIMARY KEY (`naturalperson_id`),
   KEY `np_user_id` (`user_id`),
   CONSTRAINT `np_user_id` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Exportação de dados não seleccionada.
 
@@ -130,7 +130,7 @@ CREATE TABLE IF NOT EXISTS `user` (
   `user_id` int(11) NOT NULL AUTO_INCREMENT,
   `hash_pid` varchar(256) NOT NULL,
   PRIMARY KEY (`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Exportação de dados não seleccionada.
 
@@ -167,7 +167,7 @@ CREATE TABLE IF NOT EXISTS `walletrelyingparty` (
   CONSTRAINT `fk_wrp_le` FOREIGN KEY (`legalEntity`) REFERENCES `legalentity` (`legalentity_id`),
   CONSTRAINT `fk_wrp_supervisor` FOREIGN KEY (`supervisorAuthority`) REFERENCES `legalentity` (`legalentity_id`),
   CONSTRAINT `fk_wrp_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Exportação de dados não seleccionada.
 
