@@ -222,6 +222,13 @@ def authentication():
         "utf-8"
     )
 
+    return_json = {
+        "QR_code_url": QR_code_url,
+        "presentation_id": response["transaction_id"]
+    }
+
+    return (return_json)
+
     return render_template(
         "pid_login_qr_code.html",
         url_data="deeplink_url",
@@ -252,26 +259,32 @@ def pid_authorization_get():
 @rpr.route("/getpidoid4vp", methods=["GET", "POST"])
 def getpidoid4vp():
 
-    if "response_code" in request.args and "session_id" in request.args:
+    # if "response_code" in request.args and "session_id" in request.args:
 
-        response_code = request.args.get("response_code")
-        presentation_id = oid4vp_requests[request.args.get("session_id")]["response"]["transaction_id"]
-        session["session_id"]=request.args.get("session_id")
+    #     response_code = request.args.get("response_code")
+    #     presentation_id = oid4vp_requests[request.args.get("session_id")]["response"]["transaction_id"]
+    #     session["session_id"]=request.args.get("session_id")
 
-        if oid4vp_requests[request.args.get("session_id")]["certificate_List"]:
-            if oid4vp_requests[request.args.get("session_id")]["certificate_List"] == True:
-                session["certificate_List"]=True
-        url = (
-            "https://" + cfgserv.url_verifier +"/ui/presentations/"
-            + presentation_id
-            + "?nonce=hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc="
-            + "&response_code=" + response_code
-        )
+    #     if oid4vp_requests[request.args.get("session_id")]["certificate_List"]:
+    #         if oid4vp_requests[request.args.get("session_id")]["certificate_List"] == True:
+    #             session["certificate_List"]=True
+    #     url = (
+    #         "https://" + cfgserv.url_verifier +"/ui/presentations/"
+    #         + presentation_id
+    #         + "?nonce=hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc="
+    #         + "&response_code=" + response_code
+    #     )
 
-    elif "presentation_id" in request.args:
+    if "presentation_id" not in request.args:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Missing presentation_id"
+        }, 400
+    else:
         presentation_id = request.args.get("presentation_id")
         url = "https://" + cfgserv.url_verifier +"/ui/presentations/" + presentation_id + "?nonce=hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc="
-
+    
     headers = {
     'Content-Type': 'application/json',
     }
@@ -294,11 +307,13 @@ def getpidoid4vp():
         for attribute, value in mdoc_json[doctype]:
             attributesForm.update({attribute:value})
 
-    temp_user_id=str(uuid.uuid4())
-    session[temp_user_id]= attributesForm
-    session["temp_user_id"] =temp_user_id
+    # temp_user_id=str(uuid.uuid4())
+    # session[temp_user_id]= attributesForm
+    # session["temp_user_id"] =temp_user_id
 
-    user=session[temp_user_id]
+    # user=session[temp_user_id]
+
+    user = attributesForm
 
     givenName=user["given_name"]
     surname=user["family_name"]
@@ -309,14 +324,14 @@ def getpidoid4vp():
     new_user = get_hash_user_pid.User(surname, givenName, birth_date, issuing_country, issuance_authority)
     hash_pid = new_user.hash
 
-    check_user = db.check_user(hash_pid, session["session_id"])
+    check_user = db.check_user(hash_pid, "123123")
     
     if(check_user == None):
-        db.insert_user(hash_pid, session["session_id"])
-        return render_template("user_check_hash.html", hash_pid=hash_pid)
+        db.insert_user(hash_pid, "123123")
+        return (hash_pid)
         # return redirect(url_for('RPR.menu_RP_user'))
     else:
-        return render_template("user_check_hash.html", hash_pid=hash_pid)
+        return (hash_pid)
         # return redirect(url_for('RPR.menu_RP_user'))
     
 
