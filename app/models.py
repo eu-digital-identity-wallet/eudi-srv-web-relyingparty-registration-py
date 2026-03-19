@@ -25,7 +25,7 @@ from db import get_db_connection as conn
 
 from app import logger
 
-def check_user(hash_pid, log_id):
+def check_user(hash_pid):
     try:
         connection = conn()
         if connection:
@@ -42,26 +42,24 @@ def check_user(hash_pid, log_id):
             
             if result:
                 user_id = result[0]
-                extra = {'code': log_id}
-                logger.info(f"User, {user_id}, already exists.", extra=extra)
+                logger.info(f"User, {user_id}, already exists.")
                 return user_id
             else:
-                extra = {'code': log_id}
-                logger.info("User with hash_pid not found.", extra=extra)
+                logger.info("User with hash_pid not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def insert_user(hash_pid, log_id):
+def insert_user(hash_pid):
     try:
         connection = conn()
         if connection:
@@ -73,19 +71,19 @@ def insert_user(hash_pid, log_id):
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"User successfully added. New User ID: {cursor.lastrowid}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"User successfully added. New User ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error inserting User: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error inserting User: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def insert_user_legalPerson(legalName, legalBasis, user_id, log_id):
+def insert_user_legalPerson(legalName, legalBasis, user_id):
     try:
         connection = conn()
         if connection:
@@ -97,19 +95,19 @@ def insert_user_legalPerson(legalName, legalBasis, user_id, log_id):
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"Legal Person successfully added. New Legal Person ID: {cursor.lastrowid}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"Legal Person successfully added. New Legal Person ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error inserting Legal Person: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error inserting Legal Person: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def insert_user_naturalPerson(givenName, familyName, dateOfBirth, placeOfBirth, user_id, log_id):
+def insert_user_naturalPerson(givenName, familyName, dateOfBirth, placeOfBirth, user_id):
     try:
         connection = conn()
         if connection:
@@ -121,19 +119,19 @@ def insert_user_naturalPerson(givenName, familyName, dateOfBirth, placeOfBirth, 
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"Natural Person successfully added. New Natural Person ID: {cursor.lastrowid}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"Natural Person successfully added. New Natural Person ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error inserting Natural Person: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error inserting Natural Person: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_legal_person_info(user_id, log_id):
+def get_legal_person_info(user_id):
     try:
         connection = conn()
         if connection:
@@ -152,20 +150,18 @@ def get_legal_person_info(user_id, log_id):
                 legal_person_data = [
                     {"legalperson_id": row[0], "legalBasis": row[1], "legalName": row[2]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"Legal Person found for the user_id: {user_id}", extra=extra)
+                ] 
+                logger.info(f"Legal Person found for the user_id: {user_id}")
                 return legal_person_data
             else:
-                extra = {'code': log_id}
-                logger.info("Legal Person with user_id not found.", extra=extra)
+                logger.info("Legal Person with user_id not found.")
                 return None
         else:
             return None
         
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
@@ -173,7 +169,7 @@ def get_legal_person_info(user_id, log_id):
             connection.close()
     
 
-def get_natural_person_info_le(user_id, log_id):
+def get_natural_person_info_le(user_id):
     try:
         connection = conn()
         if connection:
@@ -189,27 +185,25 @@ def get_natural_person_info_le(user_id, log_id):
             result = cursor.fetchone()
             
             if result: 
-                
-                extra = {'code': log_id} 
-                logger.info(f"natural Person found for the user_id: {user_id}", extra=extra)
+                 
+                logger.info(f"natural Person found for the user_id: {user_id}")
                 return result
             else:
-                extra = {'code': log_id}
-                logger.info("natural Person with user_id not found.", extra=extra)
+                logger.info("natural Person with user_id not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_natural_person_info(user_id, log_id):
+def get_natural_person_info(user_id):
     try:
         connection = conn()
         if connection:
@@ -228,27 +222,25 @@ def get_natural_person_info(user_id, log_id):
                 natural_person_data = [
                     {"naturalperson_id": row[0], "givenName": row[1], "familyName": row[2], "dateOfBirth": row[3], "placeOfBirth": row[4]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"natural Person found for the user_id: {user_id}", extra=extra)
+                ] 
+                logger.info(f"natural Person found for the user_id: {user_id}")
                 return natural_person_data
             else:
-                extra = {'code': log_id}
-                logger.info("natural Person with user_id not found.", extra=extra)
+                logger.info("natural Person with user_id not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def insert_legal_entity(postalAddress, country, email, phone, infoURI, identifier, identifierType, user_id, log_id):
+def insert_legal_entity(postalAddress, country, email, phone, infoURI, identifier, identifierType, user_id):
     try:
         connection = conn()
         if connection:
@@ -260,19 +252,19 @@ def insert_legal_entity(postalAddress, country, email, phone, infoURI, identifie
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"Legal Entity successfully added. New Legal Entity ID: {cursor.lastrowid}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"Legal Entity successfully added. New Legal Entity ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error inserting Legal Person: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error inserting Legal Person: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_legal_entity_info(user_id, log_id):
+def get_legal_entity_info(user_id):
     try:
         connection = conn()
         if connection:
@@ -291,27 +283,25 @@ def get_legal_entity_info(user_id, log_id):
                 legal_entity_data = [
                     {"legalentity_id": row[0], "legalperson_id": row[1], "naturalperson_id": row[2], "postalAddress": row[3], "country": row[4], "email": row[5], "phone": row[6], "infoURI": row[7], "identifier": row[8], "identifierType": row[9]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"Legal Entity found for the user_id: {user_id}", extra=extra)
+                ] 
+                logger.info(f"Legal Entity found for the user_id: {user_id}")
                 return legal_entity_data
             else:
-                extra = {'code': log_id}
-                logger.info("Legal Entity with user_id not found.", extra=extra)
+                logger.info("Legal Entity with user_id not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_check_legal_entity_info(user_id, log_id):
+def get_check_legal_entity_info(user_id):
     try:
         connection = conn()
         if connection:
@@ -330,27 +320,25 @@ def get_check_legal_entity_info(user_id, log_id):
                 legal_entity_data = [
                     {"legalentity": row[0]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"Legal Entity found for the user_id: {user_id}", extra=extra)
+                ] 
+                logger.info(f"Legal Entity found for the user_id: {user_id}")
                 return legal_entity_data
             else:
-                extra = {'code': log_id}
-                logger.info("Legal Entity with user_id not found.", extra=extra)
+                logger.info("Legal Entity with user_id not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_rp_info(user_id, log_id):
+def get_rp_info(user_id):
     try:
         connection = conn()
         if connection:
@@ -369,27 +357,25 @@ def get_rp_info(user_id, log_id):
                 rp_data = [
                     {"wrp_id": row[0], "tradeName": row[1], "supportURI": row[2], "srvDescription": row[3], "intended_use": row[4], "isPSB": row[5], "entitlement": row[6], "providesAttestations": row[7], "supervisorAuthority": row[8], "isIntermediary": row[9], "usesIntermediary": row[10], "registryURI": row[11], "providerType": row[12], "x5c": row[13], "typePolicy": row[14], "policyURI": row[15], "legalEntity": row[16]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"RP found for the user_id: {user_id}", extra=extra)
+                ] 
+                logger.info(f"RP found for the user_id: {user_id}")
                 return rp_data
             else:
-                extra = {'code': log_id}
-                logger.info("RP with user_id not found.", extra=extra)
+                logger.info("RP with user_id not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def insert_RP(tradeName, supportURI, srvDescription, entitlement, registryURI, typePolicy, policyURI, x5c, user_id, log_id):
+def insert_RP(tradeName, supportURI, srvDescription, entitlement, registryURI, typePolicy, policyURI, x5c, user_id):
     try:
         connection = conn()
         if connection:
@@ -401,19 +387,19 @@ def insert_RP(tradeName, supportURI, srvDescription, entitlement, registryURI, t
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"Wallet Relying Party successfully added. New Wallet Relying Party ID: {cursor.lastrowid}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"Wallet Relying Party successfully added. New Wallet Relying Party ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error inserting Legal Person: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error inserting Legal Person: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_intended_use_info(user_id, log_id):
+def get_intended_use_info(user_id):
     try:
         connection = conn()
         if connection:
@@ -432,27 +418,25 @@ def get_intended_use_info(user_id, log_id):
                 intended_use_data = [
                     {"intendeduse_id": row[0], "createdAt": row[1], "revokedAt": row[2], "intendedUseIdentifier": row[3], "type_policy": row[4], "policy_uri": row[5], "purpose": row[6], "credential_id": row[7], "user_id": row[8], "wrp": row[9]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"Intended Use found for the user_id: {user_id}", extra=extra)
+                ] 
+                logger.info(f"Intended Use found for the user_id: {user_id}")
                 return intended_use_data
             else:
-                extra = {'code': log_id}
-                logger.info("Intended Use with user_id not found.", extra=extra)
+                logger.info("Intended Use with user_id not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_credential_info(user_id, log_id):
+def get_credential_info(user_id):
     try:
         connection = conn()
         if connection:
@@ -471,20 +455,18 @@ def get_credential_info(user_id, log_id):
                 credential_data = [
                     {"credential_id": row[0], "name": row[1], "format": row[2], "meta": row[3], "path": row[4], "credentialValues": row[5], "user_id": row[6], "intendedUse_id": row[7]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"Credentail found for the user_id: {user_id}", extra=extra)
+                ] 
+                logger.info(f"Credentail found for the user_id: {user_id}")
                 return credential_data
             else:
-                extra = {'code': log_id}
-                logger.info("Credentail with user_id not found.", extra=extra)
+                logger.info("Credentail with user_id not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
@@ -492,7 +474,7 @@ def get_credential_info(user_id, log_id):
             connection.close()
 
 
-def insert_intended_use(createAt, revokeAt, intendedUseIdentifier, type_policy, policy_uri, purpose, user_id, log_id):
+def insert_intended_use(createAt, revokeAt, intendedUseIdentifier, type_policy, policy_uri, purpose, user_id):
     try:
         connection = conn()
         if connection:
@@ -504,19 +486,19 @@ def insert_intended_use(createAt, revokeAt, intendedUseIdentifier, type_policy, 
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"Intended Use successfully added. New Intended Use ID: {cursor.lastrowid}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"Intended Use successfully added. New Intended Use ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error inserting Intended Use: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error inserting Intended Use: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def insert_credential(name, format, meta, path, credentialValues, user_id, log_id):
+def insert_credential(name, format, meta, path, credentialValues, user_id):
     try:
         connection = conn()
         if connection:
@@ -528,19 +510,19 @@ def insert_credential(name, format, meta, path, credentialValues, user_id, log_i
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"Credential successfully added. New Credential ID: {cursor.lastrowid}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"Credential successfully added. New Credential ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error inserting Credential: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error inserting Credential: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def update_naturalPerson_legal_entity(natural_id, legalEntity_id, log_id):
+def update_naturalPerson_legal_entity(natural_id, legalEntity_id):
     try:
         connection = conn()
         if connection:
@@ -555,19 +537,19 @@ def update_naturalPerson_legal_entity(natural_id, legalEntity_id, log_id):
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"Legal Entity successfully updated: {id}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"Legal Entity successfully updated: {id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error updating Legal Entity: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error updating Legal Entity: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def remove_naturalPerson_legal_entity(legalEntity_id, log_id):
+def remove_naturalPerson_legal_entity(legalEntity_id):
     try:
         connection = conn()
         if connection:
@@ -582,20 +564,20 @@ def remove_naturalPerson_legal_entity(legalEntity_id, log_id):
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"Legal Entity successfully updated: {id}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"Legal Entity successfully updated: {id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error updating Legal Entity: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error updating Legal Entity: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
 
-def get_check_legal_entity_info_lp(user_id, log_id):
+def get_check_legal_entity_info_lp(user_id):
     try:
         connection = conn()
         if connection:
@@ -614,27 +596,25 @@ def get_check_legal_entity_info_lp(user_id, log_id):
                 legal_entity_data = [
                     {"naturalperson_id": row[0]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"Legal Entity found for the user_id: {user_id}", extra=extra)
+                ] 
+                logger.info(f"Legal Entity found for the user_id: {user_id}")
                 return legal_entity_data
             else:
-                extra = {'code': log_id}
-                logger.info("Legal Entity with user_id not found.", extra=extra)
+                logger.info("Legal Entity with user_id not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def remove_legalPerson_legal_entity(legalEntity_id, log_id):
+def remove_legalPerson_legal_entity(legalEntity_id):
     try:
         connection = conn()
         if connection:
@@ -649,19 +629,19 @@ def remove_legalPerson_legal_entity(legalEntity_id, log_id):
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"Legal Entity successfully updated: {id}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"Legal Entity successfully updated: {id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error updating Legal Entity: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error updating Legal Entity: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def update_legalPerson_legal_entity(natural_id, legalEntity_id, log_id):
+def update_legalPerson_legal_entity(natural_id, legalEntity_id):
     try:
         connection = conn()
         if connection:
@@ -676,19 +656,19 @@ def update_legalPerson_legal_entity(natural_id, legalEntity_id, log_id):
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"Legal Entity successfully updated: {id}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"Legal Entity successfully updated: {id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error updating Legal Entity: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error updating Legal Entity: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_legal_person_info_le(user_id, log_id):
+def get_legal_person_info_le(user_id):
     try:
         connection = conn()
         if connection:
@@ -704,20 +684,18 @@ def get_legal_person_info_le(user_id, log_id):
             result = cursor.fetchone()
             
             if result: 
-                
-                extra = {'code': log_id} 
-                logger.info(f"Legal Person found for the user_id: {user_id}", extra=extra)
+                 
+                logger.info(f"Legal Person found for the user_id: {user_id}")
                 return result
             else:
-                extra = {'code': log_id}
-                logger.info("Legal Person with user_id not found.", extra=extra)
+                logger.info("Legal Person with user_id not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
@@ -725,7 +703,7 @@ def get_legal_person_info_le(user_id, log_id):
             connection.close()
 
 
-def get_wrp_info_le(user_id, log_id):
+def get_wrp_info_le(user_id):
     try:
         connection = conn()
         if connection:
@@ -741,20 +719,18 @@ def get_wrp_info_le(user_id, log_id):
             result = cursor.fetchone()
             
             if result: 
-                
-                extra = {'code': log_id} 
-                logger.info(f"Legal Person found for the user_id: {user_id}", extra=extra)
+                 
+                logger.info(f"Legal Person found for the user_id: {user_id}")
                 return result
             else:
-                extra = {'code': log_id}
-                logger.info("Legal Person with user_id not found.", extra=extra)
+                logger.info("Legal Person with user_id not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
@@ -762,7 +738,7 @@ def get_wrp_info_le(user_id, log_id):
             connection.close()
 
 
-def get_legal_entity_info_rp(user_id, log_id):
+def get_legal_entity_info_rp(user_id):
     try:
         connection = conn()
         if connection:
@@ -777,27 +753,25 @@ def get_legal_entity_info_rp(user_id, log_id):
             cursor.execute(select_query, (user_id,))
             result = cursor.fetchone()
             
-            if result:
-                extra = {'code': log_id} 
-                logger.info(f"Legal Entity found for the user_id: {user_id}", extra=extra)
+            if result: 
+                logger.info(f"Legal Entity found for the user_id: {user_id}")
                 return result
             else:
-                extra = {'code': log_id}
-                logger.info("Legal Entity with user_id not found.", extra=extra)
+                logger.info("Legal Entity with user_id not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_check_iu_info(user_id, log_id):
+def get_check_iu_info(user_id):
     try:
         connection = conn()
         if connection:
@@ -816,27 +790,25 @@ def get_check_iu_info(user_id, log_id):
                 rp_data = [
                     {"intendeduse_id": row[0]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"iu found for the user_id: {user_id}", extra=extra)
+                ] 
+                logger.info(f"iu found for the user_id: {user_id}")
                 return rp_data
             else:
-                extra = {'code': log_id}
-                logger.info("iu with user_id not found.", extra=extra)
+                logger.info("iu with user_id not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def remove_legal_entity_wrp(id, log_id):
+def remove_legal_entity_wrp(id):
     try:
         connection = conn()
         if connection:
@@ -851,19 +823,19 @@ def remove_legal_entity_wrp(id, log_id):
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"wrp successfully updated: {id}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"wrp successfully updated: {id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error updating wrp: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error updating wrp: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def update_wrp_legal_entity(le, wrp, log_id):
+def update_wrp_legal_entity(le, wrp):
     try:
         connection = conn()
         if connection:
@@ -878,19 +850,19 @@ def update_wrp_legal_entity(le, wrp, log_id):
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"wrp successfully updated: {id}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"wrp successfully updated: {id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error updating wrp: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error updating wrp: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_iu_info_rp(user_id, log_id):
+def get_iu_info_rp(user_id):
     try:
         connection = conn()
         if connection:
@@ -906,27 +878,25 @@ def get_iu_info_rp(user_id, log_id):
             result = cursor.fetchone()
             
             if result: 
-                
-                extra = {'code': log_id} 
-                logger.info(f"WRP found for the user_id: {user_id}", extra=extra)
+                 
+                logger.info(f"WRP found for the user_id: {user_id}")
                 return result
             else:
-                extra = {'code': log_id}
-                logger.info("WRP with user_id not found.", extra=extra)
+                logger.info("WRP with user_id not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_check_iu_info_rp(wrp_id, log_id):
+def get_check_iu_info_rp(wrp_id):
     try:
         connection = conn()
         if connection:
@@ -945,27 +915,25 @@ def get_check_iu_info_rp(wrp_id, log_id):
                 rp_data = [
                     {"intendeduse_id": row[0]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"Intended_Use found for the wrp_id: {wrp_id}", extra=extra)
+                ] 
+                logger.info(f"Intended_Use found for the wrp_id: {wrp_id}")
                 return rp_data
             else:
-                extra = {'code': log_id}
-                logger.info("Intended_Use with wrp_id not found.", extra=extra)
+                logger.info("Intended_Use with wrp_id not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def remove_wrp_iu(id, log_id):
+def remove_wrp_iu(id):
     try:
         connection = conn()
         if connection:
@@ -980,19 +948,19 @@ def remove_wrp_iu(id, log_id):
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"Intended Use successfully updated: {id}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"Intended Use successfully updated: {id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error updating Intended Use: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error updating Intended Use: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def update_iu_wrp(wrp, iu, log_id):
+def update_iu_wrp(wrp, iu):
     try:
         connection = conn()
         if connection:
@@ -1007,19 +975,19 @@ def update_iu_wrp(wrp, iu, log_id):
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"Intended Use successfully updated: {id}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"Intended Use successfully updated: {id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error updating Intended Use: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error updating Intended Use: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_iu_info_cred(user_id, log_id):
+def get_iu_info_cred(user_id):
     try:
         connection = conn()
         if connection:
@@ -1034,27 +1002,25 @@ def get_iu_info_cred(user_id, log_id):
             cursor.execute(select_query, (user_id,))
             result = cursor.fetchone()
             
-            if result:
-                extra = {'code': log_id} 
-                logger.info(f"intendeduse found for the user_id: {user_id}", extra=extra)
+            if result: 
+                logger.info(f"intendeduse found for the user_id: {user_id}")
                 return result
             else:
-                extra = {'code': log_id}
-                logger.info("intendeduse with user_id not found.", extra=extra)
+                logger.info("intendeduse with user_id not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_check_cred_info(user_id, log_id):
+def get_check_cred_info(user_id):
     try:
         connection = conn()
         if connection:
@@ -1073,27 +1039,25 @@ def get_check_cred_info(user_id, log_id):
                 rp_data = [
                     {"wrp_id": row[0]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"WRP found for the user_id: {user_id}", extra=extra)
+                ] 
+                logger.info(f"WRP found for the user_id: {user_id}")
                 return rp_data
             else:
-                extra = {'code': log_id}
-                logger.info("WRP with user_id not found.", extra=extra)
+                logger.info("WRP with user_id not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def update_iu_cred(iu, cred, log_id):
+def update_iu_cred(iu, cred):
     try:
         connection = conn()
         if connection:
@@ -1108,19 +1072,19 @@ def update_iu_cred(iu, cred, log_id):
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"Credential successfully updated: {id}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"Credential successfully updated: {id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error updating Credential: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error updating Credential: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def remove_cred_iu(id, log_id):
+def remove_cred_iu(id):
     try:
         connection = conn()
         if connection:
@@ -1135,20 +1099,20 @@ def remove_cred_iu(id, log_id):
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"iu successfully updated: {id}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"iu successfully updated: {id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error updating iu: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error updating iu: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
 
-def get_legal_entity_info_edit(le_id, log_id):
+def get_legal_entity_info_edit(le_id):
     try:
         connection = conn()
         if connection:
@@ -1167,27 +1131,25 @@ def get_legal_entity_info_edit(le_id, log_id):
                 legal_entity_data = [
                     {"postalAddress": row[0], "country": row[1], "email": row[2], "phone": row[3], "infoURI": row[4], "identifier": row[5], "identifierType": row[6]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"Legal Entity found: {le_id}", extra=extra)
+                ] 
+                logger.info(f"Legal Entity found: {le_id}")
                 return legal_entity_data
             else:
-                extra = {'code': log_id}
-                logger.info("Legal Entity not found.", extra=extra)
+                logger.info("Legal Entity not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking legal Entity: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking legal Entity: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def update_legal_entity_edit(grouped, legal_entity_id, log_id):
+def update_legal_entity_edit(grouped, legal_entity_id):
     try:
         connection = conn()
         if connection:
@@ -1202,19 +1164,19 @@ def update_legal_entity_edit(grouped, legal_entity_id, log_id):
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"Legal Entity successfully updated: {id}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"Legal Entity successfully updated: {id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error updating Legal Entity: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error updating Legal Entity: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_rp_info_edit(rp_id, log_id):
+def get_rp_info_edit(rp_id):
     try:
         connection = conn()
         if connection:
@@ -1233,27 +1195,25 @@ def get_rp_info_edit(rp_id, log_id):
                 rp_data = [
                     {"tradeName": row[0], "supportURI": row[1], "registryURI": row[2], "policyURI": row[3], "typePolicy": row[4]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"RP found: {rp_id}", extra=extra)
+                ] 
+                logger.info(f"RP found: {rp_id}")
                 return rp_data
             else:
-                extra = {'code': log_id}
-                logger.info("RP not found.", extra=extra)
+                logger.info("RP not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking RP: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking RP: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def update_RP_edit(grouped, rp_id, log_id):
+def update_RP_edit(grouped, rp_id):
     try:
         connection = conn()
         if connection:
@@ -1268,19 +1228,19 @@ def update_RP_edit(grouped, rp_id, log_id):
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"RP successfully updated: {id}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"RP successfully updated: {id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error updating RP: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error updating RP: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
  
-def get_iu_info_edit(iu_id, log_id):
+def get_iu_info_edit(iu_id):
     try:
         connection = conn()
         if connection:
@@ -1299,27 +1259,25 @@ def get_iu_info_edit(iu_id, log_id):
                 rp_data = [
                     {"intendedUseIdentifier": row[0], "type_policy": row[1], "policy_uri": row[2]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"Intended Use found: {iu_id}", extra=extra)
+                ] 
+                logger.info(f"Intended Use found: {iu_id}")
                 return rp_data
             else:
-                extra = {'code': log_id}
-                logger.info("Intended Use not found.", extra=extra)
+                logger.info("Intended Use not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking Intended Use: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking Intended Use: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def update_iu_edit(grouped, iu_id, log_id):
+def update_iu_edit(grouped, iu_id):
     try:
         connection = conn()
         if connection:
@@ -1334,13 +1292,13 @@ def update_iu_edit(grouped, iu_id, log_id):
             
             connection.commit()
             
-            extra = {'code': log_id} 
-            logger.info(f"Intended Use successfully updated: {id}", extra=extra)
+            extra = {'code'} 
+            logger.info(f"Intended Use successfully updated: {id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error updating Intended Use: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error updating Intended Use: {e}")
     finally:
         if connection:
             cursor.close()
@@ -1364,12 +1322,10 @@ def get_all_rp_inf():
                 rp_data = [
                     {"tradeName": row[0], "srvDescription": row[1], "entitlement": row[2], "providesAttestations": row[3], "isIntermediary": row[4], "usesIntermediary": row[5], "policyURI": row[6]} 
                     for row in result
-                ]
-                extra = {'code'} 
+                ] 
                 logger.info(f"All RP found")
                 return rp_data
             else:
-                extra = {'code'}
                 logger.info("Not all RP found.")
                 return None
         else:
@@ -1384,7 +1340,7 @@ def get_all_rp_inf():
             connection.close()
 
 
-def get_rp_certificate(rp_id, log_id):
+def get_rp_certificate(rp_id):
     try:
         connection = conn()
         if connection:
@@ -1403,19 +1359,17 @@ def get_rp_certificate(rp_id, log_id):
                 rp_data = [
                     {"wrp_id": row[0], "tradeName": row[1], "supportURI": row[2], "srvDescription": row[3], "intended_use": row[4], "isPSB": row[5], "entitlement": row[6], "providesAttestations": row[7], "supervisorAuthority": row[8], "isIntermediary": row[9], "usesIntermediary": row[10], "registryURI": row[11], "providerType": row[12], "x5c": row[13], "typePolicy": row[14], "policyURI": row[15], "legalEntity": row[16], "user_id": row[17]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"RP {rp_id} found", extra=extra)
+                ] 
+                logger.info(f"RP {rp_id} found")
                 return rp_data
-            else:
-                extra = {'code': log_id} 
-                logger.info("Not all RP found.", extra=extra)
+            else: 
+                logger.info("Not all RP found.")
                 return None
         else:
             return None
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error checking: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error checking: {e}")
         return None
     finally:
         if connection:
@@ -1423,7 +1377,7 @@ def get_rp_certificate(rp_id, log_id):
             connection.close()
 
 
-def get_legal_person(legalperson_id, log_id):
+def get_legal_person(legalperson_id):
     try:
         connection = conn()
         if connection:
@@ -1442,19 +1396,17 @@ def get_legal_person(legalperson_id, log_id):
                 legal_person_data = [
                     {"legalperson_id": row[0], "legalBasis": row[1], "legalName": row[2], "user_id": row[3]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"legal person {legalperson_id} found", extra=extra)
+                ] 
+                logger.info(f"legal person {legalperson_id} found")
                 return legal_person_data
-            else:
-                extra = {'code': log_id} 
-                logger.info("No Legal Person found.", extra=extra)
+            else: 
+                logger.info("No Legal Person found.")
                 return None
         else:
             return None
     except pymysql.MySQLError as e:
-        extra = {'code': log_id} 
-        logger.error(f"Error checking: {e}", extra=extra)
+        extra = {'code'} 
+        logger.error(f"Error checking: {e}")
         return None
     finally:
         if connection:
@@ -1462,7 +1414,7 @@ def get_legal_person(legalperson_id, log_id):
             connection.close()
 
 
-def get_legal_entity(le_id, log_id):
+def get_legal_entity(le_id):
     try:
         connection = conn()
         if connection:
@@ -1481,27 +1433,25 @@ def get_legal_entity(le_id, log_id):
                 legal_entity_data = [
                     {"legalentity_id": row[0], "legalperson_id": row[1], "naturalperson_id": row[2], "postalAddress": row[3], "country": row[4], "email": row[5], "phone": row[6], "infoURI": row[7], "identifier": row[8], "identifierType": row[9], "user_id": row[10]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"Legal Entity found: {le_id}", extra=extra)
+                ] 
+                logger.info(f"Legal Entity found: {le_id}")
                 return legal_entity_data
             else:
-                extra = {'code': log_id}
-                logger.info("Legal Entity not found.", extra=extra)
+                logger.info("Legal Entity not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking legal Entity: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking legal Entity: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_natural_person(natural_person, log_id):
+def get_natural_person(natural_person):
     try:
         connection = conn()
         if connection:
@@ -1520,20 +1470,18 @@ def get_natural_person(natural_person, log_id):
                 natural_person_data = [
                     {"naturalperson_id": row[0], "givenName": row[1], "familyName": row[2], "dateOfBirth": row[3], "placeOfBirth": row[4], "user_id": row[5]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"Natural Person found: {natural_person}", extra=extra)
+                ] 
+                logger.info(f"Natural Person found: {natural_person}")
                 return natural_person_data
             else:
-                extra = {'code': log_id}
-                logger.info("Natural Person not found.", extra=extra)
+                logger.info("Natural Person not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking Natural Person: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking Natural Person: {e}")
         return None
     finally:
         if connection:
@@ -1541,7 +1489,7 @@ def get_natural_person(natural_person, log_id):
             connection.close()
 
 
-def get_intended_use(intendeduse_id, log_id):
+def get_intended_use(intendeduse_id):
     try:
         connection = conn()
         if connection:
@@ -1560,27 +1508,25 @@ def get_intended_use(intendeduse_id, log_id):
                 intended_use_data = [
                     {"intendeduse_id": row[0], "createdAt": row[1], "revokedAt": row[2], "intendedUseIdentifier": row[3], "type_policy": row[4], "policy_uri": row[5], "purpose": row[6], "credential_id": row[7], "user_id": row[8], "wrp": row[9]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"Intended Use found: {intendeduse_id}", extra=extra)
+                ] 
+                logger.info(f"Intended Use found: {intendeduse_id}")
                 return intended_use_data
             else:
-                extra = {'code': log_id}
-                logger.info("Intended Use not found.", extra=extra)
+                logger.info("Intended Use not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_credential(iu_id, log_id):
+def get_credential(iu_id):
     try:
         connection = conn()
         if connection:
@@ -1599,20 +1545,18 @@ def get_credential(iu_id, log_id):
                 credential_data = [
                     {"credential_id": row[0], "name": row[1], "format": row[2], "meta": row[3], "path": row[4], "credentialValues": row[5], "user_id": row[6]} 
                     for row in result
-                ]
-                extra = {'code': log_id} 
-                logger.info(f"Credentail found: {iu_id}", extra=extra)
+                ] 
+                logger.info(f"Credentail found: {iu_id}")
                 return credential_data
             else:
-                extra = {'code': log_id}
-                logger.info("Credentail not found.", extra=extra)
+                logger.info("Credentail not found.")
                 return None
         else:
             return None
 
     except pymysql.MySQLError as e:
-        extra = {'code': log_id}
-        logger.error(f"Error checking user: {e}", extra=extra)
+        extra = {'code'}
+        logger.error(f"Error checking user: {e}")
         return None
     finally:
         if connection:
