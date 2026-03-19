@@ -108,8 +108,33 @@ def initial_page():
     return render_template('initial_page.html', redirect_url= cfgserv.service_url, pid_auth = cfgserv.service_url + "authentication")
 
 
-@rpr.route("/authentication", methods=["GET","POST"])
+@rpr.route("/authentication", methods=["GET"])
 def authentication():
+    """
+Start Authentication Flow
+---
+tags:
+  - Authentication
+consumes:
+  - application/json
+produces:
+  - application/json
+
+responses:
+  200:
+    description: Authentication initiated successfully
+    schema:
+      type: object
+      properties:
+        QR_code_url:
+          type: string
+          description: URL to generate/display the QR code for authentication
+          example: https://example.com/qr/123456
+        presentation_id:
+          type: string
+          description: Transaction identifier for the authentication session
+          example: 550e8400-e29b-41d4-a716-446655440000
+"""
 
     url = "https://" + cfgserv.url_verifier +"/ui/presentations"
     payload ={
@@ -239,6 +264,45 @@ def authentication():
 
 @rpr.route("/pid_authorization")
 def pid_authorization_get():
+    """
+PID Authorization
+---
+tags:
+  - Authentication
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: query
+    name: presentation_id
+    required: true
+    type: string
+    description: Transaction identifier received from the authentication step
+    example: 550e8400-e29b-41d4-a716-446655440000
+
+responses:
+  200:
+    description: Authorization successful
+    schema:
+      type: object
+      properties:
+        message:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Sucess
+
+  500:
+    description: Error during authorization request
+    schema:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "500"
+"""
 
     presentation_id= request.args.get("presentation_id")
 
@@ -258,6 +322,45 @@ def pid_authorization_get():
     
 @rpr.route("/getpidoid4vp", methods=["GET", "POST"])
 def getpidoid4vp():
+    """
+Get PID (OID4VP)
+---
+tags:
+  - Authentication
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: query
+    name: presentation_id
+    required: true
+    type: string
+    description: Transaction identifier received from the authentication step
+    example: 550e8400-e29b-41d4-a716-446655440000
+
+responses:
+  200:
+    description: PID retrieved successfully
+    schema:
+      type: string
+      example: abc123hashpid
+
+  400:
+    description: Missing presentation_id
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing presentation_id
+"""
 
     # if "response_code" in request.args and "session_id" in request.args:
 
@@ -3216,6 +3319,12 @@ parameters:
           description: ID of the Relying Party whose certificate will be retrieved
           example: 2
 
+        password:
+            type: string
+            format: password
+            description: Password required
+            example: example-password
+
 responses:
   200:
     description: Certificate file successfully retrieved
@@ -3433,10 +3542,12 @@ responses:
 
         hash_pid = data.get("hash_pid")
         relying_party = data.get("relying_party")
+        password = data.get("password")
 
         required_fields = {
             "hash_pid": hash_pid,
             "relying_party": relying_party,
+            "password": password
         }
 
         missing_fields = [name for name, value in required_fields.items() if not value]
@@ -3508,6 +3619,14 @@ responses:
         supportURI=RP[0]["supportURI"]
         legal_entity = db.get_legal_entity(RP[0]["supervisorAuthority"], session_id)
 
+        if legal_entity is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Relying Parties do not have associated Legal Entity."
+            }, 400
+
         #dados da legalEntity
         #caso for natural person é serialNumber no caso de uma legal person organizationIdentifier
         identifier=legal_entity[0]["identifier"]
@@ -3539,7 +3658,6 @@ responses:
         isPSB= False
 #### ------
         # password=request.form.get("Password")
-        password = "test"
 
         certificateRequest= generateCertificateRequest(priv_key, tradeName, country, supportURI)
 
@@ -4876,8 +4994,32 @@ responses:
     # credentials_data=get_credential_data()
 
         RP_data = db.get_rp_certificate(intended_use_data[0]["wrp"], session_id)
+        if RP_data is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Intended Use do not have associated Relying Party."
+            }, 400
+
         legal_entity_data = db.get_legal_entity(RP_data[0]["supervisorAuthority"], session_id)
+        if legal_entity_data is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Relying Parties do not have associated Legal Entity."
+            }, 400
+
         credentials_data = db.get_credential(intended_use_data[0]["intendeduse_id"], session_id)
+        if credentials_data is None:
+            
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "Intended Use do not have associated Credential."
+            }, 400
+
 
     # #if legal person
     # legal_person_data=get_legal_person_data()

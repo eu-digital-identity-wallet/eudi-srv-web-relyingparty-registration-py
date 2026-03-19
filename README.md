@@ -270,6 +270,105 @@ Additionally, a usage guide will be available at the following route:
 
 This page will contain an explanation on how to correctly use the different endpoints, including recommended request formats and practical examples.
 
+## Authentication – Start Authentication Flow
+
+This endpoint initiates the authentication process and generates a QR code for the user.
+
+It is intended to be used to:
+  * Start the authentication flow
+  * Generate a QR code to be scanned by the user's wallet
+  * Obtain the presentation_id required for the next steps
+
+### Endpoint
+``` code
+  /authentication
+```
+### Arguments
+No arguments required.
+
+### Example Response
+``` code
+{
+  "QR_code_url": "https://example.com/qr/123456",
+  "presentation_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+``` 
+### Notes
+  * This endpoint does not require any input parameters.
+  * The QR_code_url should be used to display the QR code to the user.
+  * The presentation_id is required for the next steps of the authentication flow.
+
+## Authentication – PID Authorization
+
+This endpoint checks the status of the authentication process.
+
+It is intended to be used to:
+  * Validate if the user has completed the authentication
+  * Poll the authentication status using the presentation_id
+
+### Endpoint
+``` code
+  /pid_authorization
+```
+
+### Arguments (Query Parameters)
+| Name              | Description                                     |
+| ----------------- | ----------------------------------------------- |
+| `presentation_id` | Transaction identifier from authentication step |
+
+### Example Request
+``` code
+/pid_authorization?presentation_id=550e8400-e29b-41d4-a716-446655440000
+```
+
+### Example Response
+``` code
+  {
+    "message": {
+      "message": "Sucess"
+    }
+  }
+```
+
+### Notes
+  * The presentation_id parameter is mandatory.
+  * You must wait until the response returns "Sucess" before proceeding.
+  * This endpoint should be called repeatedly until authentication is completed.
+
+## Authentication – Retrieve hash_pid
+
+This endpoint retrieves the hash_pid after successful authentication.
+
+It is intended to be used to:
+  * Obtain the authenticated user identifier (hash_pid)
+  * Use this identifier in all subsequent API requests
+
+### Endpoint
+``` code
+  /getpidoid4vp
+```
+
+Arguments (Query Parameters)
+| Name              | Description                                     |
+| ----------------- | ----------------------------------------------- |
+| `presentation_id` | Transaction identifier from authentication step |
+
+### Example Request
+``` code
+  /getpidoid4vp?presentation_id=550e8400-e29b-41d4-a716-446655440000
+``` code
+
+### Example Response
+``` code
+  abc123hashpid
+```
+
+### Notes
+  * The presentation_id parameter is mandatory.
+  * The returned value is a plain string (hash_pid).
+  * The hash_pid is required for all other endpoints in the system.
+  * You should store this value securely, as it represents the authenticated user.
+
 ## Create a Natural Person
 
 This route is responsible for creating and storing a new Natural Person in the system.

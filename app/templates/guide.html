@@ -62,6 +62,8 @@
     <div class="buttons">
         <button id="prevBtn" onclick="prevStep()">Previous</button>
         <button id="nextBtn" onclick="nextStep()">Next</button>
+        <button id="home" onclick="home()">Back to Home</button>
+
     </div>
 
     <div class="step active">
@@ -85,33 +87,106 @@
     <div class="step">
         <h2>Step 1 - User Registration</h2>
         <p>
-            To start using the service, you must first register an user.
+            To start using the service, you must first register a user.
             <br>
             Go to:
             <br>
             <b>https://dev.registry.serviceproviders.eudiw.dev/authentication</b>
-            <br>
-            You can authenticate using your EUDI Wallet in one of the following ways:<br>
-                * <b>Scan the QR code</b> displayed on the page using a device that has the wallet installed.<br>
-                * If you are accessing the page from a <b>device where the wallet</b> is already installed, simply <b>click "Request"</b> to initiate the authentication process.<br>
-            <br>
-            If everything goes correctly, a page will be displayed showing your hash_pid.
-            <br>
-            This value is your unique identifier for authentication and must be used when making requests to protected API endpoints.
+        </p>
+
+        <p>
+            This endpoint will initiate the authentication process and return a JSON response containing:
+        </p>
+
+        <pre><code>
+        {
+            "QR_code_url": "https://example.com/qr/123456",
+            "presentation_id": "550e8400-e29b-41d4-a716-446655440000"
+        }
+        </code></pre>
+
+        <p>
+            <b>Notes:</b><br>
+            - The <b>QR_code_url</b> should be used to display the QR code to the user for authentication.<br>
+            - The <b>presentation_id</b> is required for the next steps of the authentication flow.
         </p>
         
-        <h2>Step 1 - Get Hash Pid</h2>
+    </div>
+        
+    <div class="step">
+        <h2>Step 2 - PID Authorization</h2>
         <p>
-            Additionally, this step can also be used if you already have your wallet registered in the system.
+            After receiving the <b>presentation_id</b> from Step 1, you must call the following endpoint:
             <br>
-            By authenticating through this page, you will be able to <b>obtain your hash_pid</b>, which is required to access and use the available API endpoints.
+            <b>/pid_authorization</b>
+        </p>
+
+        <p>
+            This request must include the <b>presentation_id</b> as a query parameter.
+        </p>
+
+        <p>
+            Example request:
+        </p>
+
+        <pre><code>
+            /pid_authorization?presentation_id=&lt;presentation_id from step 1&gt;
+        </code></pre>
+
+        <p>
+            You must wait until the authentication process is completed successfully.
+            Once successful, the endpoint will return:
+        </p>
+
+        <pre><code>
+            {
+                "message": {
+                    "message": "Sucess"
+                }
+            }
+        </code></pre>
+
+        <p>
+            Only after receiving this response should you proceed to the next step.
+        </p>
+    </div>
+    <div class="step">
+        <h2>Step 3 - Retrieve hash_pid</h2>
+        <p>
+            After successful authorization in Step 2, you must call the following endpoint:
             <br>
-            The hash_pid acts as your authentication identifier and must be included when making requests to protected endpoints.
+            <b>/getpidoid4vp</b>
+        </p>
+
+        <p>
+            This request must include the <b>presentation_id</b> as a query parameter, just like in the previous step.
+        </p>
+
+        <p>
+            Example request:
+        </p>
+
+        <pre><code>
+            /getpidoid4vp?presentation_id=&lt;presentation_id from step 1&gt;
+        </code></pre>
+
+        <p>
+            If everything is successful, the endpoint will return the <b>hash_pid</b>:
+        </p>
+
+        <pre><code>
+            abc123hashpid
+        </code></pre>
+
+        <p>
+            <b>Notes:</b><br>
+            - The <b>hash_pid</b> is required for all subsequent endpoints.<br>
+            - You should store this value securely, as it represents the authenticated user.
         </p>
     </div>
 
     <div class="step">
-        <h2>Step 2 - Create a Person</h2>
+        <h2>Step 4 - Create a Person</h2>
         <p>
             Once you have your <b>hash_pid</b>, you can start using all available endpoints.
             The first step is to <b>create a person</b>, which can either be a <b>Natural Person</b> or a <b>Legal Person</b>, each with its own specific attributes.
@@ -159,7 +234,7 @@
     </div>
 
     <div class="step">
-        <h2>Step 3 - Creating a Legal Entity</h2>
+        <h2>Step 5 - Creating a Legal Entity</h2>
         <p>
             Use the endpoint <b>/legal_entity/add_legal_entity_db</b> to create a Legal Entity.  
             Send the following JSON in the request body:
@@ -183,7 +258,7 @@
     </div>
 
     <div class="step">
-        <h2>Step 4 - Listing Persons and Legal Entities</h2>
+        <h2>Step 6 - Listing Persons and Legal Entities</h2>
         <p>
             Now that you have created your Natural Persons or Legal Persons and Legal Entities, the next step is to list them and prepare for establishing relationships.
         </p>
@@ -226,7 +301,7 @@
         </p>
     </div>
     <div class="step">
-        <h2>Step 5 - Associating Legal Entities with Persons</h2>
+        <h2>Step 7 - Associating Legal Entities with Persons</h2>
         <p>
             After listing your Natural Persons, Legal Persons and Legal Entities in Step 4, the next step is to establish associations between them.<br>  
             You can associate either a Legal Person or a Natural Person with one or more Legal Entities.
@@ -277,7 +352,7 @@
         </p>
     </div>
     <div class="step">
-        <h2>Step 6 - Creating a Relying Party</h2>
+        <h2>Step 8 - Creating a Relying Party</h2>
         <p>
             This endpoint allows you to create a Relying Party that can later be associated with a Legal Entity.
         </p>
@@ -308,7 +383,7 @@
         </p>
     </div>
     <div class="step">
-        <h2>Step 7 - Listing Legal Entities and Relying Parties</h2>
+        <h2>Step 9 - Listing Legal Entities and Relying Parties</h2>
         <p>
             Now that you have created your Legal Entities and Relying Parties, the next step is to list them and prepare for establishing relationships.
         </p>
@@ -340,7 +415,7 @@
         </p>
     </div>
     <div class="step">
-        <h2>Step 8 - Associating Relying Parties with Legal Entities</h2>
+        <h2>Step 10 - Associating Relying Parties with Legal Entities</h2>
         <p>
             After listing your Legal Entities and Relying Parties in the previous step, you can now establish associations between them.
         </p>
@@ -381,7 +456,7 @@
         </p>
     </div>
     <div class="step">
-        <h2>Step 9 - Creating an Intended Use</h2>
+        <h2>Step 11 - Creating an Intended Use</h2>
         <p>
             You can now create an Intended Use, which defines how data or services may be used within the system.
         </p>
@@ -413,7 +488,7 @@
         </p>
     </div>
     <div class="step">
-        <h2>Step 10 - Listing Relying Parties and Intended Uses</h2>
+        <h2>Step 12 - Listing Relying Parties and Intended Uses</h2>
         <p>
             Before creating associations between Relying Parties and Intended Uses, it is recommended to list the existing Relying Parties to understand their current status and relationships.
         </p>
@@ -448,7 +523,7 @@
         </p>
     </div>
     <div class="step">
-        <h2>Step 11 - Associating Intended Uses with Relying Parties</h2>
+        <h2>Step 13 - Associating Intended Uses with Relying Parties</h2>
         <p>
             After listing your Relying Parties and Intended Uses, you can now establish associations between them.
         </p>
@@ -490,7 +565,7 @@
         </p>
     </div>
     <div class="step">
-        <h2>Step 12 - Creating Credentials</h2>
+        <h2>Step 14 - Creating Credentials</h2>
         <p>
             In this endpoint, you can create new credentials using <b>/credential/add_credential_db</b>.
         </p>
@@ -516,7 +591,7 @@
         </p>
     </div>
     <div class="step">
-        <h2>Step 13 - Listing Intended Uses and Associated Credentials</h2>
+        <h2>Step 15 - Listing Intended Uses and Associated Credentials</h2>
         <p>
             After creating credentials, you can list all Intended Uses and see which credentials they are associated with using the endpoint <b>/intended_use/list</b>.
         </p>
@@ -544,7 +619,7 @@
         </p>
     </div>
     <div class="step">
-        <h2>Step 14 - Associating Intended Uses with  Credentials</h2>
+        <h2>Step 16 - Associating Intended Uses with  Credentials</h2>
         <p>
             After listing your Intended Uses and the available credentials in Step 13, you can associate an Intended Use with one or more credential using the endpoint <b>/intended_use/ui_update_intended_uses</b>.
         </p>
@@ -578,7 +653,7 @@
         </p>
     </div>
     <div class="step">
-        <h2>Step 15 - Retrieve Relying Party Certificate</h2>
+        <h2>Step 17 - Retrieve Relying Party Certificate</h2>
 
         <p>
             After creating and configuring your Relying Parties, you can retrieve the certificate associated with a specific Relying Party using the endpoint <b>/RP/certificate</b>.
@@ -595,7 +670,8 @@
         <pre><code>
             {
                 "hash_pid": "&lt;hash_pid from step 1&gt;",
-                "relying_party": 1
+                "relying_party": 1,
+                "password": "example-password"
             }
         </code></pre>
 
@@ -607,7 +683,7 @@
         </p>
     </div>
     <div class="step">
-        <h2>Step 16 - Retrieve Intended Use Certificate</h2>
+        <h2>Step 18 - Retrieve Intended Use Certificate</h2>
 
         <p>
             You can also retrieve the certificate generated for a specific Intended Use using the endpoint <b>/intended_use/certificate</b>.
@@ -707,6 +783,10 @@
             currentStep--;
             showStep(currentStep);
         }
+    }
+    
+    function home() {
+        window.location.href = "/"; ;
     }
 
     showStep(currentStep);
