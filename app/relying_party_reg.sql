@@ -1,10 +1,4 @@
 -- --------------------------------------------------------
--- Anfitrião:                    127.0.0.1
--- Versão do servidor:           11.4.2-MariaDB - mariadb.org binary distribution
--- SO do servidor:               Win64
--- HeidiSQL Versão:              12.6.0.6765
--- --------------------------------------------------------
-
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET NAMES utf8 */;
 /*!50503 SET NAMES utf8mb4 */;
@@ -15,11 +9,9 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 
--- A despejar estrutura da base de dados para relyingparty_reg
 CREATE DATABASE IF NOT EXISTS `relyingparty_reg` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci */;
 USE `relyingparty_reg`;
 
--- A despejar estrutura para tabela relyingparty_reg.access_certificate
 CREATE TABLE IF NOT EXISTS `access_certificate` (
   `accessCertificate_id` int(11) NOT NULL AUTO_INCREMENT,
   `intended_use` varchar(255) DEFAULT NULL,
@@ -40,9 +32,6 @@ CREATE TABLE IF NOT EXISTS `access_certificate` (
   CONSTRAINT `fk_user_accessCert` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Exportação de dados não seleccionada.
-
--- A despejar estrutura para tabela relyingparty_reg.relying_party
 CREATE TABLE IF NOT EXISTS `relying_party` (
   `relyingParty_id` int(11) NOT NULL AUTO_INCREMENT,
   `country` varchar(100) NOT NULL,
@@ -56,16 +45,11 @@ CREATE TABLE IF NOT EXISTS `relying_party` (
   CONSTRAINT `fk_user_relyingParty` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Exportação de dados não seleccionada.
-
--- A despejar estrutura para tabela relyingparty_reg.user
 CREATE TABLE IF NOT EXISTS `user` (
   `user_id` int(11) NOT NULL AUTO_INCREMENT,
   `hash_pid` varchar(256) NOT NULL,
   PRIMARY KEY (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- Exportação de dados não seleccionada.
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
 /*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;
