@@ -1,0 +1,42 @@
+services:
+  db:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: relyingparty_reg
+      MYSQL_USER: rpr_user
+      MYSQL_PASSWORD: rpr_password
+    volumes:
+      - ./app/relying_party_reg.sql:/docker-entrypoint-initdb.d/init.sql
+      - mariadb_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: rpr_user
+      DB_PASSWORD: rpr_password
+      DB_NAME: relyingparty_reg
+      EJBCA_HOST: ejbca.example.com
+    volumes:
+      - ./app/logs:/workspace/app/logs
+      # Mount your trusted CA certificates here:
+      # - ./certs:/etc/eudiw/pid-issuer/cert
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  mariadb_data:
