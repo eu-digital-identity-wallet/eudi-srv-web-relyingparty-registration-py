@@ -19,6 +19,8 @@
 This models.py file contains functions related to queries to add data to DB (user, Relying Party, access_certificate).
 
 """
+import json
+
 import pymysql
 from app_config.config import ConfService
 from db import get_db_connection as conn
@@ -83,1482 +85,2452 @@ def insert_user(hash_pid):
             cursor.close()
             connection.close()
 
-def insert_user_legalPerson(legalName, legalBasis, user_id):
+## -legal person-insert
+def insert_legal_person(user_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            insert_query = "INSERT INTO legalperson (legalName, legalBasis, user_id) VALUES (%s, %s, %s)"
+            insert_query = "INSERT INTO legal_person (" \
+            "user_id) " \
+            "VALUES (%s)"
             
-            cursor.execute(insert_query, (legalName, legalBasis, user_id,))
+            cursor.execute(insert_query, (user_id,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"Legal Person successfully added. New Legal Person ID: {cursor.lastrowid}")
+            logger.info(f"Legal Person successfully added. New Legal Person  ID: {cursor.lastrowid} - {user_id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error inserting Legal Person: {e}")
+        logger.error(f"Error inserting Legal Person : {e} - {user_id}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def insert_user_naturalPerson(givenName, familyName, dateOfBirth, placeOfBirth, user_id):
+def insert_legal_person_name(legal_person_id, name):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            insert_query = "INSERT INTO naturalperson (givenName, familyName, dateOfBirth, placeOfBirth, user_id) VALUES (%s, %s, %s, %s, %s)"
+            insert_query = "INSERT INTO legal_person_name (" \
+            "legal_person_id, " \
+            "name) " \
+            "VALUES (%s, %s)"
             
-            cursor.execute(insert_query, (givenName, familyName, dateOfBirth, placeOfBirth, user_id,))
+            cursor.execute(insert_query, (legal_person_id, name,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"Natural Person successfully added. New Natural Person ID: {cursor.lastrowid}")
+            logger.info(f"Legal Person Name successfully added. New Legal Person Name ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error inserting Natural Person: {e}")
+        logger.error(f"Error inserting Legal Person Name: {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_legal_person_info(user_id):
+def associate_legal_person_law(legal_person_id, law_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            select_query = """
-                SELECT legalperson_id, legalBasis, legalName
-                FROM legalperson
-                WHERE user_id = %s
+            insert_query = "INSERT INTO legal_person_law (" \
+            "legal_person_id, " \
+            "law_id) " \
+            "VALUES (%s, %s)"
+            
+            cursor.execute(insert_query, (legal_person_id, law_id,))
+            
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Legal Person - Law successfully added. New Legal Person - Law ID: {cursor.lastrowid}")
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        extra = {'code'} 
+        logger.error(f"Error inserting Legal Person - Law: {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+## -legal person-get
+def get_legal_person(user_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    lp.id,
+                    lpn.name,
+                    law.id,
+                    law.legislative_identifier,
+                    llb.legal_basis
+                FROM legal_person lp
+
+                LEFT JOIN legal_person_name lpn 
+                    ON lpn.legal_person_id = lp.id
+
+                LEFT JOIN legal_person_law lpl 
+                    ON lpl.legal_person_id = lp.id
+
+                LEFT JOIN law 
+                    ON law.id = lpl.law_id
+
+                LEFT JOIN law_legal_basis llb
+                    ON llb.law_id = law.id
+
+                WHERE lp.user_id = %s
             """
-            
-            cursor.execute(select_query, (user_id,))
-            result = cursor.fetchall()
-            
-            if result: 
-                legal_person_data = [
-                    {"legalperson_id": row[0], "legalBasis": row[1], "legalName": row[2]} 
-                    for row in result
-                ] 
-                logger.info(f"Legal Person found for the user_id: {user_id}")
-                return legal_person_data
-            else:
-                logger.info("Legal Person with user_id not found.")
-                return None
-        else:
-            return None
-        
+
+            cursor.execute(query, (user_id,))
+            rows = cursor.fetchall()
+
+            result = {}
+
+            for lp_id, name, law_id, legislative_identifier, legal_basis in rows:
+
+                if lp_id not in result:
+                    result[lp_id] = {
+                        "legal_person_id": lp_id,
+                        "legal_names": [],
+                        "laws": {}
+                    }
+
+                if name and name not in result[lp_id]["legal_names"]:
+                    result[lp_id]["legal_names"].append(name)
+
+                if law_id:
+                    laws = result[lp_id]["laws"]
+
+                    if law_id not in laws:
+                        laws[law_id] = {
+                            "legislative_identifier": legislative_identifier,
+                            "legal_basis": []
+                        }
+
+                    if legal_basis and legal_basis not in laws[law_id]["legal_basis"]:
+                        laws[law_id]["legal_basis"].append(legal_basis)
+
+            final_result = []
+
+            for lp in result.values():
+                lp["laws"] = list(lp["laws"].values())
+                final_result.append(lp)
+
+            return final_result
+
     except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+    
+def insert_legal_person_law(legal_person_id, legislative_identifier):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = "INSERT INTO legal_person_law (" \
+            "legal_person_id, " \
+            "law_id) " \
+            "VALUES (%s, %s)"
+            
+            cursor.execute(insert_query, (legal_person_id, legislative_identifier,))
+            
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Legal Person - Law successfully added. New Law ID: {cursor.lastrowid}")
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        extra = {'code'} 
+        logger.error(f"Error inserting Law: {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+            
+## -law-insert
+def insert_law(legislative_identifier, user_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = "INSERT INTO law (" \
+            "legislative_identifier, " \
+            "user_id) " \
+            "VALUES (%s, %s)"
+            
+            cursor.execute(insert_query, (legislative_identifier, user_id,))
+            
+            connection.commit()
+            
+            logger.info(f"Law successfully added. New Law ID: {cursor.lastrowid}")
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        extra = {'code'} 
+        logger.error(f"Error inserting Law: {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def insert_law_legal_basis(law_id, legal_basis):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = "INSERT INTO law_legal_basis (" \
+            "law_id, " \
+            "legal_basis) " \
+            "VALUES (%s, %s)"
+            
+            cursor.execute(insert_query, (law_id, legal_basis,))
+            
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Law Legal Basis successfully added. New Law Legal Basis ID: {cursor.lastrowid}")
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        extra = {'code'} 
+        logger.error(f"Error inserting Law Legal Basis: {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+## -law-get
+def get_law(user_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    l.id,
+                    l.legislative_identifier,
+                    llb.legal_basis
+
+                FROM law l
+
+                LEFT JOIN law_legal_basis llb 
+                    ON llb.law_id = l.id
+
+                WHERE l.user_id = %s
+            """
+
+            cursor.execute(query, (user_id,))
+            rows = cursor.fetchall()
+
+            result = {}
+
+            for l_id, legislative_identifier, legal_basis in rows:
+
+                if l_id not in result:
+                    result[l_id] = {
+                        "law_id": l_id,
+                        "legislativeIdentifier": legislative_identifier,
+                        "legalBasis": []
+                    }
+
+                if legal_basis and legal_basis not in result[l_id]["legalBasis"]:
+                    result[l_id]["legalBasis"].append(legal_basis)
+
+            return list(result.values())
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+## -natural person-insert
+def insert_natural_person(family_name, given_name, date_of_birth, place_of_birth, user_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = "INSERT INTO natural_person (" \
+            "family_name, " \
+            "given_name, " \
+            "date_of_birth, " \
+            "place_of_birth, " \
+            "user_id) " \
+            "VALUES (%s, %s, %s, %s, %s)"
+            
+            cursor.execute(insert_query, (family_name, given_name, date_of_birth, place_of_birth, user_id))
+            
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Natural Person successfully added. New Natural Person ID: {cursor.lastrowid} - {user_id}")
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        extra = {'code'} 
+        logger.error(f"Error inserting Natural Person: {e} - {user_id}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+           
+## -natural person-get
+def get_natural_person(user_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    np.id,
+                    np.family_name,
+                    np.given_name,
+                    np.date_of_birth,
+                    np.place_of_birth
+                FROM natural_person np
+                WHERE np.user_id = %s
+            """
+
+            cursor.execute(query, (user_id,))
+            rows = cursor.fetchall()
+
+            result = []
+
+            for np_id, family_name, given_name, date_of_birth, place_of_birth in rows:
+                result.append({
+                    "natural_person_id": np_id,
+                    "family_name": family_name,
+                    "given_name": given_name,
+                    "date_of_birth": str(date_of_birth) if date_of_birth else None,
+                    "place_of_birth": place_of_birth
+                })
+
+            return result
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
     finally:
         if connection:
             cursor.close()
             connection.close()
     
 
-def get_natural_person_info_le(user_id):
+## -legal entity-insert
+def insert_legal_entity(legalPerson, naturalPerson, country, user_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            select_query = """
-                SELECT givenName
-                FROM naturalperson
-                WHERE naturalperson_id = %s
-            """
+            insert_query = "INSERT INTO legal_entity (" \
+            "legal_person_id, " \
+            "natural_person_id, " \
+            "country, " \
+            "user_id) " \
+            "VALUES (%s, %s, %s, %s)"
             
-            cursor.execute(select_query, (user_id,))
-            result = cursor.fetchone()
-            
-            if result: 
-                 
-                logger.info(f"natural Person found for the user_id: {user_id}")
-                return result
-            else:
-                logger.info("natural Person with user_id not found.")
-                return None
-        else:
-            return None
-
-    except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-
-def get_natural_person_info(user_id):
-    try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            select_query = """
-                SELECT naturalperson_id, givenName, familyName, dateOfBirth, placeOfBirth
-                FROM naturalperson
-                WHERE user_id = %s
-            """
-            
-            cursor.execute(select_query, (user_id,))
-            result = cursor.fetchall()
-            
-            if result: 
-                natural_person_data = [
-                    {"naturalperson_id": row[0], "givenName": row[1], "familyName": row[2], "dateOfBirth": row[3], "placeOfBirth": row[4]} 
-                    for row in result
-                ] 
-                logger.info(f"natural Person found for the user_id: {user_id}")
-                return natural_person_data
-            else:
-                logger.info("natural Person with user_id not found.")
-                return None
-        else:
-            return None
-
-    except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-
-def insert_legal_entity(postalAddress, country, email, phone, infoURI, identifier, identifierType, user_id):
-    try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            insert_query = "INSERT INTO legalentity (postalAddress, country, email, phone, infoURI, identifier, identifierType, user_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
-            
-            cursor.execute(insert_query, (postalAddress, country, email, phone, infoURI, identifier, identifierType, user_id,))
+            cursor.execute(insert_query, (legalPerson, naturalPerson, country, user_id,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"Legal Entity successfully added. New Legal Entity ID: {cursor.lastrowid}")
+            logger.info(f"Legal Entity successfully added. New Legal Entity  ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error inserting Legal Person: {e}")
+        logger.error(f"Error inserting Legal Entity : {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_legal_entity_info(user_id):
+def insert_legal_entity_identifier(legal_entity_id, identifier_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            select_query = """
-                SELECT legalentity_id, legalperson_id, naturalperson_id, postalAddress, country, email, phone, infoURI, identifier, identifierType
-                FROM legalentity
-                WHERE user_id = %s
-            """
+            insert_query = "INSERT INTO legal_entity_identifier (" \
+            "legal_entity_id, " \
+            "identifier_id) " \
+            "VALUES (%s, %s)"
             
-            cursor.execute(select_query, (user_id,))
-            result = cursor.fetchall()
-            
-            if result: 
-                legal_entity_data = [
-                    {"legalentity_id": row[0], "legalperson_id": row[1], "naturalperson_id": row[2], "postalAddress": row[3], "country": row[4], "email": row[5], "phone": row[6], "infoURI": row[7], "identifier": row[8], "identifierType": row[9]} 
-                    for row in result
-                ] 
-                logger.info(f"Legal Entity found for the user_id: {user_id}")
-                return legal_entity_data
-            else:
-                logger.info("Legal Entity with user_id not found.")
-                return None
-        else:
-            return None
-
-    except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-
-def get_check_legal_entity_info(user_id):
-    try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            select_query = """
-                SELECT legalentity_id
-                FROM legalentity
-                WHERE legalperson_id = %s
-            """
-            
-            cursor.execute(select_query, (user_id,))
-            result = cursor.fetchall()
-            
-            if result: 
-                legal_entity_data = [
-                    {"legalentity": row[0]} 
-                    for row in result
-                ] 
-                logger.info(f"Legal Entity found for the user_id: {user_id}")
-                return legal_entity_data
-            else:
-                logger.info("Legal Entity with user_id not found.")
-                return None
-        else:
-            return None
-
-    except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-
-def get_rp_info(user_id):
-    try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            select_query = """
-                SELECT wrp_id, tradeName, supportURI, srvDescription, intended_use, isPSB, entitlement, providesAttestations, supervisorAuthority, isIntermediary, usesIntermediary, registryURI, providerType, x5c, typePolicy, policyURI, legalEntity
-                FROM walletrelyingparty
-                WHERE user_id = %s
-            """
-            
-            cursor.execute(select_query, (user_id,))
-            result = cursor.fetchall()
-            
-            if result: 
-                rp_data = [
-                    {"wrp_id": row[0], "tradeName": row[1], "supportURI": row[2], "srvDescription": row[3], "intended_use": row[4], "isPSB": row[5], "entitlement": row[6], "providesAttestations": row[7], "supervisorAuthority": row[8], "isIntermediary": row[9], "usesIntermediary": row[10], "registryURI": row[11], "providerType": row[12], "x5c": row[13], "typePolicy": row[14], "policyURI": row[15], "legalEntity": row[16]} 
-                    for row in result
-                ] 
-                logger.info(f"RP found for the user_id: {user_id}")
-                return rp_data
-            else:
-                logger.info("RP with user_id not found.")
-                return None
-        else:
-            return None
-
-    except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-
-def insert_RP(tradeName, supportURI, srvDescription, entitlement, registryURI, typePolicy, policyURI, x5c, user_id):
-    try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            insert_query = "INSERT INTO walletrelyingparty (tradeName, supportURI, srvDescription, entitlement, registryURI, typePolicy, policyURI, x5c, user_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
-            
-            cursor.execute(insert_query, (tradeName, supportURI, srvDescription, entitlement, registryURI, typePolicy, policyURI, x5c, user_id,))
+            cursor.execute(insert_query, (legal_entity_id, identifier_id,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"Wallet Relying Party successfully added. New Wallet Relying Party ID: {cursor.lastrowid}")
+            logger.info(f"Identifier successfully added. New Identifier  ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error inserting Legal Person: {e}")
+        logger.error(f"Error inserting Identifier : {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_intended_use_info(user_id):
+def insert_legal_entity_postal_address(legal_entity_id, address):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            select_query = """
-                SELECT *
-                FROM intendeduse
-                WHERE user_id = %s
-            """
+            insert_query = "INSERT INTO legal_entity_postal_address (" \
+            "legal_entity_id, " \
+            "address) " \
+            "VALUES (%s, %s)"
             
-            cursor.execute(select_query, (user_id,))
-            result = cursor.fetchall()
-            
-            if result: 
-                intended_use_data = [
-                    {"intendeduse_id": row[0], "createdAt": row[1], "revokedAt": row[2], "intendedUseIdentifier": row[3], "type_policy": row[4], "policy_uri": row[5], "purpose": row[6], "credential_id": row[7], "user_id": row[8], "wrp": row[9]} 
-                    for row in result
-                ] 
-                logger.info(f"Intended Use found for the user_id: {user_id}")
-                return intended_use_data
-            else:
-                logger.info("Intended Use with user_id not found.")
-                return None
-        else:
-            return None
-
-    except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-
-def get_credential_info(user_id):
-    try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            select_query = """
-                SELECT *
-                FROM credential
-                WHERE user_id = %s
-            """
-            
-            cursor.execute(select_query, (user_id,))
-            result = cursor.fetchall()
-            
-            if result: 
-                credential_data = [
-                    {"credential_id": row[0], "name": row[1], "format": row[2], "meta": row[3], "path": row[4], "credentialValues": row[5], "user_id": row[6], "intendedUse_id": row[7]} 
-                    for row in result
-                ] 
-                logger.info(f"Credentail found for the user_id: {user_id}")
-                return credential_data
-            else:
-                logger.info("Credentail with user_id not found.")
-                return None
-        else:
-            return None
-
-    except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-
-
-def insert_intended_use(createAt, revokeAt, intendedUseIdentifier, type_policy, policy_uri, purpose, user_id):
-    try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            insert_query = "INSERT INTO intendeduse (createdAt, revokedAt, intendedUseIdentifier, type_policy, policy_uri, purpose, user_id) VALUES (%s, %s, %s, %s, %s, %s, %s)"
-            
-            cursor.execute(insert_query, (createAt, revokeAt, intendedUseIdentifier, type_policy, policy_uri, purpose, user_id,))
+            cursor.execute(insert_query, (legal_entity_id, address,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"Intended Use successfully added. New Intended Use ID: {cursor.lastrowid}")
+            logger.info(f"Legal Entity Address successfully added. New Legal Entity Address  ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error inserting Intended Use: {e}")
+        logger.error(f"Error inserting Legal Entity Address : {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
-
-def insert_credential(name, format, meta, path, credentialValues, user_id):
+            
+def insert_legal_entity_info_uri(legal_entity_id, uri):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            insert_query = "INSERT INTO credential (name, format, meta, path, credentialValues, user_id) VALUES (%s, %s, %s, %s, %s, %s)"
+            insert_query = "INSERT INTO legal_entity_info_uri (" \
+            "legal_entity_id, " \
+            "uri) " \
+            "VALUES (%s, %s)"
             
-            cursor.execute(insert_query, (name, format, meta, path, credentialValues, user_id,))
+            cursor.execute(insert_query, (legal_entity_id, uri,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"Credential successfully added. New Credential ID: {cursor.lastrowid}")
+            logger.info(f"Legal Entity Info Uri successfully added. New Legal Entity Info Uri  ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error inserting Credential: {e}")
+        logger.error(f"Error inserting Legal Entity Info Uri : {e}")
     finally:
         if connection:
             cursor.close()
-            connection.close()
+            connection.close()  
 
-def update_naturalPerson_legal_entity(natural_id, legalEntity_id):
+def insert_legal_entity_email(legal_entity_id, email):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            insert_query = """
-                                UPDATE legalentity 
-                                SET naturalperson_id = %s
-                                WHERE legalentity_id = %s
-                            """
-            cursor.execute(insert_query, (natural_id, legalEntity_id,))
+            insert_query = "INSERT INTO legal_entity_email (" \
+            "legal_entity_id, " \
+            "email) " \
+            "VALUES (%s, %s)"
+            
+            cursor.execute(insert_query, (legal_entity_id, email,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"Legal Entity successfully updated: {id}")
+            logger.info(f"Legal Entity Email successfully added. New Legal Entity Email  ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error updating Legal Entity: {e}")
+        logger.error(f"Error inserting Legal Entity Email : {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
-
-def remove_naturalPerson_legal_entity(legalEntity_id):
+            
+def insert_legal_entity_phone(legal_entity_id, phone):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            insert_query = """
-                                UPDATE legalentity 
-                                SET naturalperson_id = NULL
-                                WHERE legalentity_id = %s
-                            """
-            cursor.execute(insert_query, (legalEntity_id,))
+            insert_query = "INSERT INTO legal_entity_phone (" \
+            "legal_entity_id, " \
+            "phone) " \
+            "VALUES (%s, %s)"
+            
+            cursor.execute(insert_query, (legal_entity_id, phone,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"Legal Entity successfully updated: {id}")
+            logger.info(f"Legal Entity Phone successfully added. New Legal Entity Phone  ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error updating Legal Entity: {e}")
+        logger.error(f"Error inserting Legal Entity Phone : {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-
-def get_check_legal_entity_info_lp(user_id):
+## -legal entity-get
+def get_legal_entity(user_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            select_query = """
-                SELECT legalentity_id
-                FROM legalentity
-                WHERE legalperson_id = %s
-            """
-            
-            cursor.execute(select_query, (user_id,))
-            result = cursor.fetchall()
-            
-            if result: 
-                legal_entity_data = [
-                    {"naturalperson_id": row[0]} 
-                    for row in result
-                ] 
-                logger.info(f"Legal Entity found for the user_id: {user_id}")
-                return legal_entity_data
-            else:
-                logger.info("Legal Entity with user_id not found.")
-                return None
-        else:
-            return None
+            query = """
+                    SELECT 
+                        le.id,
+                        le.country,
+
+                        lepa.address,
+                        leiu.uri,
+                        lee.email,
+                        lep.phone,
+
+                        i.identifier,
+                        i.type,
+
+                        lpn.name,
+
+                        np.given_name,
+                        np.family_name
+
+                    FROM legal_entity le
+
+                    LEFT JOIN legal_entity_postal_address lepa
+                        ON lepa.legal_entity_id = le.id
+                        
+                    LEFT JOIN legal_entity_info_uri leiu
+                        ON leiu.legal_entity_id = le.id
+                        
+                    LEFT JOIN legal_entity_email lee
+                        ON lee.legal_entity_id = le.id
+                        
+                    LEFT JOIN legal_entity_phone lep
+                        ON lep.legal_entity_id = le.id
+                        
+                    LEFT JOIN legal_person_name lpn
+                        ON lpn.legal_person_id = le.legal_person_id
+                        
+                    LEFT JOIN natural_person np
+                        ON np.id = le.natural_person_id
+                        
+                    LEFT JOIN legal_entity_identifier lei
+                        ON lei.legal_entity_id = le.id
+
+                    LEFT JOIN identifier i
+                        ON i.id = lei.identifier_id
+
+                    WHERE le.user_id = %s;
+                    """
+
+            cursor.execute(query, (user_id,))
+            rows = cursor.fetchall()
+
+            result = {}
+
+            for (
+                le_id, country,
+                address, uri, email, phone,
+                identifier, id_type,
+                legal_name,
+                given_name, family_name
+            ) in rows:
+
+                if le_id not in result:
+                    result[le_id] = {
+                        "legal_entity_id": le_id,
+                        "country": country,
+                        "postalAddress": [],
+                        "infoURI": [],
+                        "email": [],
+                        "phone": [],
+                        "identifier": [],
+                        "LegalPerson": None,
+                        "NaturalPerson": None
+                    }
+
+                entity = result[le_id]
+
+                # arrays simples
+                if address and address not in entity["postalAddress"]:
+                    entity["postalAddress"].append(address)
+
+                if uri and uri not in entity["infoURI"]:
+                    entity["infoURI"].append(uri)
+
+                if email and email not in entity["email"]:
+                    entity["email"].append(email)
+
+                if phone and phone not in entity["phone"]:
+                    entity["phone"].append(phone)
+
+                # identifiers
+                if identifier:
+                    id_obj = {
+                        "identifier": identifier,
+                        "type": id_type
+                    }
+                    if id_obj not in entity["identifier"]:
+                        entity["identifier"].append(id_obj)
+
+                # LegalPerson (opcional)
+                if legal_name:
+                    if entity["LegalPerson"] is None:
+                        entity["LegalPerson"] = {
+                            "legalName": []
+                        }
+
+                    if legal_name not in entity["LegalPerson"]["legalName"]:
+                        entity["LegalPerson"]["legalName"].append(legal_name)
+
+                # NaturalPerson (opcional)
+                if given_name or family_name:
+                    entity["NaturalPerson"] = {
+                        "givenName": given_name,
+                        "familyName": family_name
+                    }
+
+            return list(result.values())
 
     except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
+        logger.error(f"Error: {e}")
+        return []
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def remove_legalPerson_legal_entity(legalEntity_id):
+## -identifier-insert
+def insert_identifier(identifier, type, user_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            insert_query = """
-                                UPDATE legalentity 
-                                SET legalperson_id = NULL
-                                WHERE legalentity_id = %s
-                            """
-            cursor.execute(insert_query, (legalEntity_id,))
+            insert_query = "INSERT INTO identifier (" \
+            "identifier, " \
+            "type, " \
+            "user_id) " \
+            "VALUES (%s, %s, %s)"
+            
+            cursor.execute(insert_query, (identifier, type, user_id,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"Legal Entity successfully updated: {id}")
+            logger.info(f"Identifier successfully added. New Identifier  ID: {cursor.lastrowid} - {user_id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error updating Legal Entity: {e}")
+        logger.error(f"Error inserting Identifier : {e} - {user_id}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def update_legalPerson_legal_entity(natural_id, legalEntity_id):
+## -identifier-get
+def get_identifier(user_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            insert_query = """
-                                UPDATE legalentity 
-                                SET legalperson_id = %s
-                                WHERE legalentity_id = %s
-                            """
-            cursor.execute(insert_query, (natural_id, legalEntity_id,))
+            query = """
+                SELECT 
+                    i.id,
+                    i.identifier,
+                    i.type
+                FROM identifier i
+                WHERE i.user_id = %s
+            """
+
+            cursor.execute(query, (user_id,))
+            rows = cursor.fetchall()
+
+            result = []
+
+            for i_id, i_identifier, i_type in rows:
+                result.append({
+                    "identifier_id": i_id,
+                    "identifier": i_identifier,
+                    "type": i_type,
+                })
+
+            return result
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+    
+## -provider-insert
+def insert_provider(legal_entity_id, provider_type, user_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = "INSERT INTO provider (" \
+            "legal_entity_id, " \
+            "provider_type, " \
+            "user_id) " \
+            "VALUES (%s, %s, %s)"
+            
+            cursor.execute(insert_query, (legal_entity_id, provider_type, user_id,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"Legal Entity successfully updated: {id}")
+            logger.info(f"Provider successfully added. New Provider ID: {cursor.lastrowid} - {user_id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error updating Legal Entity: {e}")
+        logger.error(f"Error inserting Provider : {e} - {user_id}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_legal_person_info_le(user_id):
+def insert_provider_x5c(provider_id, certificate):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            select_query = """
-                SELECT legalName
-                FROM legalperson
-                WHERE legalperson_id = %s
-            """
+            insert_query = "INSERT INTO provider_x5c (" \
+            "provider_id, " \
+            "certificate) " \
+            "VALUES (%s, %s)"
             
-            cursor.execute(select_query, (user_id,))
-            result = cursor.fetchone()
-            
-            if result: 
-                 
-                logger.info(f"Legal Person found for the user_id: {user_id}")
-                return result
-            else:
-                logger.info("Legal Person with user_id not found.")
-                return None
-        else:
-            return None
-
-    except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-
-
-def get_wrp_info_le(user_id):
-    try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            select_query = """
-                SELECT legalName
-                FROM legalperson
-                WHERE legalperson_id = %s
-            """
-            
-            cursor.execute(select_query, (user_id,))
-            result = cursor.fetchone()
-            
-            if result: 
-                 
-                logger.info(f"Legal Person found for the user_id: {user_id}")
-                return result
-            else:
-                logger.info("Legal Person with user_id not found.")
-                return None
-        else:
-            return None
-
-    except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-
-
-def get_legal_entity_info_rp(user_id):
-    try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            select_query = """
-                SELECT identifier
-                FROM legalentity
-                WHERE legalentity_id = %s
-            """
-            
-            cursor.execute(select_query, (user_id,))
-            result = cursor.fetchone()
-            
-            if result: 
-                logger.info(f"Legal Entity found for the user_id: {user_id}")
-                return result
-            else:
-                logger.info("Legal Entity with user_id not found.")
-                return None
-        else:
-            return None
-
-    except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-
-def get_check_iu_info(user_id):
-    try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            select_query = """
-                SELECT intendeduse_id
-                FROM intendeduse
-                WHERE credential_id = %s
-            """
-            
-            cursor.execute(select_query, (user_id,))
-            result = cursor.fetchall()
-            
-            if result: 
-                rp_data = [
-                    {"intendeduse_id": row[0]} 
-                    for row in result
-                ] 
-                logger.info(f"iu found for the user_id: {user_id}")
-                return rp_data
-            else:
-                logger.info("iu with user_id not found.")
-                return None
-        else:
-            return None
-
-    except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-
-def remove_legal_entity_wrp(id):
-    try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            insert_query = """
-                                UPDATE walletrelyingparty 
-                                SET supervisorAuthority = NULL
-                                WHERE wrp_id = %s
-                            """
-            cursor.execute(insert_query, (id,))
+            cursor.execute(insert_query, (provider_id, certificate,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"wrp successfully updated: {id}")
+            logger.info(f"Provider x5c successfully added. New Provider x5c  ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error updating wrp: {e}")
+        logger.error(f"Error inserting Provider x5c : {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def update_wrp_legal_entity(le, wrp):
+## -provider-get
+def get_provider(user_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            insert_query = """
-                                UPDATE walletrelyingparty 
-                                SET supervisorAuthority = %s
-                                WHERE wrp_id = %s
-                            """
-            cursor.execute(insert_query, (le, wrp,))
+            query = """ 
+                SELECT 
+                    p.id,
+                    p.provider_type,
+                    p.legal_entity_id,
+                    px.certificate,
+                    pol.policy_uri,
+                    pol.type
+                FROM provider p
+                LEFT JOIN provider_x5c px
+                    ON px.provider_id = p.id
+                LEFT JOIN provider_policy pp
+                    ON pp.provider_id = p.id
+                LEFT JOIN policy pol
+                    ON pol.id = pp.policy_id
+                WHERE p.user_id = %s
+            """
+
+            cursor.execute(query, (user_id,))
+            rows = cursor.fetchall()
+
+            result = {}
+
+            for (
+                p_id, provider_type, legal_entity_id,
+                certificate,
+                policy_uri, policy_type
+            ) in rows:
+
+                if p_id not in result:
+                    result[p_id] = {
+                        "provider_id": p_id,
+                        "provider_type": provider_type,
+                        "legal_entity_id": legal_entity_id,
+                        "x5c": [],
+                        "policy": []
+                    }
+
+                provider = result[p_id]
+
+                # certificates
+                if certificate and certificate not in provider["x5c"]:
+                    provider["x5c"].append(certificate)
+
+                # policies
+                if policy_uri:
+                    policy_obj = {
+                        "policyURI": policy_uri,
+                        "type": policy_type
+                    }
+
+                    if policy_obj not in provider["policy"]:
+                        provider["policy"].append(policy_obj)
+
+            return list(result.values())
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+## -policy-insert
+def insert_policy(policy_uri, type, user_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = "INSERT INTO policy (" \
+            "policy_uri, " \
+            "type, " \
+            "user_id) " \
+            "VALUES (%s, %s, %s)"
+            
+            cursor.execute(insert_query, (policy_uri, type, user_id,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"wrp successfully updated: {id}")
+            logger.info(f"Policy successfully added. New Policy ID: {cursor.lastrowid} - {user_id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error updating wrp: {e}")
+        logger.error(f"Error inserting Policy : {e} - {user_id}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_iu_info_rp(user_id):
+## -policy-get
+def get_policy(user_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            select_query = """
-                SELECT tradeName
-                FROM walletrelyingparty
-                WHERE wrp_id = %s
+            query = """
+                SELECT 
+                    p.id,
+                    p.policy_uri,
+                    p.type
+                FROM policy p
+                WHERE p.user_id = %s
             """
-            
-            cursor.execute(select_query, (user_id,))
-            result = cursor.fetchone()
-            
-            if result: 
-                 
-                logger.info(f"WRP found for the user_id: {user_id}")
-                return result
-            else:
-                logger.info("WRP with user_id not found.")
-                return None
-        else:
-            return None
+
+            cursor.execute(query, (user_id,))
+            rows = cursor.fetchall()
+
+            result = []
+
+            for p_id, p_policy_uri, p_type in rows:
+                result.append({
+                    "policy_id": p_id,
+                    "policy_uri": p_policy_uri,
+                    "type": p_type,
+                })
+
+            return result
 
     except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
+        logger.error(f"Error: {e}")
+        return []
     finally:
         if connection:
             cursor.close()
             connection.close()
-
-def get_check_iu_info_rp(wrp_id):
+    
+def insert_provider_policy(provider_id, policy_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            select_query = """
-                SELECT intendeduse_id
-                FROM intendeduse
-                WHERE wrp = %s
-            """
+            insert_query = "INSERT INTO provider_policy (" \
+            "provider_id, " \
+            "policy_id) " \
+            "VALUES (%s, %s)"
             
-            cursor.execute(select_query, (wrp_id,))
-            result = cursor.fetchall()
-            
-            if result: 
-                rp_data = [
-                    {"intendeduse_id": row[0]} 
-                    for row in result
-                ] 
-                logger.info(f"Intended_Use found for the wrp_id: {wrp_id}")
-                return rp_data
-            else:
-                logger.info("Intended_Use with wrp_id not found.")
-                return None
-        else:
-            return None
-
-    except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-
-def remove_wrp_iu(id):
-    try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            insert_query = """
-                                UPDATE intendeduse 
-                                SET wrp = NULL
-                                WHERE intendeduse_id = %s
-                            """
-            cursor.execute(insert_query, (id,))
+            cursor.execute(insert_query, (provider_id, policy_id,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"Intended Use successfully updated: {id}")
+            logger.info(f"Provider - Policy successfully added. New Provider - Policy  ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error updating Intended Use: {e}")
+        logger.error(f"Error inserting Provider - Policy : {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def update_iu_wrp(wrp, iu):
+## -supervisory authority-insert
+def insert_supervisory_authority(name, country, user_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            insert_query = """
-                                UPDATE intendeduse 
-                                SET wrp = %s
-                                WHERE intendeduse_id = %s
-                            """
-            cursor.execute(insert_query, (wrp, iu,))
+            insert_query = "INSERT INTO supervisory_authority (" \
+            "name, " \
+            "country, " \
+            "user_id) " \
+            "VALUES (%s, %s, %s)"
+            
+            cursor.execute(insert_query, (name, country, user_id,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"Intended Use successfully updated: {id}")
+            logger.info(f"Supervisory Authority successfully added. New Supervisory Authority ID: {cursor.lastrowid} - {user_id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error updating Intended Use: {e}")
+        logger.error(f"Error inserting Supervisory Authority : {e} - {user_id}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_iu_info_cred(user_id):
+def insert_supervisory_authority_phone(authority_id, phone):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            select_query = """
-                SELECT intendedUseIdentifier
-                FROM intendeduse
-                WHERE intendeduse_id = %s
-            """
+            insert_query = "INSERT INTO supervisory_authority_phone (" \
+            "authority_id, " \
+            "phone) " \
+            "VALUES (%s, %s)"
             
-            cursor.execute(select_query, (user_id,))
-            result = cursor.fetchone()
-            
-            if result: 
-                logger.info(f"intendeduse found for the user_id: {user_id}")
-                return result
-            else:
-                logger.info("intendeduse with user_id not found.")
-                return None
-        else:
-            return None
-
-    except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-
-def get_check_cred_info(user_id):
-    try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            select_query = """
-                SELECT wrp_id
-                FROM walletrelyingparty
-                WHERE supervisorAuthority = %s
-            """
-            
-            cursor.execute(select_query, (user_id,))
-            result = cursor.fetchall()
-            
-            if result: 
-                rp_data = [
-                    {"wrp_id": row[0]} 
-                    for row in result
-                ] 
-                logger.info(f"WRP found for the user_id: {user_id}")
-                return rp_data
-            else:
-                logger.info("WRP with user_id not found.")
-                return None
-        else:
-            return None
-
-    except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-
-def update_iu_cred(iu, cred):
-    try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            insert_query = """
-                                UPDATE credential 
-                                SET intendedUse_id = %s
-                                WHERE credential_id = %s
-                            """
-            cursor.execute(insert_query, (iu, cred,))
+            cursor.execute(insert_query, (authority_id, phone,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"Credential successfully updated: {id}")
+            logger.info(f"Supervisory Authority Phone successfully added. New Supervisory Authority Phone  ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error updating Credential: {e}")
+        logger.error(f"Error inserting Supervisory Authority Phone : {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
-
-def remove_cred_iu(id):
+            
+def insert_supervisory_authority_formuri(authority_id, formURI):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            insert_query = """
-                                UPDATE intendeduse 
-                                SET credential_id = NULL
-                                WHERE intendeduse_id = %s
-                            """
-            cursor.execute(insert_query, (id,))
+            insert_query = "INSERT INTO supervisory_authority_formuri (" \
+            "authority_id, " \
+            "formURI) " \
+            "VALUES (%s, %s)"
+            
+            cursor.execute(insert_query, (authority_id, formURI,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"iu successfully updated: {id}")
+            logger.info(f"Supervisory Authority Form URI successfully added. New Supervisory Authority Form URI  ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error updating iu: {e}")
+        logger.error(f"Error inserting Supervisory Authority Form URI : {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
-
-
-def get_legal_entity_info_edit(le_id):
+                        
+def insert_supervisory_authority_email(authority_id, email):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            select_query = """
-                SELECT postalAddress, country, email, phone, infoURI, identifier, identifierType
-                FROM legalentity
-                WHERE legalentity_id = %s
-            """
+            insert_query = "INSERT INTO supervisory_authority_email (" \
+            "authority_id, " \
+            "email) " \
+            "VALUES (%s, %s)"
             
-            cursor.execute(select_query, (le_id,))
-            result = cursor.fetchall()
-            
-            if result: 
-                legal_entity_data = [
-                    {"postalAddress": row[0], "country": row[1], "email": row[2], "phone": row[3], "infoURI": row[4], "identifier": row[5], "identifierType": row[6]} 
-                    for row in result
-                ] 
-                logger.info(f"Legal Entity found: {le_id}")
-                return legal_entity_data
-            else:
-                logger.info("Legal Entity not found.")
-                return None
-        else:
-            return None
-
-    except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking legal Entity: {e}")
-        return None
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-
-def update_legal_entity_edit(grouped, legal_entity_id):
-    try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            insert_query = """
-                                UPDATE legalentity 
-                                SET country = %s, email = %s, infoURI = %s, phone = %s, postalAddress = %s, identifier = %s, identifierType = %s
-                                WHERE legalentity_id = %s
-                            """
-            cursor.execute(insert_query, (grouped["country"], grouped["email"], grouped["infoURI"], grouped["phone"], grouped["postalAddress"], grouped["identifier"], grouped["identifierType"], legal_entity_id,))
+            cursor.execute(insert_query, (authority_id, email,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"Legal Entity successfully updated: {id}")
+            logger.info(f"Supervisory Authority Email successfully added. New Supervisory Authority Email  ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error updating Legal Entity: {e}")
+        logger.error(f"Error inserting Supervisory Authority Email : {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_rp_info_edit(rp_id):
+## -supervisory authority-get
+def get_supervisory_authority(user_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            select_query = """
-                SELECT tradeName, supportURI, registryURI, policyURI, typePolicy
-                FROM walletrelyingparty
-                WHERE wrp_id = %s
+            query = """
+                SELECT 
+                    sa.id,
+                    sa.name,
+                    sa.country,
+                    sae.email,
+                    sap.phone,
+                    saf.formURI
+                FROM supervisory_authority sa
+                LEFT JOIN supervisory_authority_email sae
+                    ON sae.authority_id = sa.id
+                LEFT JOIN supervisory_authority_phone sap
+                    ON sap.authority_id = sa.id
+                LEFT JOIN supervisory_authority_formuri saf
+                    ON saf.authority_id = sa.id
+                WHERE sa.user_id = %s
             """
-            
-            cursor.execute(select_query, (rp_id,))
-            result = cursor.fetchall()
-            
-            if result: 
-                rp_data = [
-                    {"tradeName": row[0], "supportURI": row[1], "registryURI": row[2], "policyURI": row[3], "typePolicy": row[4]} 
-                    for row in result
-                ] 
-                logger.info(f"RP found: {rp_id}")
-                return rp_data
-            else:
-                logger.info("RP not found.")
-                return None
-        else:
-            return None
+
+            cursor.execute(query, (user_id,))
+            rows = cursor.fetchall()
+
+            result = {}
+
+            for sa_id, name, country, email, phone, formURI in rows:
+
+                if sa_id not in result:
+                    result[sa_id] = {
+                        "supervisory_authority_id": sa_id,
+                        "name": name,
+                        "country": country,
+                        "email": [],
+                        "phone": [],
+                        "formURI": []
+                    }
+
+                sa = result[sa_id]
+
+                if email and email not in sa["email"]:
+                    sa["email"].append(email)
+
+                if phone and phone not in sa["phone"]:
+                    sa["phone"].append(phone)
+
+                if formURI and formURI not in sa["formURI"]:
+                    sa["formURI"].append(formURI)
+
+            return list(result.values())
 
     except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking RP: {e}")
-        return None
+        logger.error(f"Error: {e}")
+        return []
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def update_RP_edit(grouped, rp_id):
+## -wrp-insert
+def insert_wrp(provider_id, trade_name, ispsb, regristry_uri, is_intermediary, supervisory_authority_id, user_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            insert_query = """
-                                UPDATE walletrelyingparty 
-                                SET tradeName = %s, supportURI = %s, registryURI = %s, policyURI = %s, typePolicy = %s
-                                WHERE wrp_id = %s
-                            """
-            cursor.execute(insert_query, (grouped["tradeName"], grouped["supportURI"], grouped["registryURI"], grouped["policyURI"], grouped["typePolicy"], rp_id,))
+            insert_query = "INSERT INTO wallet_relying_party (" \
+            "provider_id, " \
+            "trade_name, " \
+            "is_psb, " \
+            "registry_uri, " \
+            "is_intermediary, " \
+            "supervisory_authority_id, " \
+            "user_id) " \
+            "VALUES (%s, %s, %s, %s, %s, %s, %s)"
+            
+            cursor.execute(insert_query, (provider_id, trade_name, ispsb, regristry_uri, is_intermediary, supervisory_authority_id, user_id,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"RP successfully updated: {id}")
+            logger.info(f"Wallet Relying Party successfully added. New Wallet Relying Party ID: {cursor.lastrowid} - {user_id}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error updating RP: {e}")
+        logger.error(f"Error inserting Wallet Relying Party : {e} - {user_id}")
     finally:
         if connection:
             cursor.close()
             connection.close()
- 
-def get_iu_info_edit(iu_id):
+             
+def insert_wrp_entitlement(wrp_id, entitlement):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            select_query = """
-                SELECT intendedUseIdentifier, type_policy, policy_uri
-                FROM intendeduse
-                WHERE intendeduse_id = %s
-            """
+            insert_query = "INSERT INTO wrp_entitlement (" \
+            "wrp_id, " \
+            "entitlement) " \
+            "VALUES (%s, %s)"
             
-            cursor.execute(select_query, (iu_id,))
-            result = cursor.fetchall()
-            
-            if result: 
-                rp_data = [
-                    {"intendedUseIdentifier": row[0], "type_policy": row[1], "policy_uri": row[2]} 
-                    for row in result
-                ] 
-                logger.info(f"Intended Use found: {iu_id}")
-                return rp_data
-            else:
-                logger.info("Intended Use not found.")
-                return None
-        else:
-            return None
-
-    except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking Intended Use: {e}")
-        return None
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-
-def update_iu_edit(grouped, iu_id):
-    try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            insert_query = """
-                                UPDATE intendeduse 
-                                SET intendedUseIdentifier = %s, type_policy = %s, policy_uri = %s
-                                WHERE intendeduse_id = %s
-                            """
-            cursor.execute(insert_query, (grouped["intendedUseIdentifier"], grouped["type_policy"], grouped["policy_uri"], iu_id,))
+            cursor.execute(insert_query, (wrp_id, entitlement,))
             
             connection.commit()
             
             extra = {'code'} 
-            logger.info(f"Intended Use successfully updated: {id}")
+            logger.info(f"Wallet Relying Party Entitlement successfully added. New Wallet Relying Party Entitlement  ID: {cursor.lastrowid}")
             return cursor.lastrowid
 
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error updating Intended Use: {e}")
+        logger.error(f"Error inserting Wallet Relying Party Entitlement : {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
-   
-def get_all_rp_inf():
+            
+def insert_wrp_intermediary(wrp_id, intermediary_wrp_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            select_query = """
-                SELECT tradeName, supportURI, srvDescription, entitlement, providesAttestations, isIntermediary, usesIntermediary, policyURI
-                FROM walletrelyingparty
-            """
+            insert_query = "INSERT INTO wrp_intermediary (" \
+            "wrp_id, " \
+            "intermediary_wrp_id) " \
+            "VALUES (%s, %s)"
             
-            cursor.execute(select_query, ())
-            result = cursor.fetchall()
+            cursor.execute(insert_query, (wrp_id, intermediary_wrp_id,))
             
-            if result: 
-                rp_data = [
-                    {"tradeName": row[0], "srvDescription": row[1], "entitlement": row[2], "providesAttestations": row[3], "isIntermediary": row[4], "usesIntermediary": row[5], "policyURI": row[6]} 
-                    for row in result
-                ] 
-                logger.info(f"All RP found")
-                return rp_data
-            else:
-                logger.info("Not all RP found.")
-                return None
-        else:
-            return None
-    except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking: {e}")
-        return None
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Wallet Relying Party Intermediary successfully added. New Wallet Relying Party Intermediary  ID: {cursor.lastrowid}")
+            return cursor.lastrowid
 
-
-def get_rp_certificate(rp_id):
-    try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            select_query = """
-                SELECT wrp_id, tradeName, supportURI, srvDescription, intended_use, isPSB, entitlement, providesAttestations, supervisorAuthority, isIntermediary, usesIntermediary, registryURI, providerType, x5c, typePolicy, policyURI, legalEntity, user_id
-                FROM walletrelyingparty
-                WHERE wrp_id = %s
-            """
-            
-            cursor.execute(select_query, (rp_id,))
-            result = cursor.fetchall()
-            
-            if result: 
-                rp_data = [
-                    {"wrp_id": row[0], "tradeName": row[1], "supportURI": row[2], "srvDescription": row[3], "intended_use": row[4], "isPSB": row[5], "entitlement": row[6], "providesAttestations": row[7], "supervisorAuthority": row[8], "isIntermediary": row[9], "usesIntermediary": row[10], "registryURI": row[11], "providerType": row[12], "x5c": row[13], "typePolicy": row[14], "policyURI": row[15], "legalEntity": row[16], "user_id": row[17]} 
-                    for row in result
-                ] 
-                logger.info(f"RP {rp_id} found")
-                return rp_data
-            else: 
-                logger.info("Not all RP found.")
-                return None
-        else:
-            return None
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error checking: {e}")
-        return None
+        logger.error(f"Error inserting Wallet Relying Party Intermediary : {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
-
-
-def get_legal_person(legalperson_id):
+            
+def insert_wrp_srv_description(wrp_id, mls_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            select_query = """
-                SELECT legalperson_id, legalBasis, legalName, user_id
-                FROM legalperson
-                WHERE legalperson_id = %s
-            """
+            insert_query = "INSERT INTO wrp_srv_description (" \
+            "wrp_id, " \
+            "mls_id) " \
+            "VALUES (%s, %s)"
             
-            cursor.execute(select_query, (legalperson_id,))
-            result = cursor.fetchall()
+            cursor.execute(insert_query, (wrp_id, mls_id,))
             
-            if result: 
-                legal_person_data = [
-                    {"legalperson_id": row[0], "legalBasis": row[1], "legalName": row[2], "user_id": row[3]} 
-                    for row in result
-                ] 
-                logger.info(f"legal person {legalperson_id} found")
-                return legal_person_data
-            else: 
-                logger.info("No Legal Person found.")
-                return None
-        else:
-            return None
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Wallet Relying Party Srv Description successfully added. New Wallet Relying Party Srv Description  ID: {cursor.lastrowid}")
+            return cursor.lastrowid
+
     except pymysql.MySQLError as e:
         extra = {'code'} 
-        logger.error(f"Error checking: {e}")
-        return None
+        logger.error(f"Error inserting Wallet Relying Party Srv Description : {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
-
-
-def get_legal_entity(le_id):
+            
+def insert_wrp_support_uri(wrp_id, uri):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            select_query = """
-                SELECT legalentity_id, legalperson_id, naturalperson_id, postalAddress, country, email, phone, infoURI, identifier,identifierType, user_id
-                FROM legalentity
-                WHERE legalentity_id = %s
-            """
+            insert_query = "INSERT INTO wrp_support_uri (" \
+            "wrp_id, " \
+            "uri) " \
+            "VALUES (%s, %s)"
             
-            cursor.execute(select_query, (le_id,))
-            result = cursor.fetchall()
+            cursor.execute(insert_query, (wrp_id, uri,))
             
-            if result: 
-                legal_entity_data = [
-                    {"legalentity_id": row[0], "legalperson_id": row[1], "naturalperson_id": row[2], "postalAddress": row[3], "country": row[4], "email": row[5], "phone": row[6], "infoURI": row[7], "identifier": row[8], "identifierType": row[9], "user_id": row[10]} 
-                    for row in result
-                ] 
-                logger.info(f"Legal Entity found: {le_id}")
-                return legal_entity_data
-            else:
-                logger.info("Legal Entity not found.")
-                return None
-        else:
-            return None
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Wallet Relying Party Support Uri successfully added. New Wallet Relying Party Support Uri  ID: {cursor.lastrowid}")
+            return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking legal Entity: {e}")
-        return None
+        extra = {'code'} 
+        logger.error(f"Error inserting Wallet Relying Party Support Uri : {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_natural_person(natural_person):
+def insert_wrp_provided_attestation(wrp_id, provided_attestation_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            select_query = """
-                SELECT naturalperson_id, givenName, familyName, dateOfBirth, placeOfBirth, user_id
-                FROM naturalperson
-                WHERE naturalperson_id = %s
-            """
+            insert_query = "INSERT INTO wrp_provided_attestation (" \
+            "wrp_id, " \
+            "provided_attestation_id) " \
+            "VALUES (%s, %s)"
             
-            cursor.execute(select_query, (natural_person,))
-            result = cursor.fetchall()
+            cursor.execute(insert_query, (wrp_id, provided_attestation_id,))
             
-            if result: 
-                natural_person_data = [
-                    {"naturalperson_id": row[0], "givenName": row[1], "familyName": row[2], "dateOfBirth": row[3], "placeOfBirth": row[4], "user_id": row[5]} 
-                    for row in result
-                ] 
-                logger.info(f"Natural Person found: {natural_person}")
-                return natural_person_data
-            else:
-                logger.info("Natural Person not found.")
-                return None
-        else:
-            return None
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Wallet Relying Party Provided Attestation successfully added. New Wallet Relying Party Provided Attestation  ID: {cursor.lastrowid}")
+            return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking Natural Person: {e}")
-        return None
+        extra = {'code'} 
+        logger.error(f"Error inserting Wallet Relying Party Provided Attestation : {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-
-def get_intended_use(intendeduse_id):
+def insert_wrp_intended_use(wrp_id, intended_use_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            select_query = """
-                SELECT *
-                FROM intendeduse
-                WHERE intendeduse_id = %s
-            """
+            insert_query = "INSERT INTO wrp_intended_use (" \
+            "wrp_id, " \
+            "intended_use_id) " \
+            "VALUES (%s, %s)"
             
-            cursor.execute(select_query, (intendeduse_id,))
-            result = cursor.fetchall()
+            cursor.execute(insert_query, (wrp_id, intended_use_id,))
             
-            if result: 
-                intended_use_data = [
-                    {"intendeduse_id": row[0], "createdAt": row[1], "revokedAt": row[2], "intendedUseIdentifier": row[3], "type_policy": row[4], "policy_uri": row[5], "purpose": row[6], "credential_id": row[7], "user_id": row[8], "wrp": row[9]} 
-                    for row in result
-                ] 
-                logger.info(f"Intended Use found: {intendeduse_id}")
-                return intended_use_data
-            else:
-                logger.info("Intended Use not found.")
-                return None
-        else:
-            return None
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Wallet Relying Party Intended Use successfully added. New Wallet Relying Party Intended Use  ID: {cursor.lastrowid}")
+            return cursor.lastrowid
 
     except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
+        extra = {'code'} 
+        logger.error(f"Error inserting Wallet Relying Party Intended Use : {e}")
     finally:
         if connection:
             cursor.close()
             connection.close()
 
-def get_credential(iu_id):
+## -wrp-get
+def get_wrp(user_id):
     try:
         connection = conn()
         if connection:
             cursor = connection.cursor()
 
-            select_query = """
-                SELECT *
-                FROM credential
-                WHERE intendedUse_id = %s
-            """
+            query = """
+                SELECT 
+                    wrp.id,
+                    wrp.provider_id,
+                    wrp.trade_name,
+                    wrp.is_psb,
+                    wrp.registry_uri,
+                    wrp.is_intermediary,
+                    wrp.supervisory_authority_id,
+
+                    su.uri,
+                    we.entitlement,
+
+                    wi.intermediary_wrp_id,
+
+                    mls.lang,
+                    mls.content,
+
+                    sa.name,
+                    sa.country,
+                    sae.email,
+                    sap.phone,
+                    saf.formURI,
+
+                    iu.id,
+                    iu.intended_use_identifier
+
+                FROM wallet_relying_party wrp
+
+                LEFT JOIN wrp_support_uri su
+                    ON su.wrp_id = wrp.id
+
+                LEFT JOIN wrp_entitlement we
+                    ON we.wrp_id = wrp.id
+
+                LEFT JOIN wrp_intermediary wi
+                    ON wi.wrp_id = wrp.id
+
+                LEFT JOIN wrp_srv_description wsd
+                    ON wsd.wrp_id = wrp.id
+
+                LEFT JOIN multilanguage_string mls
+                    ON mls.id = wsd.mls_id
+
+                LEFT JOIN supervisory_authority sa
+                    ON sa.id = wrp.supervisory_authority_id
+
+                LEFT JOIN supervisory_authority_email sae
+                    ON sae.authority_id = sa.id
+
+                LEFT JOIN supervisory_authority_phone sap
+                    ON sap.authority_id = sa.id
+                
+                LEFT JOIN supervisory_authority_formuri saf
+                    ON saf.authority_id = sa.id
+
+                LEFT JOIN wrp_intended_use wrpiu
+                    ON wrpiu.wrp_id = wrp.id
+                    
+                LEFT JOIN intended_use iu
+                    ON iu.id = wrpiu.intended_use_id
+
+                WHERE wrp.user_id = %s;
+                """
             
-            cursor.execute(select_query, (iu_id,))
-            result = cursor.fetchall()
-            
-            if result: 
-                credential_data = [
-                    {"credential_id": row[0], "name": row[1], "format": row[2], "meta": row[3], "path": row[4], "credentialValues": row[5], "user_id": row[6]} 
-                    for row in result
-                ] 
-                logger.info(f"Credentail found: {iu_id}")
-                return credential_data
-            else:
-                logger.info("Credentail not found.")
-                return None
-        else:
-            return None
+            cursor.execute(query, (user_id,))
+            rows = cursor.fetchall()
+
+            result = {}
+
+            for (
+                wrp_id, provider_id, trade_name,
+                is_psb, registry_uri, is_intermediary, sa_id,
+                support_uri, entitlement,
+                intermediary_id,
+                lang, content,
+                sa_name, sa_country,
+                sa_email, sa_phone, sa_form,
+                iu_id, iu_intended_use_identifier
+            ) in rows:
+
+                if wrp_id not in result:
+                    result[wrp_id] = {
+                        "wrp_id": wrp_id,
+                        "provider_id": provider_id,
+                        "trade_name": trade_name,
+                        "isPSB": bool(is_psb),
+                        "registryURI": registry_uri,
+                        "isIntermediary": bool(is_intermediary),
+
+                        "supportURI": [],
+                        "entitlements": [],
+                        "srvDescription": [],
+                        "usesIntermediary": [],
+
+                        "SupervisoryAuthority": None,
+
+                        "intendedUses": []
+                    }
+
+                wrp = result[wrp_id]
+
+                # supportURI
+                if support_uri and support_uri not in wrp["supportURI"]:
+                    wrp["supportURI"].append(support_uri)
+
+                # entitlements
+                if entitlement and entitlement not in wrp["entitlements"]:
+                    wrp["entitlements"].append(entitlement)
+
+                # intermediary
+                if intermediary_id and intermediary_id not in wrp["usesIntermediary"]:
+                    wrp["usesIntermediary"].append(intermediary_id)
+
+                # srvDescription
+                if lang and content:
+                    obj = {"lang": lang, "content": content}
+                    if obj not in wrp["srvDescription"]:
+                        wrp["srvDescription"].append(obj)
+
+                # Supervisory Authority
+                if sa_name:
+                    if wrp["SupervisoryAuthority"] is None:
+                        wrp["SupervisoryAuthority"] = {
+                            "name": sa_name,
+                            "country": sa_country,
+                            "email": [],
+                            "phone": [],
+                            "formURI": []
+                        }
+
+                    sa = wrp["SupervisoryAuthority"]
+
+                    if sa_email and sa_email not in sa["email"]:
+                        sa["email"].append(sa_email)
+
+                    if sa_phone and sa_phone not in sa["phone"]:
+                        sa["phone"].append(sa_phone)
+
+                    if sa_form and sa_form not in sa["formURI"]:
+                        sa["formURI"].append(sa_form)
+                
+                # Intended Uses
+                if iu_id:
+                    obj = {
+                        "id": iu_id,
+                        "identifier": iu_intended_use_identifier
+                    }
+
+                    if obj not in wrp["intendedUses"]:
+                        wrp["intendedUses"].append(obj)
+
+
+            return list(result.values())
 
     except pymysql.MySQLError as e:
-        extra = {'code'}
-        logger.error(f"Error checking user: {e}")
-        return None
+        logger.error(f"Error: {e}")
+        return []
     finally:
         if connection:
             cursor.close()
             connection.close()
+
+            
+def get_wrp_id(wrp_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    wrp.id,
+                    wrp.provider_id,
+                    wrp.trade_name,
+                    wrp.is_psb,
+                    wrp.registry_uri,
+                    wrp.is_intermediary,
+                    wrp.supervisory_authority_id,
+
+                    su.uri,
+                    we.entitlement,
+
+                    wi.intermediary_wrp_id,
+
+                    mls.lang,
+                    mls.content,
+
+                    sa.name,
+                    sa.country,
+                    sae.email,
+                    sap.phone,
+                    saf.formURI
+
+                FROM wallet_relying_party wrp
+
+                LEFT JOIN wrp_support_uri su
+                    ON su.wrp_id = wrp.id
+
+                LEFT JOIN wrp_entitlement we
+                    ON we.wrp_id = wrp.id
+
+                LEFT JOIN wrp_intermediary wi
+                    ON wi.wrp_id = wrp.id
+
+                LEFT JOIN wrp_srv_description wsd
+                    ON wsd.wrp_id = wrp.id
+
+                LEFT JOIN multilanguage_string mls
+                    ON mls.id = wsd.mls_id
+
+                LEFT JOIN supervisory_authority sa
+                    ON sa.id = wrp.supervisory_authority_id
+
+                LEFT JOIN supervisory_authority_email sae
+                    ON sae.authority_id = sa.id
+
+                LEFT JOIN supervisory_authority_phone sap
+                    ON sap.authority_id = sa.id
+
+                LEFT JOIN supervisory_authority_formuri saf
+                    ON saf.authority_id = sa.id
+
+                WHERE wrp.id = %s;
+                """
+            
+            cursor.execute(query, (wrp_id,))
+            rows = cursor.fetchall()
+
+            result = {}
+
+            for (
+                wrp_id, provider_id, trade_name,
+                is_psb, registry_uri, is_intermediary, sa_id,
+                support_uri, entitlement,
+                intermediary_id,
+                lang, content,
+                sa_name, sa_country,
+                sa_email, sa_phone, sa_form
+            ) in rows:
+
+                if wrp_id not in result:
+                    result[wrp_id] = {
+                        "trade_name": trade_name,
+                        "isPSB": bool(is_psb),
+                        "registryURI": registry_uri,
+                        "isIntermediary": bool(is_intermediary),
+
+                        "supportURI": [],
+                        "entitlements": [],
+                        "srvDescription": [],
+                        "usesIntermediary": [],
+
+                        "SupervisoryAuthority": None
+                    }
+
+                wrp = result[wrp_id]
+
+                # supportURI
+                if support_uri and support_uri not in wrp["supportURI"]:
+                    wrp["supportURI"].append(support_uri)
+
+                # entitlements
+                if entitlement and entitlement not in wrp["entitlements"]:
+                    wrp["entitlements"].append(entitlement)
+
+                # intermediary
+                if intermediary_id and intermediary_id not in wrp["usesIntermediary"]:
+                    wrp["usesIntermediary"].append(intermediary_id)
+
+                # srvDescription
+                if lang and content:
+                    obj = {"lang": lang, "content": content}
+                    if obj not in wrp["srvDescription"]:
+                        wrp["srvDescription"].append(obj)
+
+                # Supervisory Authority
+                if sa_name:
+                    if wrp["SupervisoryAuthority"] is None:
+                        wrp["SupervisoryAuthority"] = {
+                            "name": sa_name,
+                            "country": sa_country,
+                            "email": [],
+                            "phone": [],
+                            "formURI": []
+                        }
+
+                    sa = wrp["SupervisoryAuthority"]
+
+                    if sa_email and sa_email not in sa["email"]:
+                        sa["email"].append(sa_email)
+
+                    if sa_phone and sa_phone not in sa["phone"]:
+                        sa["phone"].append(sa_phone)
+
+                    if sa_form and sa_form not in sa["formURI"]:
+                        sa["formURI"].append(sa_form)
+
+            return list(result.values())
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+
+### -provided attestation-insert
+def insert_provided_attestation(format, meta, user_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = "INSERT INTO provided_attestation (" \
+            "format, " \
+            "meta, " \
+            "user_id) " \
+            "VALUES (%s, %s, %s)"
+            
+            cursor.execute(insert_query, (format, meta, user_id))
+            
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Provided Attestation successfully added. New Provided Attestation  ID: {cursor.lastrowid}")
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        extra = {'code'} 
+        logger.error(f"Error inserting Provided Attestation : {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+## -provided attestation-get
+def get_provided_attestation(user_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    pa.id,
+                    pa.format,
+                    pa.meta
+                FROM provided_attestation pa
+                WHERE pa.user_id = %s
+            """
+
+            cursor.execute(query, (user_id,))
+            rows = cursor.fetchall()
+
+            result = []
+
+            for pa_id, format_, meta in rows:
+                result.append({
+                    "provided_attestation_id": pa_id,
+                    "format": format_,
+                    "meta": meta
+                })
+
+            return result
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+## -multilanguage string-insert
+def insert_multilanguage_string(lang, content, user_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = "INSERT INTO multilanguage_string (" \
+            "lang, " \
+            "content, " \
+            "user_id) " \
+            "VALUES (%s, %s, %s)"
+            
+            cursor.execute(insert_query, (lang, content, user_id,))
+            
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Multilanguage String successfully added. New Multilanguage String  ID: {cursor.lastrowid}")
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        extra = {'code'} 
+        logger.error(f"Error inserting Multilanguage String : {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+## -intended use-insert
+def insert_intended_use(intended_use_identifier, created_at, revoked_at, user_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = "INSERT INTO intended_use (" \
+            "intended_use_identifier, " \
+            "created_at, " \
+            "revoked_at, " \
+            "user_id) " \
+            "VALUES (%s, %s, %s, %s)"
+            
+            cursor.execute(insert_query, (intended_use_identifier, created_at, revoked_at, user_id,))
+            
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Intended Use successfully added. New Intended Use  ID: {cursor.lastrowid}")
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        extra = {'code'} 
+        logger.error(f"Error inserting Intended Use : {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+            
+def insert_intended_use_purpose(intended_use_id, mls_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = "INSERT INTO intended_use_purpose (" \
+            "intended_use_id, " \
+            "mls_id) " \
+            "VALUES (%s, %s)"
+            
+            cursor.execute(insert_query, (intended_use_id, mls_id,))
+            
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Intended Use Purpose successfully added. New Intended Use Purpose  ID: {cursor.lastrowid}")
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        extra = {'code'} 
+        logger.error(f"Error inserting Intended Use Purpose : {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+            
+def insert_intended_use_policy(intended_use_id, policy_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = "INSERT INTO intended_use_policy (" \
+            "intended_use_id, " \
+            "policy_id) " \
+            "VALUES (%s, %s)"
+            
+            cursor.execute(insert_query, (intended_use_id, policy_id,))
+            
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Intended Use - Policy successfully added. New Intended Use - Policy  ID: {cursor.lastrowid}")
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        extra = {'code'} 
+        logger.error(f"Error inserting Intended Use - Policy : {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+            
+def insert_intended_use_credential(intended_use_id, credential_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = "INSERT INTO intended_use_credential (" \
+            "intended_use_id, " \
+            "credential_id) " \
+            "VALUES (%s, %s)"
+            
+            cursor.execute(insert_query, (intended_use_id, credential_id,))
+            
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Intended Use - Credential successfully added. New Intended Use - Credential  ID: {cursor.lastrowid}")
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        extra = {'code'} 
+        logger.error(f"Error inserting Intended Use - Credential : {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+## -intended use-get
+def get_intended_use(user_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    iu.id,
+                    iu.intended_use_identifier,
+                    iu.created_at,
+                    iu.revoked_at,
+
+                    mls.lang,
+                    mls.content,
+
+                    pol.policy_uri,
+                    pol.type,
+
+                    c.id,
+                    c.format,
+                    c.meta,
+
+                    cl.path
+
+                FROM intended_use iu
+
+                LEFT JOIN intended_use_purpose iup
+                    ON iup.intended_use_id = iu.id
+
+                LEFT JOIN multilanguage_string mls
+                    ON mls.id = iup.mls_id
+
+                LEFT JOIN intended_use_policy iupol
+                    ON iupol.intended_use_id = iu.id
+
+                LEFT JOIN policy pol
+                    ON pol.id = iupol.policy_id
+                    
+                LEFT JOIN intended_use_credential iuc
+                    ON iuc.intended_use_id = iu.id
+
+                LEFT JOIN credential c
+                    ON c.id = iuc.credential_id 
+
+                LEFT JOIN claim cl
+                    ON cl.credential_id = c.id
+
+                WHERE iu.user_id = %s;
+            """
+            
+            cursor.execute(query, (user_id,))
+            rows = cursor.fetchall()
+
+            result = {}
+
+            for (
+                iu_id, identifier, created_at, revoked_at,
+                lang, content,
+                policy_uri, policy_type,
+                cred_id, cred_format, cred_meta,
+                claim_path
+            ) in rows:
+
+                # Intended Use base
+                if iu_id not in result:
+                    result[iu_id] = {
+                        "intended_use_id": iu_id,
+                        "intendedUseIdentifier": identifier,
+                        "createdAt": str(created_at),
+                        "revokedAt": str(revoked_at) if revoked_at else None,
+                        "purpose": [],
+                        "privacyPolicy": [],
+                        "credentials": {},
+                        "_purpose_seen": set(),
+                        "_policy_seen": set()
+                    }
+
+                iu = result[iu_id]
+
+                # PURPOSE
+                if lang and content:
+                    key = (lang, content)
+                    if key not in iu["_purpose_seen"]:
+                        iu["purpose"].append({
+                            "lang": lang,
+                            "content": content
+                        })
+                        iu["_purpose_seen"].add(key)
+
+                # POLICY
+                if policy_uri:
+                    key = (policy_uri, policy_type)
+                    if key not in iu["_policy_seen"]:
+                        iu["privacyPolicy"].append({
+                            "policyURI": policy_uri,
+                            "type": policy_type
+                        })
+                        iu["_policy_seen"].add(key)
+
+                # CREDENTIALS
+                if cred_id:
+                    if cred_id not in iu["credentials"]:
+                        iu["credentials"][cred_id] = {
+                            "credential_id": cred_id,
+                            "format": cred_format,
+                            "meta": cred_meta,
+                            "claims": [],
+                            "_claims_seen": set()
+                        }
+
+                    cred = iu["credentials"][cred_id]
+
+                    # CLAIMS
+                    if claim_path and claim_path not in cred["_claims_seen"]:
+                        cred["claims"].append({
+                            "path": claim_path
+                        })
+                        cred["_claims_seen"].add(claim_path)
+
+            # CLEAN FINAL
+            final_result = []
+
+            for iu in result.values():
+
+                # limpar sets internos
+                del iu["_purpose_seen"]
+                del iu["_policy_seen"]
+
+                # credentials -> lista + limpar sets internos
+                creds = []
+                for cred in iu["credentials"].values():
+                    del cred["_claims_seen"]
+                    creds.append(cred)
+
+                iu["credentials"] = creds
+
+                final_result.append(iu)
+
+            return final_result
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+## -credential-insert
+def insert_credential(format, meta, user_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = "INSERT INTO credential (" \
+            "format, " \
+            "meta, " \
+            "user_id) " \
+            "VALUES (%s, %s, %s)"
+            
+            cursor.execute(insert_query, (format, meta, user_id,))
+            
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Credential successfully added. New Credential  ID: {cursor.lastrowid}")
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        extra = {'code'} 
+        logger.error(f"Error inserting Credential : {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+## -credential-get
+def get_credentials(user_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    c.id,
+                    c.format,
+                    c.meta,
+                    cl.id,
+                    cl.path
+
+                FROM credential c
+
+                LEFT JOIN claim cl 
+                    ON cl.credential_id = c.id
+
+                WHERE c.user_id = %s
+            """
+
+            cursor.execute(query, (user_id,))
+            rows = cursor.fetchall()
+
+            result = {}
+
+            for (
+                cred_id,
+                format,
+                meta,
+                claim_id,
+                path
+            ) in rows:
+
+                if cred_id not in result:
+                    result[cred_id] = {
+                        "credential_id": cred_id,
+                        "format": format,
+                        "meta": meta,
+                        "claims": []
+                    }
+
+                if claim_id:
+                    result[cred_id]["claims"].append({
+                        "claim_id": claim_id,
+                        "path": path
+                    })
+
+            return list(result.values())
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+## -claim-insert 
+def insert_claim(credential_id, path):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = "INSERT INTO claim (" \
+            "credential_id, " \
+            "path) " \
+            "VALUES (%s, %s)"
+            
+            cursor.execute(insert_query, (credential_id, path,))
+            
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Claim successfully added. New Claim  ID: {cursor.lastrowid}")
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        extra = {'code'} 
+        logger.error(f"Error inserting Claim : {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def search_wrp_public(
+    identifier=None,
+    legalname=None,
+    tradename=None,
+    policy=None,
+    entitlement=None,
+    providesattestation=None,
+    intendeduseidentifier=None,
+    isintermediary=None,
+    usesintermediary=None
+):
+    try:
+        connection = conn()
+        if not connection:
+            return []
+
+        cursor = connection.cursor()
+
+        query = """
+            SELECT 
+                wrp.id,
+                wrp.trade_name,
+                wrp.is_intermediary,
+
+                mls.lang,
+                mls.content,
+
+                we.entitlement,
+
+                pol.policy_uri,
+
+                wi.intermediary_wrp_id,
+
+                pa.format
+
+            FROM wallet_relying_party wrp
+
+            LEFT JOIN wrp_srv_description wsd
+                ON wsd.wrp_id = wrp.id
+
+            LEFT JOIN multilanguage_string mls
+                ON mls.id = wsd.mls_id
+
+            LEFT JOIN wrp_entitlement we
+                ON we.wrp_id = wrp.id
+
+            LEFT JOIN provider p
+                ON p.id = wrp.provider_id
+
+            LEFT JOIN provider_policy pp
+                ON pp.provider_id = p.id
+
+            LEFT JOIN policy pol
+                ON pol.id = pp.policy_id
+
+            LEFT JOIN wrp_intermediary wi
+                ON wi.wrp_id = wrp.id
+
+            LEFT JOIN wrp_provided_attestation wrppa
+                on wrppa.wrp_id = wrp.id
+
+            LEFT JOIN provided_attestation pa
+                ON pa.id = wrppa.provided_attestation_id
+
+            WHERE 1=1
+        """
+
+        params = []
+
+        # filters
+
+        # if tradename:
+        #     query += " AND wrp.trade_name LIKE %s"
+        #     params.append(f"%{tradename}%")
+
+        if isintermediary is not None:
+            query += " AND wrp.is_intermediary = %s"
+            params.append(isintermediary)
+
+        if entitlement:
+            query += """
+                AND wrp.id IN (
+                    SELECT wrp_id 
+                    FROM wrp_entitlement
+                    WHERE entitlement LIKE %s
+                )
+            """
+            params.append(f"%{entitlement}%")
+
+        if policy:
+            if policy:
+                query += """
+                    AND wrp.id IN (
+                        SELECT wrp2.id
+                        FROM wallet_relying_party wrp2
+                        JOIN provider p2 ON p2.id = wrp2.provider_id
+                        JOIN provider_policy pp2 ON pp2.provider_id = p2.id
+                        JOIN policy pol2 ON pol2.id = pp2.policy_id
+                        WHERE pol2.policy_uri LIKE %s
+                    )
+                """
+                params.append(f"%{policy}%")
+
+        # if providesattestation:
+        #     query += """
+        #         AND wrp.id IN (
+        #             SELECT wrppa.wrp_id
+        #             FROM wrp_provided_attestation wrppa
+        #             JOIN provided_attestation pa 
+        #                 ON pa.id = wrppa.provided_attestation_id
+        #             WHERE pa.format LIKE %s
+        #         )
+        #     """
+        #     params.append(f"%{providesattestation}%")
+
+        # if intendeduseidentifier:
+        #     query += """
+        #         AND wrp.id IN (
+        #             SELECT wi.wrp_id
+        #             FROM wrp_intended_use wi
+        #             JOIN intended_use iu 
+        #                 ON iu.id = wi.intended_use_id
+        #             WHERE iu.intended_use_identifier LIKE %s
+        #         )
+        #     """
+        #     params.append(f"%{intendeduseidentifier}%")
+
+        # if usesintermediary is not None:
+        #     if usesintermediary:
+        #         query += """
+        #             AND wrp.id IN (
+        #                 SELECT wrp_id FROM wrp_intermediary
+        #             )
+        #         """
+        #     else:
+        #         query += """
+        #             AND wrp.id NOT IN (
+        #                 SELECT wrp_id FROM wrp_intermediary
+        #             )
+        #         """
+
+        # identifier (legal_entity_identifier)
+        if identifier:
+            query += """
+                AND wrp.id IN (
+                    SELECT wrp2.id
+                    FROM wallet_relying_party wrp2
+                    JOIN provider p2 ON p2.id = wrp2.provider_id
+                    JOIN legal_entity le2 ON le2.id = p2.legal_entity_id
+                    JOIN legal_entity_identifier lei ON lei.legal_entity_id = le2.id
+                    JOIN identifier i ON i.id = lei.identifier_id
+                    WHERE i.identifier LIKE %s
+                )
+            """
+            params.append(f"%{identifier}%")
+
+        # legalname
+        if legalname:
+            query += """
+                AND wrp.id IN (
+                    SELECT wrp3.id
+                    FROM wallet_relying_party wrp3
+                    JOIN provider p3 ON p3.id = wrp3.provider_id
+                    JOIN legal_entity le3 ON le3.id = p3.legal_entity_id
+                    JOIN legal_person_name lpn ON lpn.legal_person_id = le3.legal_person_id
+                    WHERE lpn.name LIKE %s
+                )
+            """
+            params.append(f"%{legalname}%")
+
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+
+        # Agregation
+        result = {}
+
+        for (
+            wrp_id,
+            trade_name,
+            is_intermediary,
+            lang,
+            content,
+            entitlement_val,
+            policy_uri,
+            intermediary_id,
+            attestation_format
+        ) in rows:
+
+            if wrp_id not in result:
+                result[wrp_id] = {
+                    "tradeName": trade_name,
+                    "srvDescription": [],
+                    "entitlements": [],
+                    "providesAttestations": [],
+                    "isIntermediary": bool(is_intermediary) if is_intermediary is not None else None,
+                    "usesIntermediary": None,
+                    "policyURI": None
+                }
+
+            wrp = result[wrp_id]
+
+            # srvDescription
+            if lang and content:
+                obj = {"lang": lang, "srvDescription": content}
+                if obj not in wrp["srvDescription"]:
+                    wrp["srvDescription"].append(obj)
+
+            # entitlements
+            if entitlement_val and entitlement_val not in wrp["entitlements"]:
+                wrp["entitlements"].append(entitlement_val)
+
+            # policy 
+            if policy_uri:
+                wrp["policyURI"] = policy_uri
+
+            # usesIntermediary
+            if intermediary_id:
+                wrp["usesIntermediary"] = True
+
+            # providesAttestations
+            if attestation_format and attestation_format not in wrp["providesAttestations"]:
+                wrp["providesAttestations"].append(attestation_format)
+
+        # cleanup
+        final = []
+
+        for wrp in result.values():
+
+            if not wrp["entitlements"]:
+                wrp["entitlements"] = None
+
+            if not wrp["providesAttestations"]:
+                wrp["providesAttestations"] = None
+
+            final.append(wrp)
+
+        return final
+
+    except pymysql.MySQLError as e:
+        logger.error(f"search_wrp_public error: {e}")
+        return []
+
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def get_wrp_by_identifier(identifier):
+    try:
+        connection = conn()
+        cursor = connection.cursor()
+
+        query = """
+            SELECT wrp.id
+            FROM wallet_relying_party wrp
+
+            JOIN provider p ON p.id = wrp.provider_id
+            JOIN legal_entity le ON le.id = p.legal_entity_id
+            JOIN legal_entity_identifier lei ON lei.legal_entity_id = le.id
+            JOIN identifier i ON i.id = lei.identifier_id
+
+            WHERE i.identifier = %s
+        """
+
+        cursor.execute(query, (identifier,))
+        row = cursor.fetchone()
+
+        if not row:
+            return None
+
+        wrp_id = row[0]
+
+        return get_wrp_id(wrp_id)
+
+    except Exception as e:
+        logger.error(e)
+        return None
+
+def check_intended_use(
+    identifier,
+    claim_path=None,
+    credential_format=None,
+    credential_meta=None,
+    intended_use_identifier=None
+):
+    try:
+        connection = conn()
+        cursor = connection.cursor()
+
+        query = """
+            SELECT 1
+            FROM wallet_relying_party wrp
+
+            JOIN provider p 
+                ON p.id = wrp.provider_id
+            JOIN legal_entity le 
+                ON le.id = p.legal_entity_id
+            JOIN legal_entity_identifier lei 
+                ON lei.legal_entity_id = le.id
+            JOIN identifier i 
+                ON i.id = lei.identifier_id
+
+            JOIN wrp_intended_use wi 
+                ON wi.wrp_id = wrp.id
+            JOIN intended_use iu 
+                ON iu.id = wi.intended_use_id
+
+            LEFT JOIN intended_use_credential iuc
+                ON iuc.intended_use_id = iu.id
+            LEFT JOIN credential c 
+                ON c.id = iuc.credential_id
+
+            LEFT JOIN claim cl 
+                ON cl.credential_id = c.id
+
+            WHERE i.identifier = %s
+        """
+
+        params = [identifier]
+
+        if intended_use_identifier:
+            query += " AND iu.intended_use_identifier = %s"
+            params.append(intended_use_identifier)
+
+        if credential_format:
+            query += " AND c.format = %s"
+            params.append(credential_format)
+
+        if credential_meta:
+            query += " AND c.meta = %s"
+            params.append(credential_meta)
+
+        if claim_path:
+            query += " AND cl.path = %s"
+            params.append(claim_path)
+
+        query += " LIMIT 1"
+
+        cursor.execute(query, tuple(params))
+        result = cursor.fetchone()
+
+        return result is not None
+
+    except Exception as e:
+        logger.error(e)
+        return False
