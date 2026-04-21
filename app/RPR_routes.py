@@ -101,6 +101,47 @@ rpr = Blueprint("RPR", __name__, url_prefix="/")
 
 rpr.template_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'template/')
 
+def validate_required_fields(data, required_fields):
+    missing = [field for field in required_fields if field not in data or data[field] is None]
+    return missing
+
+def error_response(message, missing_fields=None, code=400):
+    return {
+        "status": "error",
+        "code": code,
+        "message": message,
+        "data": {
+            "missing_fields": missing_fields or []
+        }
+    }, code
+
+def error_invalid(message, code=400):
+    return {
+        "status": "error",
+        "code": code,
+        "message": message
+    }, code
+
+def create_response(message, data=None, result=None, code=201):
+    return {
+        "status": "success",
+        "code": code,
+        "message": message,
+        "data": {
+            data: result or []
+        }
+    }, code
+
+def list_response(message, result, name, code=200):
+    return {
+        "status": "success",
+        "code": code,
+        "message": message,
+        "data": {
+            name: result
+        }
+    }, code
+
 
 @rpr.route('/', methods=['GET','POST'])
 def initial_page():
@@ -610,8 +651,6 @@ def insert_wrp():
             for y in claims:
                 db.insert_claim(credential_id, y.get("path"))
                 
-
-
     return {
         "status": "success",
         "code": 201,
@@ -625,48 +664,38 @@ def create_law():
     data = request.get_json(silent=True)
 
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "law"])
+    if missing:
+        return error_response("Missing required fields.", missing)
 
     hash_pid = data.get("hash_pid")
-    
     laws = data.get("law", [])
 
-    required_fields = {
-        "hash_pid": hash_pid
-    }
-
-    missing_fields = [name for name, value in required_fields.items() if not value]
-
-    if missing_fields:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": missing_fields
-            }
-        }, 400
-
     user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    result = []
 
+    for law in laws: 
+        missing = validate_required_fields(law, ["legislativeIdentifier"])
+        if missing:
+            return error_response("Missing required fields.", missing)
+    
     for law in laws:
         legislativeIdentifier = law.get("legislativeIdentifier")
         legalBasis = law.get("legalBasis", [])
 
         law_id = db.insert_law(legislativeIdentifier, user_id)
+        result.append(law_id)
 
         for aux in legalBasis:
-            db.insert_law_legal_basis(law_id, aux)
+            if aux:
+                db.insert_law_legal_basis(law_id, aux)
 
-    return {
-        "status": "success",
-        "code": 201,
-        "message": "Lawcreated successfully"
-    }, 201
+    return create_response("Law created successfully", "Law new ids:", result)
 
 @rpr.route('/list_law', methods=['POST'])
 def list_law():
@@ -674,46 +703,21 @@ def list_law():
     data = request.get_json(silent=True)
     
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid"])
+    if missing:
+        return error_response("Missing required fields.", missing)
     
     hash_pid = data.get("hash_pid")
-
-    if not hash_pid:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": ["hash_pid"]
-            }
-        }, 400
     
     user_id = db.check_user(hash_pid)
-
     if user_id is None:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid hash_pid",
-            "data": {
-                "hash_pid": hash_pid
-            }
-        }, 400
+        return error_invalid("Invalid hash_pid", missing)
 
     result = db.get_law(user_id)
 
-    return {
-        "status": "success",
-        "code": 200,
-        "message": "Law retrieved successfully.",
-        "data": {
-            "law": result
-        }
-    }, 200
+    return list_response("Law retrieved successfully.", result, "law")
 
 ## -legal person 
 @rpr.route('/create_legal_person', methods=['POST'])
@@ -722,96 +726,71 @@ def create_legal_person():
     data = request.get_json(silent=True)
 
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "legalPerson"])
+    if missing:
+        return error_response("Missing required fields.", missing)
 
     hash_pid = data.get("hash_pid")
-    
-    legalNames = data.get("legalName", [])
-    laws = data.get("law", [])
-
-    required_fields = {
-        "hash_pid": hash_pid,
-        "laws": laws
-    }
-
-    missing_fields = [name for name, value in required_fields.items() if not value]
-
-    if missing_fields:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": missing_fields
-            }
-        }, 400
+    legalPersons = data.get("legalPerson", [])
 
     user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    result = []
 
-    legal_person_id = db.insert_legal_person(user_id)
+    #verification
+    for legalPerson in legalPersons:
+        missing = validate_required_fields(legalPerson, ["legalName"])
+        if missing:
+            return error_response("Missing required fields.", missing)
+        
+        laws = legalPerson.get("law", [])
+        for law in laws:
+            if law:
+                if user_id != db.check_law(law):
+                    return error_invalid("law id doesn't belong to this user")
+    
+    #inserts data base
+    for legalPerson in legalPersons:
+        legalNames = legalPerson.get("legalName", [])
+        laws = legalPerson.get("law", [])
 
-    for legalName in legalNames:
-        db.insert_legal_person_name(legal_person_id, legalName)
+        legal_person_id = db.insert_legal_person(user_id)
+        result.append(legal_person_id)
+        
+        for legalName in legalNames:
+            db.insert_legal_person_name(legal_person_id, legalName)
+        
+        for law in laws:
+            if law:
+                db.associate_legal_person_law(legal_person_id, law)
 
-    for law in laws:
-        db.associate_legal_person_law(legal_person_id, law)
-
-    return {
-        "status": "success",
-        "code": 201,
-        "message": "Legal Person created successfully"
-    }, 201
+    return create_response("Legal Person created successfully", "Legal person new ids:", result)
 
 @rpr.route('/list_legal_person', methods=['POST'])
 def list_legal_person():
 
     data = request.get_json(silent=True)
-    
+   
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid"])
+    if missing:
+        return error_response("Missing required fields.", missing)
     
     hash_pid = data.get("hash_pid")
-
-    if not hash_pid:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": ["hash_pid"]
-            }
-        }, 400
     
     user_id = db.check_user(hash_pid)
-
     if user_id is None:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid hash_pid",
-            "data": {
-                "hash_pid": hash_pid
-            }
-        }, 400
+        return error_invalid("Invalid hash_pid")
 
     result = db.get_legal_person(user_id)
 
-    return {
-        "status": "success",
-        "code": 200,
-        "message": "Legal Persons retrieved successfully.",
-        "data": {
-            "legal_person": result
-        }
-    }, 200
+    return list_response("Legal Persons retrieved successfully.", result, "legal_person")
 
 ## -natural person
 @rpr.route('/create_natural_person', methods=['POST'])
@@ -820,74 +799,38 @@ def create_natural_person():
     data = request.get_json(silent=True)
 
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "naturalPerson"])
+    if missing:
+        return error_response("Missing required fields.", missing)
 
     hash_pid = data.get("hash_pid")
-    family_name = data.get("familyName")
-    given_name = data.get("givenName")
-    date_of_birth = data.get("dateOfBirth")
-    place_of_birth = data.get("placeOfBirth")
-
-    required_fields = {
-        "hash_pid": hash_pid
-    }
-
-    missing_fields = [name for name, value in required_fields.items() if not value]
-
-    if missing_fields:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": missing_fields
-            }
-        }, 400
+    naturalPersons = data.get("naturalPerson", [])
 
     user_id = db.check_user(hash_pid)
+    result = []
 
     if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    #verification
+    for naturalPerson in naturalPersons:
+        missing = validate_required_fields(naturalPerson, ["familyName", "givenName"])
+        if missing:
+            return error_response("Missing required fields.", missing)
         
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid hash_pid",
-            "data": {
-                "hash_pid": hash_pid
-            }
-        }, 400
+    #insert data base    
+    for naturalPerson in naturalPersons:
+        family_name = naturalPerson.get("familyName")
+        given_name = naturalPerson.get("givenName")
+        date_of_birth = naturalPerson.get("dateOfBirth")
+        place_of_birth = naturalPerson.get("placeOfBirth")
 
-    if not family_name or not given_name:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "familyName and givenName are required"
-        }, 400
+        natural_person_id = db.insert_natural_person(family_name, given_name, date_of_birth, place_of_birth, user_id)
+        result.append(natural_person_id)
 
-    result = db.insert_natural_person(
-        family_name,
-        given_name,
-        date_of_birth,
-        place_of_birth,
-        user_id
-    )
-
-    if not result:
-        return {
-            "status": "error",
-            "code": 500,
-            "message": "Failed to create natural person"
-        }, 500
-
-    return {
-        "status": "success",
-        "code": 201,
-        "message": "Natural Person created successfully"
-    }, 201
+    return create_response("Natural Person created successfully", "Natural person new ids", result)
 
 @rpr.route('/list_natural_person', methods=['POST'])
 def get_natural_person():
@@ -895,46 +838,21 @@ def get_natural_person():
     data = request.get_json(silent=True)
     
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid"])
+    if missing:
+        return error_response("Missing required fields.", missing)
     
     hash_pid = data.get("hash_pid")
-
-    if not hash_pid:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": ["hash_pid"]
-            }
-        }, 400
     
     user_id = db.check_user(hash_pid)
-
     if user_id is None:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid hash_pid",
-            "data": {
-                "hash_pid": hash_pid
-            }
-        }, 400
+        return error_invalid("Invalid hash_pid")
 
     result = db.get_natural_person(user_id)
 
-    return {
-        "status": "success",
-        "code": 200,
-        "message": "Natural Persons retrieved successfully.",
-        "data": {
-            "natural_person": result
-        }
-    }, 200
+    return list_response("Natural Persons retrieved successfully.", result, "natural_person")
 
 ## -identifier
 @rpr.route('/create_identifier', methods=['POST'])
@@ -943,98 +861,62 @@ def create_identifier():
     data = request.get_json(silent=True)
 
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "identifier"])
+    if missing:
+        return error_response("Missing required fields.", missing)
 
     hash_pid = data.get("hash_pid")
     identifiers = data.get("identifier", [])
 
-    required_fields = {
-        "hash_pid": hash_pid
-    }
-
-    missing_fields = [name for name, value in required_fields.items() if not value]
-
-    if missing_fields:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": missing_fields
-            }
-        }, 400
-
     user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    result = []
 
+    #verification
+    for identifier in identifiers:
+        missing = validate_required_fields(identifier, ["identifier", "type"])
+        if missing:
+            return error_response("Missing required fields.", missing)
+        
+        type = identifier.get("type")
+        if type not in cfgserv.legal_entity_type_identifier["Type of Identifier"]:
+            return error_invalid(f"Invalid type_of_identifier. Must be one of: {', '.join(cfgserv.legal_entity_type_identifier['Type of Identifier'])}")
+
+    #insert data base
     for identifier in identifiers:
         identifier_value = identifier.get("identifier")
         type = identifier.get("type")
 
-        result = db.insert_identifier(identifier_value, type, user_id)
+        identifier_id = db.insert_identifier(identifier_value, type, user_id)
+        result.append(identifier_id)
 
-    if not result:
-        return {
-            "status": "error",
-            "code": 500,
-            "message": "Failed to create Identifier"
-        }, 500
-
-    return {
-        "status": "success",
-        "code": 201,
-        "message": "Identifier created successfully"
-    }, 201
+    return create_response("Identifier created successfully", "Identifiers new ids", result)
 
 @rpr.route('/list_identifier', methods=['POST'])
 def list_identifier():
 
     data = request.get_json(silent=True)
-    
+
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid"])
+    if missing:
+        return error_response("Missing required fields.", missing)
     
     hash_pid = data.get("hash_pid")
-
-    if not hash_pid:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": ["hash_pid"]
-            }
-        }, 400
     
     user_id = db.check_user(hash_pid)
-
     if user_id is None:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid hash_pid",
-            "data": {
-                "hash_pid": hash_pid
-            }
-        }, 400
+        return error_invalid("Invalid hash_pid")
 
     result = db.get_identifier(user_id)
 
-    return {
-        "status": "success",
-        "code": 200,
-        "message": "Identifiers retrieved successfully.",
-        "data": {
-            "identifier": result
-        }
-    }, 200
+    return list_response("Identifiers retrieved successfully.", result, "identifier")
 
 ## -legal entity
 @rpr.route('/create_legal_entity', methods=['POST'])
@@ -1043,69 +925,81 @@ def create_legal_entity():
     data = request.get_json(silent=True)
 
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "legal_entity"])
+    if missing:
+        return error_response("Missing required fields.", missing)
 
     hash_pid = data.get("hash_pid")
-    identifier_ids = data.get("identifiers", [])
-    postalAddress = data.get("postalAddress", [])
-    country = data.get("country")
-    emails = data.get("email", [])
-    phones = data.get("phone", [])
-    infoURIs = data.get("infoURI", [])
-    legal_person_id = data.get("legal_person_id")
-    natural_person_id = data.get("natural_person_id")
-
-    required_fields = {
-        "hash_pid": hash_pid
-    }
-
-    missing_fields = [name for name, value in required_fields.items() if not value]
-
-    if missing_fields:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": missing_fields
-            }
-        }, 400
+    legal_entity = data.get("legal_entity")
 
     user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    result = []
+
+    #verification
+    for aux in legal_entity:
+        missing = validate_required_fields(aux, ["identifiers", "country"])
+        if missing:
+            return error_response("Missing required fields.", missing)
+
+        legal_person_id = aux.get("legal_person_id")
+        natural_person_id = aux.get("natural_person_id")
+        identifier_ids = aux.get("identifiers", [])
+        country = aux.get("country")
+
+        if country not in cfgserv.eu_countries:
+                return error_invalid(f"Invalid Country. Must be one of: {', '.join(cfgserv.eu_countries)}")
+
+        if natural_person_id:
+            if user_id != db.check_natural_person(natural_person_id):
+                return error_invalid("The natural person ID does not belong to this user")
+
+        if legal_person_id: 
+            if user_id != db.check_legal_person(legal_person_id):
+                return error_invalid("The legal person ID does not belong to this user")
+        
+        for identifier_id in identifier_ids:
+            if user_id != db.check_identifier(identifier_id):
+                return error_invalid("The identifier ID does not belong to this user")
+
+    #insert data base
+    for aux in legal_entity:
+        identifier_ids = aux.get("identifiers", [])
+        postalAddress = aux.get("postalAddress", [])
+        country = aux.get("country")
+        emails = aux.get("email", [])
+        phones = aux.get("phone", [])
+        infoURIs = aux.get("infoURI", [])
+        legal_person_id = aux.get("legal_person_id")
+        natural_person_id = aux.get("natural_person_id")
 
     legal_entity_id = db.insert_legal_entity(legal_person_id, natural_person_id, country, user_id)
-    
+    result.append(legal_entity_id)
+
     for identifier_id in identifier_ids:
         db.insert_legal_entity_identifier(legal_entity_id, identifier_id)
 
-    for aux in postalAddress:
-        db.insert_legal_entity_postal_address(legal_entity_id, aux)
-        
-    for email in emails:
-        db.insert_legal_entity_email(legal_entity_id, email)
-        
-    for phone in phones:
-        db.insert_legal_entity_phone(legal_entity_id, phone)
-        
-    for infoURI in infoURIs:
-        result = db.insert_legal_entity_info_uri(legal_entity_id, infoURI)
+    if postalAddress:
+        for aux in postalAddress:
+            db.insert_legal_entity_postal_address(legal_entity_id, aux)
+    
+    if emails:
+        for email in emails:
+            db.insert_legal_entity_email(legal_entity_id, email)
+    
+    if phones:
+        for phone in phones:
+            db.insert_legal_entity_phone(legal_entity_id, phone)
 
-    if not result:
-        return {
-            "status": "error",
-            "code": 500,
-            "message": "Failed to create Lgal Entity"
-        }, 500
+    if  infoURIs:
+        for infoURI in infoURIs:
+            db.insert_legal_entity_info_uri(legal_entity_id, infoURI)
 
-    return {
-        "status": "success",
-        "code": 201,
-        "message": "Legal Entity created successfully"
-    }, 201
+    return create_response("Legal Entity created successfully.", "legal Entity id:", result)
 
 @rpr.route('/list_legal_entity', methods=['POST'])
 def list_legal_entity():
@@ -1113,143 +1007,21 @@ def list_legal_entity():
     data = request.get_json(silent=True)
     
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid"])
+    if missing:
+        return error_response("Missing required fields.", missing)
     
     hash_pid = data.get("hash_pid")
-
-    if not hash_pid:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": ["hash_pid"]
-            }
-        }, 400
     
     user_id = db.check_user(hash_pid)
-
     if user_id is None:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid hash_pid",
-            "data": {
-                "hash_pid": hash_pid
-            }
-        }, 400
+        return error_invalid("Invalid hash_pid")
 
     result = db.get_legal_entity(user_id)
 
-    return {
-        "status": "success",
-        "code": 200,
-        "message": "Legal Entity retrieved successfully.",
-        "data": {
-            "legal_entity": result
-        }
-    }, 200
-
-## -provider
-@rpr.route('/create_provider', methods=['POST'])
-def create_provider():
-
-    data = request.get_json(silent=True)
-
-    if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
-
-    hash_pid = data.get("hash_pid")
-    legalEntityId = data.get("legalEntityId")
-    providerType = data.get("providerType")
-    x5c = data.get("x5c", [])
-    policy_ids = data.get("policy_id", [])
-
-    required_fields = {
-        "hash_pid": hash_pid
-    }
-
-    missing_fields = [name for name, value in required_fields.items() if not value]
-
-    if missing_fields:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": missing_fields
-            }
-        }, 400
-
-    user_id = db.check_user(hash_pid)
-
-    provider_id = db.insert_provider(legalEntityId, providerType, user_id)
-    
-    for policy_id in policy_ids:
-        db.insert_provider_policy(provider_id, policy_id)
-
-    for cert in x5c:
-        db.insert_provider_x5c(provider_id, cert)
-
-    return {
-        "status": "success",
-        "code": 201,
-        "message": "Provider created successfully"
-    }, 201
-
-@rpr.route('/list_provider', methods=['POST'])
-def list_provider():
-    data = request.get_json(silent=True)
-    
-    if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
-    
-    hash_pid = data.get("hash_pid")
-
-    if not hash_pid:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": ["hash_pid"]
-            }
-        }, 400
-    
-    user_id = db.check_user(hash_pid)
-
-    if user_id is None:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid hash_pid",
-            "data": {
-                "hash_pid": hash_pid
-            }
-        }, 400
-
-    result = db.get_provider(user_id)
-
-    return {
-        "status": "success",
-        "code": 200,
-        "message": "Legal Entity retrieved successfully.",
-        "data": {
-            "provider": result
-        }
-    }, 200
+    return list_response("Legal Entity retrieved successfully.", result, "legal_entity")
 
 ## -policy
 @rpr.route('/create_policy', methods=['POST'])
@@ -1258,189 +1030,224 @@ def create_policy():
     data = request.get_json(silent=True)
 
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "policy"])
+    if missing:
+        return error_response("Missing required fields.", missing)
 
     hash_pid = data.get("hash_pid")
     policies = data.get("policy", [])
 
-    required_fields = {
-        "hash_pid": hash_pid
-    }
-
-    missing_fields = [name for name, value in required_fields.items() if not value]
-
-    if missing_fields:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": missing_fields
-            }
-        }, 400
-
     user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    result = []
 
+    #verification
+    for policy in policies:
+        missing = validate_required_fields(policy, ["policyURI", "type", "intention"])
+        if missing:
+            return error_response("Missing required fields.", missing)
+
+        type = policy.get("type")
+        intention = policy.get("intention")
+
+        if intention != "intended_use" and intention != "wrp":
+            return error_invalid("Invalid intention. 'wrp' or 'intended_use'.")
+
+        if intention == "wrp":
+            if type not in cfgserv.relying_party["Type of Policy"]:
+                return error_invalid(f"Invalid 'wrp' Type of Policy. Must be one of: {', '.join(cfgserv.relying_party['Type of Policy'])}")
+
+        if intention == "intended_use":
+            if type not in cfgserv.intended_use["Type of Privacy Policy"]:
+                return error_invalid(f"Invalid 'intended_use' type_policy. Must be one of: {', '.join(cfgserv.intended_use['Type of Privacy Policy'])}")
+
+    #insert data base
     for policy in policies:
         policyURI = policy.get("policyURI")
         type = policy.get("type")
 
-        db.insert_policy(policyURI, type, user_id)
+        policy_id = db.insert_policy(policyURI, type, user_id)
+        result.append(policy_id)
 
-    return {
-        "status": "success",
-        "code": 201,
-        "message": "Policy created successfully"
-    }, 201
+    return create_response("Policy created successfully", "Policies IDs:", result)
 
 @rpr.route('/list_policy', methods=['POST'])
 def list_policy():
 
     data = request.get_json(silent=True)
-    
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid"])
+    if missing:
+        return error_response("Missing required fields.", missing)
     
     hash_pid = data.get("hash_pid")
-
-    if not hash_pid:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": ["hash_pid"]
-            }
-        }, 400
     
     user_id = db.check_user(hash_pid)
-
     if user_id is None:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid hash_pid",
-            "data": {
-                "hash_pid": hash_pid
-            }
-        }, 400
+        return error_invalid("Invalid hash_pid")
 
     result = db.get_policy(user_id)
 
-    return {
-        "status": "success",
-        "code": 200,
-        "message": "Policies retrieved successfully.",
-        "data": {
-            "policy": result
-        }
-    }, 200
+    return create_response("Policies retrieved successfully.", "policy", result)
+
+## -provider
+@rpr.route('/create_provider', methods=['POST'])
+def create_provider():
+
+    data = request.get_json(silent=True)
+
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "provider"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    providers = data.get("provider", [])
+
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    result = []
+
+    #validation
+    for provider in providers:
+        missing = validate_required_fields(provider, ["policy_id", "providerType"])
+        if missing:
+            return error_response("Missing required fields.", missing)
+
+        policy_ids = provider.get("policy_id", [])
+        for policy_id in policy_ids:
+            row = db.check_policy(policy_id)
+            
+            if user_id[0] != row[0]:
+                return error_invalid("The Policy ID does not belong to this user")
+            
+            if row[1] not in cfgserv.relying_party["Type of Policy"]:
+                return error_invalid(f"The policy has an incorrect type; it must be a policy with a type for 'Wallet Relying Party'(intention: wrp). Must be one of: {', '.join(cfgserv.relying_party['Type of Policy'])}")
+
+        legalEntityId = provider.get("legalEntityId")
+        if user_id != db.check_legal_entity(legalEntityId):
+            return error_invalid("The Legal Entity ID does not belong to this user")
+            
+    #insert data base
+    for provider in providers:
+        legalEntityId = provider.get("legalEntityId")
+        providerType = provider.get("providerType")
+        x5c = provider.get("x5c", [])
+        policy_ids = provider.get("policy_id", [])
+
+        provider_id = db.insert_provider(legalEntityId, providerType, user_id)
+        result.append(provider_id)
+
+        for policy_id in policy_ids:
+            db.insert_provider_policy(provider_id, policy_id)
+
+        for cert in x5c:
+            if cert:
+                db.insert_provider_x5c(provider_id, cert)
+
+    return create_response("Provider created successfully", "Provider id", result)
+
+
+@rpr.route('/list_provider', methods=['POST'])
+def list_provider():
+    data = request.get_json(silent=True)
+    
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+
+    result = db.get_provider(user_id)
+
+    return list_response("Legal Entity retrieved successfully.", result, "provider")
 
 ## -credential
 @rpr.route('/create_credential', methods=['POST'])
 def create_credential():
 
     data = request.get_json(silent=True)
-
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "credentials"])
+    if missing:
+        return error_response("Missing required fields.", missing)
 
     hash_pid = data.get("hash_pid")
     credentials = data.get("credentials", [])
 
-    required_fields = {
-        "hash_pid": hash_pid
-    }
-
-    missing_fields = [name for name, value in required_fields.items() if not value]
-
-    if missing_fields:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": missing_fields
-            }
-        }, 400
-
     user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    result = []
 
+    #verification
+    for credential in credentials:
+        missing = validate_required_fields(credential, ["format", "meta", "claims"])
+        if missing:
+            return error_response("Missing required fields.", missing)
+        
+        claims = credential.get("claims", [])
+        for claim in claims:
+            missing = validate_required_fields(claim, ["path"])
+            if missing:
+                return error_response("Missing required fields.", missing)
+
+    #insert data base
     for credential in credentials:
         format = credential.get("format")
         meta = credential.get("meta")
         claims = credential.get("claims", [])
-
+        
         credential_id = db.insert_credential(format, meta, user_id)
+        result.append(credential_id)
 
         for claim in claims:
             path = claim.get("path")
 
             db.insert_claim(credential_id, path)
     
-    return {
-        "status": "success",
-        "code": 201,
-        "message": "Credential created successfully"
-    }, 201
+    return create_response("Credential created successfully", "Credentials ids", result)
 
 @rpr.route('/list_credential', methods=['POST'])
 def list_credential():
     data = request.get_json(silent=True)
     
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
-    
-    hash_pid = data.get("hash_pid")
+        return error_response("Invalid or missing JSON body")
 
-    if not hash_pid:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": ["hash_pid"]
-            }
-        }, 400
+    missing = validate_required_fields(data, ["hash_pid"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+
+    hash_pid = data.get("hash_pid")
     
     user_id = db.check_user(hash_pid)
-
     if user_id is None:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid hash_pid",
-            "data": {
-                "hash_pid": hash_pid
-            }
-        }, 400
+        return error_invalid("Invalid hash_pid")
     
     result = db.get_credentials(user_id)
 
-    return {
-        "status": "success",
-        "code": 200,
-        "message": "Credentials retrieved successfully.",
-        "data": {
-            "credential": result
-        }
-    }, 200
+    return list_response("Credentials retrieved successfully.", result, "credential")
 
 ## -intended use
 @rpr.route('/create_intended_use', methods=['POST'])
@@ -1449,33 +1256,54 @@ def create_intended_use():
     data = request.get_json(silent=True)
 
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "intended_uses"])
+    if missing:
+        return error_response("Missing required fields.", missing)
 
     hash_pid = data.get("hash_pid")
     intended_uses = data.get("intended_uses", [])
 
-    required_fields = {
-        "hash_pid": hash_pid
-    }
-
-    missing_fields = [name for name, value in required_fields.items() if not value]
-
-    if missing_fields:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": missing_fields
-            }
-        }, 400
-
     user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    result = []
 
+    #validation
+    for intended_use in intended_uses:
+        missing = validate_required_fields(intended_use, ["intendedUseIdentifier", "createdAt", "revokedAt", "purpose", "privacyPolicy_id", "credential_ids"])
+        if missing:
+            return error_response("Missing required fields.", missing)
+        
+        purposes = intended_use.get("purpose", [])
+        for purpose in purposes:
+            missing = validate_required_fields(purpose, ["lang", "content"])
+            if missing:
+                return error_response("Missing required fields.", missing)
+            
+            lang = purpose.get("lang")
+            
+            if lang not in cfgserv.eu_countries:
+                return error_invalid(f"Invalid purpose_lang. Must be one of: {', '.join(cfgserv.eu_countries)}")
+        
+        privacyPolicy_ids = intended_use.get("privacyPolicy_id", [])
+        for privacyPolicy_id in privacyPolicy_ids:
+            row = db.check_policy(privacyPolicy_id)
+            
+            if user_id[0] != row[0]:
+                return error_invalid("The Policy ID does not belong to this user")
+            
+            if row[1] not in cfgserv.intended_use["Type of Privacy Policy"]:
+                return error_invalid( f"The policy has an incorrect type; it must be a policy with a type for 'Wallet Relying Party'(intention: wrp). Must be one of: {', '.join(cfgserv.relying_party['Type of Policy'])}")
+
+        credential_ids = intended_use.get("credential_ids", [])
+        for credential_id in credential_ids:
+            if user_id != db.check_credentials(credential_id):
+                return error_invalid("The Credential ID does not belong to this user.")
+            
+    #insert data base
     for intended_use in intended_uses:
         intendedUseIdentifier = intended_use.get("intendedUseIdentifier")
         createdAt = intended_use.get("createdAt")
@@ -1485,6 +1313,7 @@ def create_intended_use():
         credential_ids = intended_use.get("credential_ids", [])
 
         intended_use_id = db.insert_intended_use(intendedUseIdentifier, createdAt, revokedAt, user_id)
+        result.append(intended_use_id)
 
         for purpose in purposes:
             lang = purpose.get("lang")
@@ -1499,57 +1328,28 @@ def create_intended_use():
         for credential_id in credential_ids:
             db.insert_intended_use_credential(intended_use_id, credential_id)
     
-    return {
-        "status": "success",
-        "code": 201,
-        "message": "Credential created successfully"
-    }, 201
+    return create_response("Intended Use created successfully", "Credentials ids", result)
 
 @rpr.route('/list_intended_use', methods=['POST'])
 def list_intended_use():
     data = request.get_json(silent=True)
     
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "supervisoryAuthority"])
+    if missing:
+        return error_response("Missing required fields.", missing)
     
     hash_pid = data.get("hash_pid")
-
-    if not hash_pid:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": ["hash_pid"]
-            }
-        }, 400
     
     user_id = db.check_user(hash_pid)
-
     if user_id is None:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid hash_pid",
-            "data": {
-                "hash_pid": hash_pid
-            }
-        }, 400
+        return error_invalid("Invalid hash_pid")
 
     result = db.get_intended_use(user_id)
 
-    return {
-        "status": "success",
-        "code": 200,
-        "message": "Intended Use retrieved successfully.",
-        "data": {
-            "intended_use": result
-        }
-    }, 200
+    return list_response("Intended Use retrieved successfully.", result, "intended_use")
 
 ## -provided attestation
 @rpr.route('/create_provided_attestation', methods=['POST'])
@@ -1558,90 +1358,133 @@ def create_provided_attestation():
     data = request.get_json(silent=True)
 
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "providesAttestations"])
+    if missing:
+        return error_response("Missing required fields.", missing)
 
     hash_pid = data.get("hash_pid")
     providesAttestations = data.get("providesAttestations", [])
 
-    required_fields = {
-        "hash_pid": hash_pid
-    }
-
-    missing_fields = [name for name, value in required_fields.items() if not value]
-
-    if missing_fields:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": missing_fields
-            }
-        }, 400
-
     user_id = db.check_user(hash_pid)
-
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    result = []
+    
+    #validation
+    for providesAttestation in providesAttestations:
+        missing = validate_required_fields(providesAttestation, ["format", "meta"])
+        if missing:
+            return error_response("Missing required fields.", missing)
+    
+    #insert data base
     for providesAttestation in providesAttestations:
         format = providesAttestation.get("format")
         meta = providesAttestation.get("meta")
+        
+        provided_attestation_id = db.insert_provided_attestation(format, meta, user_id)
+        result.append(provided_attestation_id)
 
-        db.insert_provided_attestation(format, meta, user_id)
-
-    return {
-        "status": "success",
-        "code": 201,
-        "message": "Provided Attestation created successfully"
-    }, 201
+    return create_response("Provided Attestation created successfully.", "Provided Attestation ids", result)
 
 @rpr.route('/list_provided_attestation', methods=['POST'])
 def list_provided_attestation():
     data = request.get_json(silent=True)
-    
+
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid"])
+    if missing:
+        return error_response("Missing required fields.", missing)
     
     hash_pid = data.get("hash_pid")
-
-    if not hash_pid:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": ["hash_pid"]
-            }
-        }, 400
     
     user_id = db.check_user(hash_pid)
-
     if user_id is None:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid hash_pid",
-            "data": {
-                "hash_pid": hash_pid
-            }
-        }, 400
+        return error_invalid("Invalid hash_pid")
 
     result = db.get_provided_attestation(user_id)
 
-    return {
-        "status": "success",
-        "code": 200,
-        "message": "Provided attestation retrieved successfully.",
-        "data": {
-            "provided_attestation": result
-        }
-    }, 200
+    return list_response("Provided attestation retrieved successfully.", result, "provided_attestation")
+
+## -supervisoryAuthority
+@rpr.route('/create_supervisory_authority', methods=['POST'])
+def create_supervisory_authority():
+
+    data = request.get_json(silent=True)
+
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "supervisoryAuthority"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    supervisoryAuthority = data.get("supervisoryAuthority", [])
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+
+    result = []
+
+    #validation
+    for aux in supervisoryAuthority:
+        missing = validate_required_fields(aux, ["name", "country"])
+        if missing:
+            return error_response("Missing required fields.", missing)
+
+    
+    #insert data base
+    for aux in supervisoryAuthority:
+
+        name = aux.get("name")
+        country = aux.get("country")
+        emails = aux.get("email", [])
+        formuris = aux.get("formURI", [])
+        phones = aux.get("phone", [])
+        
+        supervisory_authority_id = db.insert_supervisory_authority(name, country, user_id)
+        result.append(supervisory_authority_id)
+
+        if emails:
+            for email in emails:
+                db.insert_supervisory_authority_email(supervisory_authority_id, email)
+
+        if formuris:
+            for formUri in formuris:
+                db.insert_supervisory_authority_formuri(supervisory_authority_id, formUri)
+
+        if phones:
+            for phone in phones:
+                db.insert_supervisory_authority_phone(supervisory_authority_id, phone)
+
+    return create_response("Supervisory Authority created successfully", "Supervisory Authority ids", result)
+
+@rpr.route('/list_supervisory_authority', methods=['POST'])
+def list_supervisory_authority():
+    data = request.get_json(silent=True)
+    
+    if not data:
+        return error_response("Invalid or missing JSON body")
+    
+    missing = validate_required_fields(data, ["hash_pid"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+
+    result = db.get_supervisory_authority(user_id)
+
+    return list_response("Supervisory Authority retrieved successfully.", result, "supervisory_authority")
 
 ## -wrp
 @rpr.route('/create_wrp', methods=['POST'])
@@ -1650,33 +1493,71 @@ def create_wrp():
     data = request.get_json(silent=True)
 
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "WalletRelyingParty"])
+    if missing:
+        return error_response("Missing required fields.", missing)
 
     hash_pid = data.get("hash_pid")
     wrps = data.get("WalletRelyingParty", [])
 
-    required_fields = {
-        "hash_pid": hash_pid
-    }
-
-    missing_fields = [name for name, value in required_fields.items() if not value]
-
-    if missing_fields:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": missing_fields
-            }
-        }, 400
-
     user_id = db.check_user(hash_pid)
-    
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+
+    result = []
+
+    #validation
+    for wrp in wrps:
+        missing = validate_required_fields(wrp, ["supportURI", "provider_id", "supportURI", "srvDescription", 
+                                                 "intendedUse_ids", "isPSB", "entitlements", 
+                                                 "supervisoryAuthority", "registryURI", "isIntermediary"])
+        if missing:
+            return error_response("Missing required fields.", missing)
+        
+        supervisoryAuthority = wrp.get("supervisoryAuthority")
+        usesIntermediarys = wrp.get("usesIntermediary", [])
+        providesAttestations_ids = wrp.get("providesAttestations_id", [])
+        provider_id = wrp.get("provider_id")
+        intendedUse_ids = wrp.get("intendedUse_ids", [])
+        entitlements = wrp.get("entitlements", [])
+        srvDescriptions = wrp.get("srvDescription", [])
+        
+        if user_id != db.check_supervisory_authority(supervisoryAuthority):
+            return error_invalid("The supervisoryAuthority ID does not belong to this user")
+        
+        if usesIntermediarys:
+            for usesIntermediary in usesIntermediarys:
+                if user_id != db.check_wrp(usesIntermediary):
+                    return error_invalid("The usesIntermediary ID does not belong to this user")
+        
+        if providesAttestations_ids:
+            for providesAttestations_id in providesAttestations_ids:
+                if user_id != db.check_provided_attestation(providesAttestations_id):
+                    return error_invalid("The providesAttestations ID does not belong to this user")
+        
+        if user_id != db.check_provider(provider_id):
+                return error_invalid("The Provider ID does not belong to this user")
+        
+        for intendedUse_id in intendedUse_ids:
+            if user_id != db.check_intendedUse(intendedUse_id):
+                return error_invalid("The intendedUse ID does not belong to this user")
+        
+        for entitlement in entitlements:
+            if entitlement not in cfgserv.relying_party["Entitlement"]:
+                return error_invalid(f"Invalid entitlement. Must be one of: {', '.join(cfgserv.relying_party['Entitlement'])}")
+
+        for srvDescription in srvDescriptions:
+            missing = validate_required_fields(srvDescription, ["lang"])
+            if missing:
+                return error_response("Missing required fields.", missing)
+            
+            lang = srvDescription.get("lang")
+            if lang not in cfgserv.eu_countries:
+                return error_invalid(f"Invalid srvDescription_lang. Must be one of: {', '.join(cfgserv.eu_countries)}")
+
+    #insert data base
     for wrp in wrps:
         tradeName = wrp.get("tradeName")
         supportURIs = wrp.get("supportURI", [])
@@ -1691,30 +1572,15 @@ def create_wrp():
         provider_id = wrp.get("provider_id")
         intendedUse_ids = wrp.get("intendedUse_ids", [])
 
-        supervisoryAuthority_name = supervisoryAuthority.get("name")
-        supervisoryAuthority_country = supervisoryAuthority.get("country")
-        supervisoryAuthority_emails = supervisoryAuthority.get("email", [])
-        supervisoryAuthority_formuris = supervisoryAuthority.get("formURI", [])
-        supervisoryAuthority_phones = supervisoryAuthority.get("phone", [])
-
-        supervisory_authority_id = db.insert_supervisory_authority(supervisoryAuthority_name, supervisoryAuthority_country, user_id)
-
-        for email in supervisoryAuthority_emails:
-            db.insert_supervisory_authority_email(supervisory_authority_id, email)
-
-        for formUri in supervisoryAuthority_formuris:
-            db.insert_supervisory_authority_formuri(supervisory_authority_id, formUri)
-
-        for phone in supervisoryAuthority_phones:
-            db.insert_supervisory_authority_phone(supervisory_authority_id, phone)
-
-        wrp_id = db.insert_wrp(provider_id, tradeName, isPSB, registryURI, isIntermediary, supervisory_authority_id, user_id)
+        wrp_id = db.insert_wrp(provider_id, tradeName, isPSB, registryURI, isIntermediary, supervisoryAuthority, user_id)
+        result.append(wrp_id)
 
         for entitlement in entitlements:
             db.insert_wrp_entitlement(wrp_id, entitlement)
 
-        for usesIntermediary in usesIntermediarys:
-            db.insert_wrp_intermediary(wrp_id, usesIntermediary)
+        if usesIntermediarys:
+            for usesIntermediary in usesIntermediarys:
+                db.insert_wrp_intermediary(wrp_id, usesIntermediary)
         
         for supportURI in supportURIs:
             db.insert_wrp_support_uri(wrp_id, supportURI)
@@ -1727,190 +1593,73 @@ def create_wrp():
 
             db.insert_wrp_srv_description(wrp_id, mls_id)
 
-        for providesAttestations_id in providesAttestations_ids:
-            db.insert_wrp_provided_attestation(wrp_id, providesAttestations_id)
+        if providesAttestations_ids:
+            for providesAttestations_id in providesAttestations_ids:
+                db.insert_wrp_provided_attestation(wrp_id, providesAttestations_id)
 
         for intendedUse_id in intendedUse_ids:
             db.insert_wrp_intended_use(wrp_id, intendedUse_id)
 
-    return {
-        "status": "success",
-        "code": 201,
-        "message": "Provided Attestation created successfully"
-    }, 201
+    return create_response("Wallet Relying Party created successfully", "wrp ids", result)
 
 @rpr.route('/list_wrp', methods=['POST'])
 def list_wrp():
     data = request.get_json(silent=True)
     
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid"])
+    if missing:
+        return error_response("Missing required fields.", missing)
     
     hash_pid = data.get("hash_pid")
-
-    if not hash_pid:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": ["hash_pid"]
-            }
-        }, 400
     
     user_id = db.check_user(hash_pid)
-
     if user_id is None:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid hash_pid",
-            "data": {
-                "hash_pid": hash_pid
-            }
-        }, 400
+        return error_invalid("Invalid hash_pid")
 
     result = db.get_wrp(user_id)
 
-    return {
-        "status": "success",
-        "code": 200,
-        "message": "Wallet Relying Party retrieved successfully.",
-        "data": {
-            "wrp": result
-        }
-    }, 200
-
-@rpr.route('/list_supervisory_authority', methods=['POST'])
-def list_supervisory_authority():
-    data = request.get_json(silent=True)
-    
-    if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
-    
-    hash_pid = data.get("hash_pid")
-
-    if not hash_pid:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": ["hash_pid"]
-            }
-        }, 400
-    
-    user_id = db.check_user(hash_pid)
-
-    if user_id is None:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid hash_pid",
-            "data": {
-                "hash_pid": hash_pid
-            }
-        }, 400
-
-    result = db.get_supervisory_authority(user_id)
-
-    return {
-        "status": "success",
-        "code": 200,
-        "message": "Legal Entity retrieved successfully.",
-        "data": {
-            "supervisory_authority": result
-        }
-    }, 200
+    return list_response("Wallet Relying Party retrieved successfully.", result, "wrp")
 
 @rpr.route('/list_claim', methods=['POST'])
 def list_claim():
     data = request.get_json(silent=True)
-    
+        
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "supervisoryAuthority"])
+    if missing:
+        return error_response("Missing required fields.", missing)
     
     hash_pid = data.get("hash_pid")
-
-    if not hash_pid:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": ["hash_pid"]
-            }
-        }, 400
     
     user_id = db.check_user(hash_pid)
-
     if user_id is None:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid hash_pid",
-            "data": {
-                "hash_pid": hash_pid
-            }
-        }, 400
-
+        return error_invalid("Invalid hash_pid")
 
     result = db.get_claim(user_id)
 
-    return {
-        "status": "success",
-        "code": 200,
-        "message": "Claims retrieved successfully.",
-        "data": {
-            "claim": result
-        }
-    }, 200
+    return list_response("Claims retrieved successfully.", result, "claim")
+
 @rpr.route('/list_full_info', methods=['POST'])
 def list_full_info():
     data = request.get_json(silent=True)
     
     if not data:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid or missing JSON body"
-        }, 400
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid"])
+    if missing:
+        return error_response("Missing required fields.", missing)
     
     hash_pid = data.get("hash_pid")
-
-    if not hash_pid:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": ["hash_pid"]
-            }
-        }, 400
     
     user_id = db.check_user(hash_pid)
-
     if user_id is None:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid hash_pid",
-            "data": {
-                "hash_pid": hash_pid
-            }
-        }, 400
+        return error_invalid("Invalid hash_pid")
 
     legal_entities = db.get_legal_entity(user_id)
     providers = db.get_provider(user_id)
@@ -1963,11 +1712,7 @@ def list_full_info():
 
         result.append(le_obj)
 
-    return {
-        "status": "success",
-        "code": 200,
-        "data": result
-    }, 200
+    return list_response("Info retrieved successfully.", result, "data")
 
 @rpr.route('/wrp', methods=['GET'])
 def search_wrp_public():

@@ -40,7 +40,11 @@ def check_user(hash_pid):
             """
             
             cursor.execute(select_query, (hash_pid,))
-            result = cursor.fetchone()
+            row = cursor.fetchone()
+            if row:
+                return row
+            else:
+                return []
             
             if result:
                 user_id = result[0]
@@ -268,6 +272,35 @@ def insert_legal_person_law(legal_person_id, legislative_identifier):
         if connection:
             cursor.close()
             connection.close()
+
+def check_legal_person(id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    lp.user_id
+                FROM legal_person lp
+                WHERE lp.id = %s
+            """
+
+            cursor.execute(query, (id,))
+            row = cursor.fetchone()
+            if row:
+                return row
+            else:
+                return []
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+    
             
 ## -law-insert
 def insert_law(legislative_identifier, user_id):
@@ -372,6 +405,39 @@ def get_law(user_id):
             cursor.close()
             connection.close()
 
+
+def check_law(id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    l.user_id
+
+                FROM law l
+
+                WHERE l.id = %s
+            """
+
+            cursor.execute(query, (id,))
+            row = cursor.fetchone()
+            if row:
+                return row
+            else:
+                return []
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+
 ## -natural person-insert
 def insert_natural_person(family_name, given_name, date_of_birth, place_of_birth, user_id):
     try:
@@ -446,6 +512,34 @@ def get_natural_person(user_id):
             connection.close()
     
 
+def check_natural_person(id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    np.user_id
+                FROM natural_person np
+                WHERE np.id = %s
+            """
+
+            cursor.execute(query, (id,))
+            row = cursor.fetchone()
+            if row:
+                return row
+            else:
+                return []
+            
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+    
 ## -legal entity-insert
 def insert_legal_entity(legalPerson, naturalPerson, country, user_id):
     try:
@@ -742,6 +836,36 @@ def get_legal_entity(user_id):
             cursor.close()
             connection.close()
 
+def check_legal_entity(id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                    SELECT 
+                        le.user_id
+
+                    FROM legal_entity le
+
+                    WHERE le.id = %s;
+                    """
+
+            cursor.execute(query, (id,))
+            row = cursor.fetchone()
+            if row:
+                return row
+            else:
+                return []
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
 ## -identifier-insert
 def insert_identifier(identifier, type, user_id):
     try:
@@ -800,6 +924,34 @@ def get_identifier(user_id):
                 })
 
             return result
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+    
+def check_identifier(id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    i.user_id
+                FROM identifier i
+                WHERE i.id = %s
+            """
+
+            cursor.execute(query, (id,))
+            row = cursor.fetchone()
+            if row:
+                return row
+            else:
+                return []
 
     except pymysql.MySQLError as e:
         logger.error(f"Error: {e}")
@@ -936,6 +1088,34 @@ def get_provider(user_id):
             cursor.close()
             connection.close()
 
+def check_provider(id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """ 
+                SELECT 
+                    p.user_id
+                FROM provider p
+                WHERE p.id = %s
+            """
+
+            cursor.execute(query, (id,))
+            row = cursor.fetchone()
+            if row:
+                return row
+            else:
+                return []
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
 ## -policy-insert
 def insert_policy(policy_uri, type, user_id):
     try:
@@ -1003,6 +1183,35 @@ def get_policy(user_id):
             cursor.close()
             connection.close()
     
+def check_policy(id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    p.user_id,
+                    p.type
+                FROM policy p
+                WHERE p.id = %s
+            """
+
+            cursor.execute(query, (id,))
+            row = cursor.fetchone()
+            if row:
+                return row
+            else:
+                return []
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
 def insert_provider_policy(provider_id, policy_id):
     try:
         connection = conn()
@@ -1194,6 +1403,34 @@ def get_supervisory_authority(user_id):
                     sa["formURI"].append(formURI)
 
             return list(result.values())
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def check_supervisory_authority(id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    sa.user_id
+                FROM supervisory_authority sa
+                WHERE sa.id = %s
+            """
+
+            cursor.execute(query, (id,))
+            row = cursor.fetchone()
+            if row:
+                return row
+            else:
+                return []
 
     except pymysql.MySQLError as e:
         logger.error(f"Error: {e}")
@@ -1568,6 +1805,36 @@ def get_wrp(user_id):
             cursor.close()
             connection.close()
 
+def check_wrp(id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    wrp.user_id
+
+                FROM wallet_relying_party wrp
+
+                WHERE wrp.id = %s;
+                """
+            
+            cursor.execute(query, (id,))
+            row = cursor.fetchone()
+            if row:
+                return row
+            else:
+                return []
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
             
 def get_wrp_id(wrp_id):
     try:
@@ -1772,6 +2039,34 @@ def get_provided_attestation(user_id):
                 })
 
             return result
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def check_provided_attestation(id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    pa.user_id
+                FROM provided_attestation pa
+                WHERE pa.id = %s
+            """
+
+            cursor.execute(query, (id,))
+            row = cursor.fetchone()
+            if row:
+                return row
+            else:
+                return []
 
     except pymysql.MySQLError as e:
         logger.error(f"Error: {e}")
@@ -2071,6 +2366,36 @@ def get_intended_use(user_id):
             cursor.close()
             connection.close()
 
+def check_intendedUse(id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    iu.user_id
+
+                FROM intended_use iu
+
+                WHERE iu.id = %s;
+            """
+            
+            cursor.execute(query, (id,))
+            row = cursor.fetchone()
+            if row:
+                return row
+            else:
+                return []
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
 ## -credential-insert
 def insert_credential(format, meta, user_id):
     try:
@@ -2151,6 +2476,36 @@ def get_credentials(user_id):
                     })
 
             return list(result.values())
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def check_credentials(id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    c.user_id
+
+                FROM credential c
+
+                WHERE c.id = %s
+            """
+
+            cursor.execute(query, (id,))
+            row = cursor.fetchone()
+            if row:
+                return row
+            else:
+                return []
 
     except pymysql.MySQLError as e:
         logger.error(f"Error: {e}")
