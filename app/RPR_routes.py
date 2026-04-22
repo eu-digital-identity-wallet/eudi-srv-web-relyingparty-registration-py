@@ -102,7 +102,29 @@ rpr = Blueprint("RPR", __name__, url_prefix="/")
 rpr.template_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'template/')
 
 def validate_required_fields(data, required_fields):
-    missing = [field for field in required_fields if field not in data or data[field] is None]
+    missing = []
+
+    for field in required_fields:
+        if field not in data:
+            missing.append(field)
+            continue
+
+        value = data[field]
+
+        if value is None:
+            missing.append(field)
+            continue
+
+        # empty strings
+        if isinstance(value, str) and value.strip() == "":
+            missing.append(field)
+            continue
+
+        # lists ou empty dicts
+        if isinstance(value, (list, dict)) and len(value) == 0:
+            missing.append(field)
+            continue
+
     return missing
 
 def error_response(message, missing_fields=None, code=400):
@@ -120,6 +142,14 @@ def error_invalid(message, code=400):
         "status": "error",
         "code": code,
         "message": message
+    }, code
+
+def update_response(message, len, code=201):
+    return {
+        "status": "success",
+        "code": code,
+        "message": message,
+        "updated_count": len
     }, code
 
 def create_response(message, data=None, result=None, code=201):
@@ -423,7 +453,7 @@ responses:
         return (hash_pid)
     
 
-@rpr.route('/insert_wrp', methods=['POST'])
+#@rpr.route('/insert_wrp', methods=['POST'])
 def insert_wrp():
 
     data = request.get_json(silent=True)
@@ -658,7 +688,7 @@ def insert_wrp():
     }, 201
 
 ## -law
-@rpr.route('/create_law', methods=['POST'])
+@rpr.route('/law/create', methods=['POST'])
 def create_law():
 
     data = request.get_json(silent=True)
@@ -697,7 +727,7 @@ def create_law():
 
     return create_response("Law created successfully", "Law new ids:", result)
 
-@rpr.route('/list_law', methods=['POST'])
+@rpr.route('/law/list', methods=['POST'])
 def list_law():
 
     data = request.get_json(silent=True)
@@ -720,7 +750,7 @@ def list_law():
     return list_response("Law retrieved successfully.", result, "law")
 
 ## -legal person 
-@rpr.route('/create_legal_person', methods=['POST'])
+@rpr.route('/legal_person/create', methods=['POST'])
 def create_legal_person():
 
     data = request.get_json(silent=True)
@@ -770,7 +800,7 @@ def create_legal_person():
 
     return create_response("Legal Person created successfully", "Legal person new ids:", result)
 
-@rpr.route('/list_legal_person', methods=['POST'])
+@rpr.route('/legal_person/list', methods=['POST'])
 def list_legal_person():
 
     data = request.get_json(silent=True)
@@ -792,8 +822,42 @@ def list_legal_person():
 
     return list_response("Legal Persons retrieved successfully.", result, "legal_person")
 
+@rpr.route('/legal_person/update_law', methods=['POST'])
+def update_legal_person_law():
+
+    data = request.get_json(silent=True)
+   
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "legal_person_id", "law_ids"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    legal_person_id = data.get("legal_person_id")
+    law_ids = data.get("law_ids", [])
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    #verification
+    if user_id != db.check_legal_person(legal_person_id):
+        return error_invalid("Legal Entity id doesn't belong to this user")
+    
+    for law_id in law_ids:
+        if user_id != db.check_law(law_id):
+            return error_invalid("law id doesn't belong to this user")
+        
+    #insert data base
+    for law_id in law_ids:
+        db.insert_legal_person_law(legal_person_id, law_id)
+
+    return update_response("Legal person law associations updated successfully", len(law_ids))
+
 ## -natural person
-@rpr.route('/create_natural_person', methods=['POST'])
+@rpr.route('/natural_person/create', methods=['POST'])
 def create_natural_person():
 
     data = request.get_json(silent=True)
@@ -832,7 +896,7 @@ def create_natural_person():
 
     return create_response("Natural Person created successfully", "Natural person new ids", result)
 
-@rpr.route('/list_natural_person', methods=['POST'])
+@rpr.route('/natural_person/list', methods=['POST'])
 def get_natural_person():
 
     data = request.get_json(silent=True)
@@ -855,7 +919,7 @@ def get_natural_person():
     return list_response("Natural Persons retrieved successfully.", result, "natural_person")
 
 ## -identifier
-@rpr.route('/create_identifier', methods=['POST'])
+@rpr.route('/identifier/create', methods=['POST'])
 def create_identifier():
 
     data = request.get_json(silent=True)
@@ -896,7 +960,7 @@ def create_identifier():
 
     return create_response("Identifier created successfully", "Identifiers new ids", result)
 
-@rpr.route('/list_identifier', methods=['POST'])
+@rpr.route('/identifier/list', methods=['POST'])
 def list_identifier():
 
     data = request.get_json(silent=True)
@@ -919,7 +983,7 @@ def list_identifier():
     return list_response("Identifiers retrieved successfully.", result, "identifier")
 
 ## -legal entity
-@rpr.route('/create_legal_entity', methods=['POST'])
+@rpr.route('/legal_entity/create', methods=['POST'])
 def create_legal_entity():
 
     data = request.get_json(silent=True)
@@ -1001,7 +1065,7 @@ def create_legal_entity():
 
     return create_response("Legal Entity created successfully.", "legal Entity id:", result)
 
-@rpr.route('/list_legal_entity', methods=['POST'])
+@rpr.route('/legal_entity/list', methods=['POST'])
 def list_legal_entity():
 
     data = request.get_json(silent=True)
@@ -1023,8 +1087,42 @@ def list_legal_entity():
 
     return list_response("Legal Entity retrieved successfully.", result, "legal_entity")
 
+@rpr.route('/legal_entity/update_identifier', methods=['POST'])
+def update_legal_entity_identifier():
+
+    data = request.get_json(silent=True)
+   
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "legal_entity_id", "identifier_ids"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    legal_entity_id = data.get("legal_entity_id")
+    identifier_ids = data.get("identifier_ids", [])
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    #verification
+    if user_id != db.check_legal_entity(legal_entity_id):
+        return error_invalid("Legal Entity id doesn't belong to this user")
+    
+    for identifier_id in identifier_ids:
+        if user_id != db.check_identifier(identifier_id):
+            return error_invalid("Identifier id doesn't belong to this user")
+        
+    #insert data base
+    for identifier_id in identifier_ids:
+        db.insert_legal_entity_identifier(legal_entity_id, identifier_id)
+
+    return update_response("Legal Entity Identifier associations updated successfully", len(identifier_ids))
+
 ## -policy
-@rpr.route('/create_policy', methods=['POST'])
+@rpr.route('/policy/create', methods=['POST'])
 def create_policy():
 
     data = request.get_json(silent=True)
@@ -1075,7 +1173,7 @@ def create_policy():
 
     return create_response("Policy created successfully", "Policies IDs:", result)
 
-@rpr.route('/list_policy', methods=['POST'])
+@rpr.route('/policy/list', methods=['POST'])
 def list_policy():
 
     data = request.get_json(silent=True)
@@ -1097,7 +1195,7 @@ def list_policy():
     return create_response("Policies retrieved successfully.", "policy", result)
 
 ## -provider
-@rpr.route('/create_provider', methods=['POST'])
+@rpr.route('/provider/create', methods=['POST'])
 def create_provider():
 
     data = request.get_json(silent=True)
@@ -1158,7 +1256,7 @@ def create_provider():
     return create_response("Provider created successfully", "Provider id", result)
 
 
-@rpr.route('/list_provider', methods=['POST'])
+@rpr.route('/provider/list', methods=['POST'])
 def list_provider():
     data = request.get_json(silent=True)
     
@@ -1179,8 +1277,45 @@ def list_provider():
 
     return list_response("Legal Entity retrieved successfully.", result, "provider")
 
+@rpr.route('/provider/update_policy', methods=['POST'])
+def update_provider_policy():
+    data = request.get_json(silent=True)
+   
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "provider_id", "policy_ids"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    provider_id = data.get("provider_id")
+    policy_ids = data.get("policy_ids", [])
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    #verification
+    if user_id != db.check_provider(provider_id):
+        return error_invalid("Provider id doesn't belong to this user")
+    
+    for policy_id in policy_ids:
+        row = db.check_policy(policy_id)
+        
+        if user_id[0] != row[0]:
+            return error_invalid("The Policy ID does not belong to this user")
+        if row[1] not in cfgserv.relying_party["Type of Policy"]:
+            return error_invalid(f"The policy has an incorrect type; it must be a policy with a type for 'Wallet Relying Party'(intention: wrp). Must be one of: {', '.join(cfgserv.relying_party['Type of Policy'])}")
+
+    #insert data base
+    for policy_id in policy_ids:
+        db.insert_provider_policy(provider_id, policy_id)
+
+    return update_response("Provider Policy associations updated successfully", len(policy_ids))
+
 ## -credential
-@rpr.route('/create_credential', methods=['POST'])
+@rpr.route('/credential/create', methods=['POST'])
 def create_credential():
 
     data = request.get_json(silent=True)
@@ -1228,7 +1363,7 @@ def create_credential():
     
     return create_response("Credential created successfully", "Credentials ids", result)
 
-@rpr.route('/list_credential', methods=['POST'])
+@rpr.route('/credential/list', methods=['POST'])
 def list_credential():
     data = request.get_json(silent=True)
     
@@ -1250,7 +1385,7 @@ def list_credential():
     return list_response("Credentials retrieved successfully.", result, "credential")
 
 ## -intended use
-@rpr.route('/create_intended_use', methods=['POST'])
+@rpr.route('/intended_use/create', methods=['POST'])
 def create_intended_use():
 
     data = request.get_json(silent=True)
@@ -1330,14 +1465,14 @@ def create_intended_use():
     
     return create_response("Intended Use created successfully", "Credentials ids", result)
 
-@rpr.route('/list_intended_use', methods=['POST'])
+@rpr.route('/intended_use/list', methods=['POST'])
 def list_intended_use():
     data = request.get_json(silent=True)
     
     if not data:
         return error_response("Invalid or missing JSON body")
 
-    missing = validate_required_fields(data, ["hash_pid", "supervisoryAuthority"])
+    missing = validate_required_fields(data, ["hash_pid"])
     if missing:
         return error_response("Missing required fields.", missing)
     
@@ -1351,8 +1486,79 @@ def list_intended_use():
 
     return list_response("Intended Use retrieved successfully.", result, "intended_use")
 
+
+@rpr.route('/intended_use/update_credential', methods=['POST'])
+def update_intended_use_credential():
+    data = request.get_json(silent=True)
+   
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "intended_use_id", "credential_ids"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    intended_use_id = data.get("intended_use_id")
+    credential_ids = data.get("credential_ids", [])
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    #verification
+    if user_id != db.check_intendedUse(intended_use_id):
+        return error_invalid("Intended Use id doesn't belong to this user")
+    
+    for credential_id in credential_ids:
+        if user_id != db.check_credentials(credential_id):
+            return error_invalid("Credential id doesn't belong to this user")
+        
+    #insert data base
+    for credential_id in credential_ids:
+        db.insert_intended_use_credential(intended_use_id, credential_id)
+
+    return update_response("Intended Use Credential associations updated successfully", len(credential_ids))
+
+@rpr.route('/intended_use/update_policy', methods=['POST'])
+def update_intended_use_policy():
+    data = request.get_json(silent=True)
+   
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "intended_use_id", "policy_ids"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    intended_use_id = data.get("intended_use_id")
+    policy_ids = data.get("policy_ids", [])
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    #verification
+    if user_id != db.check_intendedUse(intended_use_id):
+        return error_invalid("Provider id doesn't belong to this user")
+    
+    for policy_id in policy_ids:
+        row = db.check_policy(policy_id)
+        
+        if user_id[0] != row[0]:
+            return error_invalid("The Policy ID does not belong to this user")
+        if row[1] not in cfgserv.intended_use["Type of Policy"]:
+            return error_invalid(f"The policy has an incorrect type; it must be a policy with a type for 'Wallet Relying Party'(intention: wrp). Must be one of: {', '.join(cfgserv.relying_party['Type of Policy'])}")
+
+    #insert data base
+    for policy_id in policy_ids:
+        db.insert_intended_use_policy(intended_use_id, policy_id)
+
+    return update_response("Intended Use Policy associations updated successfully", len(policy_ids))
+
 ## -provided attestation
-@rpr.route('/create_provided_attestation', methods=['POST'])
+@rpr.route('/provided_attestation/create', methods=['POST'])
 def create_provided_attestation():
 
     data = request.get_json(silent=True)
@@ -1389,7 +1595,7 @@ def create_provided_attestation():
 
     return create_response("Provided Attestation created successfully.", "Provided Attestation ids", result)
 
-@rpr.route('/list_provided_attestation', methods=['POST'])
+@rpr.route('/provided_attestation/list', methods=['POST'])
 def list_provided_attestation():
     data = request.get_json(silent=True)
 
@@ -1411,7 +1617,7 @@ def list_provided_attestation():
     return list_response("Provided attestation retrieved successfully.", result, "provided_attestation")
 
 ## -supervisoryAuthority
-@rpr.route('/create_supervisory_authority', methods=['POST'])
+@rpr.route('/supervisory_authority/create', methods=['POST'])
 def create_supervisory_authority():
 
     data = request.get_json(silent=True)
@@ -1465,7 +1671,7 @@ def create_supervisory_authority():
 
     return create_response("Supervisory Authority created successfully", "Supervisory Authority ids", result)
 
-@rpr.route('/list_supervisory_authority', methods=['POST'])
+@rpr.route('/supervisory_authority/list', methods=['POST'])
 def list_supervisory_authority():
     data = request.get_json(silent=True)
     
@@ -1487,7 +1693,7 @@ def list_supervisory_authority():
     return list_response("Supervisory Authority retrieved successfully.", result, "supervisory_authority")
 
 ## -wrp
-@rpr.route('/create_wrp', methods=['POST'])
+@rpr.route('/wallet_rp/create', methods=['POST'])
 def create_wrp():
 
     data = request.get_json(silent=True)
@@ -1602,7 +1808,7 @@ def create_wrp():
 
     return create_response("Wallet Relying Party created successfully", "wrp ids", result)
 
-@rpr.route('/list_wrp', methods=['POST'])
+@rpr.route('/wallet_rp/list', methods=['POST'])
 def list_wrp():
     data = request.get_json(silent=True)
     
@@ -1622,6 +1828,105 @@ def list_wrp():
     result = db.get_wrp(user_id)
 
     return list_response("Wallet Relying Party retrieved successfully.", result, "wrp")
+
+@rpr.route('/wallet_rp/update_intended_use', methods=['POST'])
+def update_wrp_intended_use():
+    data = request.get_json(silent=True)
+   
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "wrp_id", "intended_use_ids"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    wrp_id = data.get("wrp_id")
+    intended_use_ids = data.get("intended_use_ids", [])
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    #verification
+    if user_id != db.check_wrp(wrp_id):
+        return error_invalid("Wallet Relying Party id doesn't belong to this user")
+    
+    for intended_use_id in intended_use_ids:
+        if user_id != db.check_intendedUse(intended_use_id):
+            return error_invalid("Intended Use id doesn't belong to this user")
+        
+    #insert data base
+    for intended_use_id in intended_use_ids:
+        db.insert_wrp_intended_use(wrp_id, intended_use_id)
+
+    return update_response("Wallet Relying Party Intended Use associations updated successfully", len(intended_use_ids))
+
+@rpr.route('/wallet_rp/update_provided_attestation', methods=['POST'])
+def update_wrp_provided_attestion():
+    data = request.get_json(silent=True)
+   
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "wrp_id", "provided_attestation_ids"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    wrp_id = data.get("wrp_id")
+    provided_attestation_ids = data.get("provided_attestation_ids", [])
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    #verification
+    if user_id != db.check_wrp(wrp_id):
+        return error_invalid("Wallet Relying Party id doesn't belong to this user")
+    
+    for provided_attestation_id in provided_attestation_ids:
+        if user_id != db.check_provided_attestation(provided_attestation_id):
+            return error_invalid("Provided Attestation id doesn't belong to this user")
+        
+    #insert data base
+    for provided_attestation_id in provided_attestation_ids:
+        db.insert_wrp_provided_attestation(wrp_id, provided_attestation_id)
+
+    return update_response("Wallet Relying Party Provided Attestation associations updated successfully", len(provided_attestation_ids))
+
+@rpr.route('/wallet_rp/update_uses_intermediary', methods=['POST'])
+def update_wrp_uses_intermediary():
+    data = request.get_json(silent=True)
+   
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "wrp_id", "uses_intermediary_ids"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    wrp_id = data.get("wrp_id")
+    uses_intermediary_ids = data.get("uses_intermediary_ids", [])
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    #verification
+    if user_id != db.check_wrp(wrp_id):
+        return error_invalid("Wallet Relying Party id doesn't belong to this user")
+    
+    for uses_intermediary_id in uses_intermediary_ids:
+        if user_id != db.check_wrp(uses_intermediary_id):
+            return error_invalid("Wallet Relying Party id doesn't belong to this user")
+        
+    #insert data base
+    for uses_intermediary_id in uses_intermediary_ids:
+        db.insert_wrp_intermediary(wrp_id, uses_intermediary_id)
+
+    return update_response("Wallet Relying Party uses Intermediary associations updated successfully", len(uses_intermediary_ids))
 
 @rpr.route('/list_claim', methods=['POST'])
 def list_claim():
@@ -6070,7 +6375,7 @@ def list_intended_use(user_id):
 
     return menu, data, header_table, list
 
-@rpr.route('/intended_use/list', methods=['GET','POST'])
+#@rpr.route('/intended_use/list', methods=['GET','POST'])
 def intended_use_list():
     """
 List Intended Uses

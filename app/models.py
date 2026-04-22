@@ -246,7 +246,7 @@ def get_legal_person(user_id):
             cursor.close()
             connection.close()
     
-def insert_legal_person_law(legal_person_id, legislative_identifier):
+def insert_legal_person_law(legal_person_id, law_id):
     try:
         connection = conn()
         if connection:
@@ -257,7 +257,7 @@ def insert_legal_person_law(legal_person_id, legislative_identifier):
             "law_id) " \
             "VALUES (%s, %s)"
             
-            cursor.execute(insert_query, (legal_person_id, legislative_identifier,))
+            cursor.execute(insert_query, (legal_person_id, law_id,))
             
             connection.commit()
             
@@ -1202,7 +1202,7 @@ def check_policy(id):
             if row:
                 return row
             else:
-                return []
+                return [None, None]
 
     except pymysql.MySQLError as e:
         logger.error(f"Error: {e}")
@@ -1667,7 +1667,11 @@ def get_wrp(user_id):
                     saf.formURI,
 
                     iu.id,
-                    iu.intended_use_identifier
+                    iu.intended_use_identifier,
+
+                    pa.id,
+                    pa.format,
+                    pa.meta
 
                 FROM wallet_relying_party wrp
 
@@ -1704,6 +1708,12 @@ def get_wrp(user_id):
                 LEFT JOIN intended_use iu
                     ON iu.id = wrpiu.intended_use_id
 
+                LEFT JOIN wrp_provided_attestation wpa
+                    ON wpa.wrp_id = wrp.id
+                    
+                LEFT JOIN provided_attestation pa
+                    ON pa.id = wpa.provided_attestation_id
+
                 WHERE wrp.user_id = %s;
                 """
             
@@ -1720,7 +1730,8 @@ def get_wrp(user_id):
                 lang, content,
                 sa_name, sa_country,
                 sa_email, sa_phone, sa_form,
-                iu_id, iu_intended_use_identifier
+                iu_id, iu_intended_use_identifier,
+                pa_id, pa_format, pa_meta
             ) in rows:
 
                 if wrp_id not in result:
@@ -1739,7 +1750,9 @@ def get_wrp(user_id):
 
                         "SupervisoryAuthority": None,
 
-                        "intendedUses": []
+                        "intendedUses": [],
+
+                        "providedAttestation": [] 
                     }
 
                 wrp = result[wrp_id]
@@ -1793,6 +1806,17 @@ def get_wrp(user_id):
 
                     if obj not in wrp["intendedUses"]:
                         wrp["intendedUses"].append(obj)
+
+                # Provided Attestation
+                if pa_id:
+                    obj = {
+                        "id": pa_id,
+                        "format": pa_format,
+                        "meta": pa_meta
+                    }
+
+                    if obj not in wrp["providedAttestation"]:
+                        wrp["providedAttestation"].append(obj)
 
 
             return list(result.values())
