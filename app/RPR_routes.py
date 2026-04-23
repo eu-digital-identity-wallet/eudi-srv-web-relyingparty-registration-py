@@ -2401,6 +2401,714 @@ def check_intended_use():
 
     return signed_jws
 
+@rpr.route("/static/swagger.json")
+def swagger_static():
+    return send_from_directory("static", "swagger.json")
+
+@rpr.route("/guide")
+def guide():
+    return render_template("guide.html")
+
+@rpr.route("/wallet_rp/certificate", methods=["POST"])
+def wrp_access_certificate():
+    
+    data = request.get_json(silent=True)
+        
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "wrp_id", "password"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    wrp_id = data.get("wrp_id")
+    password = data.get("password")
+
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    if user_id != db.check_wrp(wrp_id):
+        return error_invalid("Wallet Relying Party id doesn't belong to this user")
+
+    wrp = db.get_wrp_id(wrp_id)
+
+    modulus=crypto.key_size
+    exponent=crypto.exponent
+    priv_key = ec.generate_private_key(ec.SECP256R1(), default_backend() )
+
+    #dados da RP
+    TypeIdentifier={
+        "http://data.europa.eu/eudi/id/EORI-No":"EOR",
+        "http://data.europa.eu/eudi/id/LEI":"LEI" ,
+        "http://data.europa.eu/eudi/id/EUID":"NTR" ,
+        "http://data.europa.eu/eudi/id/VATIN":"VAT"  ,
+        "http://data.europa.eu/eudi/id/TIN":"TIN",
+        "http://data.europa.eu/eudi/id/Excise":"EXC"
+    }
+    #commonName
+    tradeName = wrp[0]["trade_name"]
+
+    #uniformResourceIdentifier
+    supportURI = wrp[0]["supportURI"][0]
+    
+
+    legal_entity = db.get_legal_entity_id(wrp[0]["provider_id"])
+    
+    #dados da legalEntity
+    #caso for natural person é serialNumber no caso de uma legal person organizationIdentifier
+    identifier = legal_entity[0]["identifier"]
+    country = legal_entity[0]["country"]
+
+    email = None
+    if email:
+        email = legal_entity[0]["email"][0]
+    phone = None
+    if phone:
+        phone = legal_entity[0]["phone"][0]
+
+    if legal_entity[0]["LegalPerson"] is None:
+        #se user for natural person
+        givenName=legal_entity[0]["NaturalPerson"]["givenName"]
+        #surname
+        surname=legal_entity[0]["NaturalPerson"]["familyName"]
+
+        first = legal_entity[0]["identifier"][0]
+        serial_number = (TypeIdentifier[first["type"]] + first["identifier"])
+
+        certificateRequest= generateCertificateRequest(priv_key=priv_key, commonName=tradeName, countryName=country, uniformResourceIdentifier=supportURI, 
+                                                       givenName=givenName, surname=surname, serialNumber=serial_number, email=email)
+        
+    else:
+        #se user for legal person
+        #dados da legal person
+        #organizationName
+        legalName = legal_entity[0]["LegalPerson"]["legalName"][0]
+
+        first = legal_entity[0]["identifier"][0]
+        organizationIdentifier = (TypeIdentifier[first["type"]] + first["identifier"])
+        
+        certificateRequest = generateCertificateRequest(priv_key=priv_key, commonName=tradeName, countryName=country, uniformResourceIdentifier=supportURI, 
+                                                       organizationName=legalName, organizationIdentifier=organizationIdentifier, email=None)
+
+    #como as TSLs, ex: lang en, description=test  
+    #servicesDescription=RP[0]["srvDescription"]#como as TSLs, ex: lang en, description=test  
+    #entitlement=RP[0]["entitlement"]
+    # verificar legal entity se é pertence ao sector público, se sim True, se não False
+    isPSB= False
+#### ------
+    # password=request.form.get("Password")
+
+
+    certificateRequestString = "-----BEGIN CERTIFICATE REQUEST-----\n"+ base64.b64encode(certificateRequest).decode("utf-8") + "\n"+ "-----END CERTIFICATE REQUEST-----"
+    certificateAuthorityName = getCertificateAuthorityName(country)
+    certificateRequestBody = getJsonBody(certificateRequestString, certificateAuthorityName, country)
+    postUrl = "https://" + ejbca.cahost + "/ejbca/ejbca-rest-api/v1" + ejbca.endpoint
+
+    headers ={
+        "Content-Type": "application/json",
+        'Authorization': 'Bearer test',
+    }
+
+    clientP12ArchiveFilepath = ejbca.clientP12ArchiveFilepath
+    clientP12ArchivePassword = ejbca.clientP12ArchivePassword
+    ManagementCA = ejbca.managementCA
+
+    trustCA= getTrustManagerOfCACertificate(ManagementCA)
+
+    response = http_post_requests_with_custom_ssl_context(ManagementCA, clientP12ArchiveFilepath, clientP12ArchivePassword, postUrl,certificateRequestBody, headers)
+
+    response = response.json()
+    
+    certificate_bytes=base64.b64decode(response["certificate"])
+
+    certificate = x509.load_der_x509_certificate(certificate_bytes, default_backend())
+
+    serial_number=response["serial_number"]
+
+    p12=pkcs12.serialize_key_and_certificates(
+        name=tradeName.encode("utf-8"),key=priv_key,cert=certificate, cas=list().append(trustCA),
+        encryption_algorithm=serialization.BestAvailableEncryption(password.encode("utf-8"))
+    )
+
+    tag = uuid.uuid4()
+
+    file_name = tradeName + "_" + str(tag)
+
+    p12_temp.update({file_name:{"response": p12, "expires":datetime.now() + timedelta(minutes=cfgserv.deffered_expiry)}})
+
+    cert = certificate.subject.rfc4514_string().split(",")
+    dic = {parte.split("=")[0]: parte for parte in cert}
+    order = [dic.get("C"),
+            #dic.get("O"),
+            dic.get("CN")]
+    aux = [v for k, v in dic.items() if k not in ["C", "O", "CN"]]
+
+    cert_subject_rfc4514_string = ",".join(order + aux)
+
+    certificate_presentation={
+        "certificate_issuer":certificate.issuer.rfc4514_string(),
+        "certificate_distinguished_name":cert_subject_rfc4514_string,
+        "validity_from":certificate.not_valid_before_utc,
+        "validity_to":certificate.not_valid_after_utc,
+    }
+
+    file_base64 = base64.b64encode(p12).decode()
+
+    return jsonify({
+        "status": "success",
+        "code": 200,
+        "data": {
+            "filename": "document_with_signature.json",
+            "file_base64": file_base64
+        }
+    })
+
+
+
+@rpr.route("/intended_use/certificate", methods=["GET"])
+def asdintended_use_registration_certificate():
+    """
+Retrieve Intended Use Certificate
+---
+tags:
+  - Intended Use
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - hash_pid
+        - intended_use
+      properties:
+        hash_pid:
+          type: string
+          description: User identifier obtained from wallet login
+          example: abc123hashpid
+
+        intended_use:
+          type: integer
+          description: ID of the Intended Use whose certificate will be retrieved
+          example: 3
+
+responses:
+  200:
+    description: Intended Use certificate retrieved successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        code:
+          type: integer
+          example: 200
+        data:
+          type: object
+          properties:
+            filename:
+              type: string
+              example: document_with_signature.json
+            file_base64:
+              type: string
+              description: Base64 encoded file containing the generated document
+              example: ewoJImRhdGEiOiAiZXhhbX...
+            cose_base64:
+              type: string
+              description: Base64 encoded COSE signature of the document
+              example: eyJhbGciOiAiRVMyNTYifQ...
+
+  400:
+    description: Invalid request or validation error
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing required fields.
+        data:
+          type: object
+          properties:
+            missing_fields:
+              type: array
+              items:
+                type: string
+              example:
+                - intended_use
+
+  400_invalid_hash_pid:
+    description: Invalid hash_pid
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Invalid hash_pid
+        data:
+          type: object
+          properties:
+            hash_pid:
+              type: string
+              example: abc123hashpid
+
+  400_invalid_intended_use:
+    description: Intended Use does not exist
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Intended Use do not Exist
+        data:
+          type: object
+          properties:
+            intended_use:
+              type: integer
+              example: 3
+
+  400_not_user:
+    description: Intended Use does not belong to the authenticated user
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Intended Use do not belong to this User.
+        data:
+          type: object
+          properties:
+            intended_use:
+              type: integer
+              example: 3
+"""
+
+    data = request.get_json(silent=True)
+
+    if not data:
+        return {
+                "status": "error",
+                "code": 400,
+                "message": "Invalid or missing JSON body"
+            }, 400
+
+    hash_pid = data.get("hash_pid")
+    intended_use = data.get("intended_use")
+
+    required_fields = {
+        "hash_pid": hash_pid,
+        "intended_use": intended_use,
+    }
+
+    missing_fields = [name for name, value in required_fields.items() if not value]
+
+    if missing_fields:
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Missing required fields.",
+            "data": {
+                "missing_fields": missing_fields
+            }
+        }, 400
+    
+    user_id = db.check_user(hash_pid)
+    
+    if user_id is None:
+        
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Invalid hash_pid",
+            "data": {
+                "hash_pid": hash_pid
+            }
+        }, 400
+    
+    intended_use_data=db.get_intended_use(intended_use)
+
+    if intended_use_data is None:
+        
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Intended Use do not Exist",
+            "data": {
+                "intended_use": intended_use
+            }
+        }, 400
+    
+    if intended_use_data[0]["user_id"] is not user_id:
+        
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Intended Use do not belong to this User.",
+            "data": {
+                "intended_use": intended_use
+            }
+        }, 400
+
+    RP_data = db.get_rp_certificate(intended_use_data[0]["wrp"])
+    if RP_data is None:
+        
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Intended Use do not have associated Relying Party."
+        }, 400
+
+    legal_entity_data = db.get_legal_entity(RP_data[0]["supervisorAuthority"])
+    if legal_entity_data is None:
+        
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Relying Parties do not have associated Legal Entity."
+        }, 400
+
+    credentials_data = db.get_credential(intended_use_data[0]["intendeduse_id"])
+    if credentials_data is None:
+        
+        return {
+            "status": "error",
+            "code": 400,
+            "message": "Intended Use do not have associated Credential."
+        }, 400
+
+
+# #if legal person
+# legal_person_data=get_legal_person_data()
+
+# #if natural person
+# natural_person_data= get_natural_person_data()
+
+# #if legal_person
+# legal_name=legal_person_data["legal_name"]
+
+# #if natural_person
+# given_name=natural_person_data["given_name"]
+# family_name=natural_person_data["family_name"]
+
+
+    iat= int(time.time())
+
+# name=RP_data["tradeName"]
+# purpose=intended_use_data["purpose"]
+# info_uri=legal_entity_data["info_uri"]
+# country=legal_entity_data["country"]
+
+    name=RP_data[0]["tradeName"]
+    supportURI=RP_data[0]["supportURI"]
+    purpose=intended_use_data[0]["purpose"]
+    info_uri=legal_entity_data[0]["infoURI"]
+    country=legal_entity_data[0]["country"]
+
+# id=legal_entity_data["identifier"]
+# privacy_policy=intended_use_data["privacyPolicy"]
+
+    id=legal_entity_data[0]["identifier"]
+    privacy_policy=intended_use_data[0]["type_policy"]
+
+# # definir de acordo com os dados do certificado
+# # policy_id=certificate_policy_id
+# # certificate_policy=certificate_URI
+
+# entitlement=RP_data["entitlement"]
+# providesAttestations=RP_data["providesAttestations"]
+# public_body=RP_data["isPSB"]
+# service=RP_data["srvDescription"]
+
+    entitlement=RP_data[0]["entitlement"]
+    providesAttestations=RP_data[0]["providesAttestations"]
+    public_body=RP_data[0]["isPSB"]
+    service=RP_data[0]["srvDescription"]
+
+# #A URI to a status list presenting information about validity of the WRPRC. 
+# #status=
+
+# #se utiliza intermediário
+# #act            
+
+    TypeIdentifier={
+        "http://data.europa.eu/eudi/id/EORI-No":"EOR",
+        "http://data.europa.eu/eudi/id/LEI":"LEI" ,
+        "http://data.europa.eu/eudi/id/EUID":"NTR" ,
+        "http://data.europa.eu/eudi/id/VATIN":"VAT"  ,
+        "http://data.europa.eu/eudi/id/TIN":"TIN",
+        "http://data.europa.eu/eudi/id/Excise":"EXC"
+    }
+
+    sub_id = TypeIdentifier[legal_entity_data[0]["identifierType"]] + '-' + id
+
+    # json_header = { "typ": "rc-wrp+jwt",
+    #             "alg": "ES256", 
+    #             "b64": "true", 
+    #             "cty": ["b64"], "x5c": [],}
+
+    headers={
+        "accept": "application/json",
+        "X-API-Key": "test" ,
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+
+    data={
+        "country":"FC",
+        "doctype":"wrprc",
+        "expiry_date":"2030-11-11"
+    }
+
+    response = requests.post(cfgserv.url_statuslist, headers=headers, data=data)
+
+    status=response.json()
+
+    status_idx=status["status_list"]["idx"]
+    status_uri=status["status_list"]["uri"]
+
+    json_payload = { 
+                        "name": name,
+                        "purpose": purpose, 
+                        "info_uri": info_uri,
+                        "country": country,
+                        "sub": sub_id,
+                        "privacy_policy": privacy_policy, 
+                        "policy_id": [ "{ itu-t(0) identified-organization(4) etsi(0) eudiwrpa(19475) policy-identifiers(3) wrprc (1)}" ],
+                        "iat": iat, 
+                        "credentials": credentials_data,
+                        "entitlements": entitlement,
+                        "provides_attestations": [ { 
+                                                    "format": credentials_data[0]["format"], "meta": { "vct_values": [ credentials_data[0]["meta"] ] } 
+                        } ],
+                        "public_body": False,
+                        "service": service,
+                        "supportURI":supportURI,
+                        "status": { 
+                            "status_list": { 
+                                            "idx": status_idx, "uri": status_uri
+                            } 
+                        }
+        }
+    
+    if legal_entity_data[0]["legalperson_id"] is None:
+        natural_person = db.get_natural_person(legal_entity_data[0]["naturalperson_id"])
+        #se user for natural person
+        givenName=natural_person[0]["givenName"]
+        #surname
+        surname=natural_person[0]["familyName"]
+        certificate_policy = "itu-t(0) identified-organization(4) etsi(0) eudiwrp(194118) policy-identifiers(1) ncp-natural (1)"
+        json_payload.update({
+            "sub_gn": givenName,
+            "sub_fn":surname,
+            "certificate_policy":certificate_policy
+        })
+
+        
+    else:
+        legal_person = db.get_legal_person(legal_entity_data[0]["legalperson_id"])
+        #se user for legal person
+        #dados da legal person
+        #organizationName
+        legalName=legal_person[0]["legalName"]
+        certificate_policy = "itu-t(0) identified-organization(4) etsi(0) eudiwrp(194118) policy-identifiers(1) ncp-legal (2)"
+        json_payload.update({
+            "sub_ln": legalName,
+            "certificate_policy":certificate_policy
+        })
+
+    if RP_data[0]["usesIntermediary"] != None:
+        rp_intermediary = db.get_rp_certificate(RP_data[0]["usesIntermediary"])
+        legalentity_intermediary = db.get_legal_entity_info_edit(rp_intermediary[0]["supervisorAuthority"])
+        aux = TypeIdentifier[legalentity_intermediary[0]['identifierType']] + '-' + legalentity_intermediary[0]['identifier']
+
+        json_payload.update({
+            "intermediary":{
+                "sub":aux,
+                "sname":legalentity_intermediary[0]["tradeName"]
+            }
+        })
+    
+    with open(cfgserv.wrprc_certificate, "rb") as f:
+        cert = x509.load_der_x509_certificate(f.read(), default_backend())
+
+    base64_cert = base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode("utf-8")
+    
+    #Jades with b-b profile
+
+    # base64_header=base64.b64encode(json.dumps(json_header).encode()).decode("utf-8")
+
+    # with open("naoAssinado.json", "w", encoding="utf-8") as f:
+    #     json.dump(
+    #         json_payload,
+    #         f,
+    # )
+
+    file_bytes = json.dumps(json_payload).encode()
+    
+    # digest = hashes.Hash(hashes.SHA256())
+    # digest.update(file_bytes)
+    # hash_value = digest.finalize()
+
+    base64_payload=base64.b64encode(file_bytes).decode("utf-8")
+
+    #print(document)
+    payload=json.dumps({
+
+            "documents":[{
+
+                "document": base64_payload,
+                "signature_format": "J",
+                "conformance_level":"Ades-B-B",
+                "signed_envelope_property": "ENVELOPING",
+                "container": "No"
+
+            } ],
+        "endEntityCertificate": base64_cert,
+        "certificateChain": [
+        ],
+        "hashAlgorithmOID": "2.16.840.1.101.3.4.2.1"
+
+    })
+
+    headers={
+        'Content-Type': 'application/json'
+    }
+
+    calculate_hash=requests.post(url=cfgserv.sca_signer_url+"/signatures/calculate_hash",headers=headers, data=payload)
+
+    #print(calculate_hash.json())
+    #print(calculate_hash.json()["hashes"])
+
+    hashes1 = calculate_hash.json()["hashes"]
+
+    #print(hashes1[0])
+
+    base64_string = urllib.parse.unquote(hashes1[0])
+
+    data_to_be_signed = base64.b64decode(base64_string)
+
+    #print(data_to_be_signed)
+
+    #print(data_to_be_signed)
+    # hash = base64.urlsafe_b64decode(hashes[0]).
+    # base64.b64decode
+
+    signature_date = calculate_hash.json()["signature_date"]
+
+    with open(cfgserv.wrprc_privateKey, "rb") as f:
+        private_key = serialization.load_pem_private_key(
+        f.read(),
+        password=None,
+        backend=default_backend()
+    )
+
+    # key=ECC.import_key(private_key)
+
+    # signature = DSS.new(key).sign(data_to_be_signed)
+    signature = private_key.sign(
+        data_to_be_signed,
+        ec.ECDSA(utils.Prehashed(hashes.SHA256()))
+    )
+
+    base64_signature= base64.b64encode(signature).decode()
+    #print(base64_signature)
+
+    payload = json.dumps({
+        "documents": [
+            {
+                "document": base64_payload,
+                "signature_format": "J",
+                "conformance_level":"Ades-B-B",
+                "signed_envelope_property": "ENVELOPING",
+                "container": "No"
+            }
+        ],
+        "hashAlgorithmOID": "2.16.840.1.101.3.4.2.1",
+        "returnValidationInfo": False,
+        "endEntityCertificate": base64_cert,
+        "certificateChain": [
+        ],
+        "signatures":[base64_signature],
+        "date": signature_date
+    }).encode()
+
+    obtain_signed_document=requests.post(url=cfgserv.sca_signer_url+"/signatures/obtain_signed_doc",headers=headers, data=payload)
+    
+    document_with_signature=obtain_signed_document.json()["documentWithSignature"][0]
+
+    # data=json.loads(base64.b64decode(document_with_signature).decode("utf-8"))
+
+    # jwt_payload=data["payload"]
+    # jwt_header=data["signatures"][0]["protected"]
+    # jwt_signature=data["signatures"][0]["signature"]
+
+    # jwt = jwt_header + "." + jwt_payload + "." + jwt_signature
+    #cbor
+
+    cbor_data= cbor2.dumps(json_payload)
+
+    msg = Sign1Message(phdr={Algorithm: Es256},uhdr={KID: b"key1"},payload=cbor_data)
+
+    with open(cfgserv.wrprc_privateKey, "rb") as f:
+        pem_bytes = f.read()
+
+    cose_key = CoseKey.from_pem_private_key(pem_bytes.decode())
+    msg.key = cose_key
+    cose_bytes = msg.encode()
+
+    file_data = base64.b64decode(document_with_signature)
+
+    file_base64 = base64.b64encode(file_data).decode()
+    cose_base64 = base64.urlsafe_b64encode(cose_bytes).decode()
+
+    return jsonify({
+        "status": "success",
+        "code": 200,
+        "data": {
+            "filename": "document_with_signature.json",
+            "file_base64": file_base64,
+            "cose_base64": cose_base64
+        }
+    })
+
+    return send_file(
+        io.BytesIO(file_data),
+        download_name="document_with_signature.json",
+        as_attachment=True,
+        mimetype='application/json'
+    )
+
+    cose_base64 = base64.urlsafe_b64encode(cose_bytes).decode()
+    return cose_base64
 
 
 
@@ -2436,6 +3144,9 @@ def check_intended_use():
 
 
     
+
+
+
 @rpr.route('/natural_person/add_natural_person_db', methods=['POST'])
 def add_natural_person_db():
     """
@@ -8219,11 +8930,3 @@ def request_RP_data():
     signed_jws = jws.sign_json([ec_key])
 
     return signed_jws
-
-@rpr.route("/static/swagger.json")
-def swagger_static():
-    return send_from_directory("static", "swagger.json")
-
-@rpr.route("/guide")
-def guide():
-    return render_template("guide.html")

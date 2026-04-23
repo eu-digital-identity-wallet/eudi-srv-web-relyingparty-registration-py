@@ -550,7 +550,47 @@ def get_natural_person(user_id):
             cursor.close()
             connection.close()
     
+def get_natural_person_id(natural_person_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
 
+            query = """
+                SELECT 
+                    np.id,
+                    np.family_name,
+                    np.given_name,
+                    np.date_of_birth,
+                    np.place_of_birth
+                FROM natural_person np
+                WHERE np.id = %s
+            """
+
+            cursor.execute(query, (natural_person_id,))
+            rows = cursor.fetchall()
+
+            result = []
+
+            for np_id, family_name, given_name, date_of_birth, place_of_birth in rows:
+                result.append({
+                    "natural_person_id": np_id,
+                    "family_name": family_name,
+                    "given_name": given_name,
+                    "date_of_birth": str(date_of_birth) if date_of_birth else None,
+                    "place_of_birth": place_of_birth
+                })
+
+            return result
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+    
 def check_natural_person(id):
     try:
         connection = conn()
@@ -935,6 +975,141 @@ def check_legal_entity(id):
                 return row
             else:
                 return []
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def get_legal_entity_id(provider_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                    SELECT 
+                        le.id,
+                        le.country,
+
+                        lepa.address,
+                        leiu.uri,
+                        lee.email,
+                        lep.phone,
+
+                        i.id,
+                        i.identifier,
+                        i.type,
+
+                        lpn.name,
+
+                        np.given_name,
+                        np.family_name
+
+                    FROM legal_entity le
+
+                    LEFT JOIN provider p
+                        ON p.legal_entity_id = le.id
+
+                    LEFT JOIN legal_entity_postal_address lepa
+                        ON lepa.legal_entity_id = le.id
+                        
+                    LEFT JOIN legal_entity_info_uri leiu
+                        ON leiu.legal_entity_id = le.id
+                        
+                    LEFT JOIN legal_entity_email lee
+                        ON lee.legal_entity_id = le.id
+                        
+                    LEFT JOIN legal_entity_phone lep
+                        ON lep.legal_entity_id = le.id
+                        
+                    LEFT JOIN legal_person_name lpn
+                        ON lpn.legal_person_id = le.legal_person_id
+                        
+                    LEFT JOIN natural_person np
+                        ON np.id = le.natural_person_id
+                        
+                    LEFT JOIN legal_entity_identifier lei
+                        ON lei.legal_entity_id = le.id
+
+                    LEFT JOIN identifier i
+                        ON i.id = lei.identifier_id
+
+                    WHERE p.id = %s;
+                    """
+
+            cursor.execute(query, (provider_id,))
+            rows = cursor.fetchall()
+
+            result = {}
+
+            for (
+                le_id, country,
+                address, uri, email, phone,
+                i_id, identifier, id_type,
+                legal_name,
+                given_name, family_name
+            ) in rows:
+
+                if le_id not in result:
+                    result[le_id] = {
+                        "legal_entity_id": le_id,
+                        "country": country,
+                        "postalAddress": [],
+                        "infoURI": [],
+                        "email": [],
+                        "phone": [],
+                        "identifier": [],
+                        "LegalPerson": None,
+                        "NaturalPerson": None
+                    }
+
+                entity = result[le_id]
+
+                # arrays simples
+                if address and address not in entity["postalAddress"]:
+                    entity["postalAddress"].append(address)
+
+                if uri and uri not in entity["infoURI"]:
+                    entity["infoURI"].append(uri)
+
+                if email and email not in entity["email"]:
+                    entity["email"].append(email)
+
+                if phone and phone not in entity["phone"]:
+                    entity["phone"].append(phone)
+
+                # identifiers
+                if identifier:
+                    id_obj = {
+                        "identifier_id": i_id,
+                        "identifier": identifier,
+                        "type": id_type
+                    }
+                    if id_obj not in entity["identifier"]:
+                        entity["identifier"].append(id_obj)
+
+                # LegalPerson (opcional)
+                if legal_name:
+                    if entity["LegalPerson"] is None:
+                        entity["LegalPerson"] = {
+                            "legalName": []
+                        }
+
+                    if legal_name not in entity["LegalPerson"]["legalName"]:
+                        entity["LegalPerson"]["legalName"].append(legal_name)
+
+                # NaturalPerson (opcional)
+                if given_name or family_name:
+                    entity["NaturalPerson"] = {
+                        "givenName": given_name,
+                        "familyName": family_name
+                    }
+
+            return list(result.values())
 
     except pymysql.MySQLError as e:
         logger.error(f"Error: {e}")
@@ -2178,6 +2353,7 @@ def get_wrp_id(wrp_id):
                         "isPSB": bool(is_psb),
                         "registryURI": registry_uri,
                         "isIntermediary": bool(is_intermediary),
+                        "provider_id": provider_id,
 
                         "supportURI": [],
                         "entitlements": [],
