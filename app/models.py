@@ -143,6 +143,7 @@ def insert_legal_person_name(legal_person_id, name):
             cursor.close()
             connection.close()
 
+## -legal person-update
 def associate_legal_person_law(legal_person_id, law_id):
     try:
         connection = conn()
@@ -165,6 +166,43 @@ def associate_legal_person_law(legal_person_id, law_id):
     except pymysql.MySQLError as e:
         extra = {'code'} 
         logger.error(f"Error inserting Legal Person - Law: {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def delete_legal_person_laws(legal_person_id, law_ids):
+    if not law_ids:
+        return 0
+
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            placeholders = ','.join(['%s'] * len(law_ids))
+
+            delete_query = "DELETE FROM legal_person_law " \
+                "WHERE legal_person_id = %s " \
+                f"AND law_id IN ({placeholders})"
+
+            params = [legal_person_id] + law_ids
+
+            cursor.execute(delete_query, params)
+
+            connection.commit()
+
+            deleted_count = cursor.rowcount
+
+            extra = {'code'}
+            logger.info(f"Legal Person - Law associations removed successfully. Rows affected: {deleted_count}")
+
+            return deleted_count
+
+    except pymysql.MySQLError as e:
+        extra = {'code'}
+        logger.error(f"Error deleting Legal Person - Law associations: {e}")
+
     finally:
         if connection:
             cursor.close()
@@ -223,6 +261,7 @@ def get_legal_person(user_id):
 
                     if law_id not in laws:
                         laws[law_id] = {
+                            "law_id": law_id,
                             "legislative_identifier": legislative_identifier,
                             "legal_basis": []
                         }
@@ -705,6 +744,43 @@ def insert_legal_entity_phone(legal_entity_id, phone):
             cursor.close()
             connection.close()
 
+def delete_legal_entity_identifier(legal_entity_id, identifier_ids):
+    if not identifier_ids:
+        return 0
+
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            placeholders = ','.join(['%s'] * len(identifier_ids))
+
+            delete_query = "DELETE FROM legal_entity_identifier " \
+                "WHERE legal_entity_id = %s " \
+                f"AND identifier_id IN ({placeholders})"
+
+            params = [legal_entity_id] + identifier_ids
+
+            cursor.execute(delete_query, params)
+
+            connection.commit()
+
+            deleted_count = cursor.rowcount
+
+            extra = {'code'}
+            logger.info(f"Legal Entity - Identifier associations removed successfully. Rows affected: {deleted_count}")
+
+            return deleted_count
+
+    except pymysql.MySQLError as e:
+        extra = {'code'}
+        logger.error(f"Error deleting Legal Entity - Identifier associations: {e}")
+
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
 ## -legal entity-get
 def get_legal_entity(user_id):
     try:
@@ -722,6 +798,7 @@ def get_legal_entity(user_id):
                         lee.email,
                         lep.phone,
 
+                        i.id,
                         i.identifier,
                         i.type,
 
@@ -767,7 +844,7 @@ def get_legal_entity(user_id):
             for (
                 le_id, country,
                 address, uri, email, phone,
-                identifier, id_type,
+                i_id, identifier, id_type,
                 legal_name,
                 given_name, family_name
             ) in rows:
@@ -803,6 +880,7 @@ def get_legal_entity(user_id):
                 # identifiers
                 if identifier:
                     id_obj = {
+                        "identifier_id": i_id,
                         "identifier": identifier,
                         "type": id_type
                     }
@@ -1029,16 +1107,24 @@ def get_provider(user_id):
                     p.id,
                     p.provider_type,
                     p.legal_entity_id,
+
                     px.certificate,
+
+                    pol.id,
                     pol.policy_uri,
                     pol.type
+
                 FROM provider p
+
                 LEFT JOIN provider_x5c px
                     ON px.provider_id = p.id
+
                 LEFT JOIN provider_policy pp
                     ON pp.provider_id = p.id
+
                 LEFT JOIN policy pol
                     ON pol.id = pp.policy_id
+
                 WHERE p.user_id = %s
             """
 
@@ -1050,7 +1136,7 @@ def get_provider(user_id):
             for (
                 p_id, provider_type, legal_entity_id,
                 certificate,
-                policy_uri, policy_type
+                pol_id, policy_uri, policy_type
             ) in rows:
 
                 if p_id not in result:
@@ -1071,6 +1157,7 @@ def get_provider(user_id):
                 # policies
                 if policy_uri:
                     policy_obj = {
+                        "policy_id": pol_id,
                         "policyURI": policy_uri,
                         "type": policy_type
                     }
@@ -1234,6 +1321,43 @@ def insert_provider_policy(provider_id, policy_id):
     except pymysql.MySQLError as e:
         extra = {'code'} 
         logger.error(f"Error inserting Provider - Policy : {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def delete_provider_policy(provider_id, policy_ids):
+    if not policy_ids:
+        return 0
+
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            placeholders = ','.join(['%s'] * len(policy_ids))
+
+            delete_query = "DELETE FROM provider_policy " \
+                "WHERE provider_id = %s " \
+                f"AND policy_id IN ({placeholders})"
+
+            params = [provider_id] + policy_ids
+
+            cursor.execute(delete_query, params)
+
+            connection.commit()
+
+            deleted_count = cursor.rowcount
+
+            extra = {'code'}
+            logger.info(f"Provider - Policy associations removed successfully. Rows affected: {deleted_count}")
+
+            return deleted_count
+
+    except pymysql.MySQLError as e:
+        extra = {'code'}
+        logger.error(f"Error deleting Provider - Policy associations: {e}")
+
     finally:
         if connection:
             cursor.close()
@@ -1630,6 +1754,117 @@ def insert_wrp_intended_use(wrp_id, intended_use_id):
     except pymysql.MySQLError as e:
         extra = {'code'} 
         logger.error(f"Error inserting Wallet Relying Party Intended Use : {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def delete_wrp_intended_use(wrp_id, intended_use_ids):
+    if not intended_use_ids:
+        return 0
+
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            placeholders = ','.join(['%s'] * len(intended_use_ids))
+
+            delete_query = "DELETE FROM wrp_intended_use " \
+                "WHERE wrp_id = %s " \
+                f"AND intended_use_id IN ({placeholders})"
+
+            params = [wrp_id] + intended_use_ids
+
+            cursor.execute(delete_query, params)
+
+            connection.commit()
+
+            deleted_count = cursor.rowcount
+
+            extra = {'code'}
+            logger.info(f"Wrp Intended Use associations removed successfully. Rows affected: {deleted_count}")
+
+            return deleted_count
+
+    except pymysql.MySQLError as e:
+        extra = {'code'}
+        logger.error(f"Error deleting Wrp Intended Use associations: {e}")
+
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def delete_wrp_provided_attestion(wrp_id, provided_attestation_ids):
+    if not provided_attestation_ids:
+        return 0
+
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            placeholders = ','.join(['%s'] * len(provided_attestation_ids))
+
+            delete_query = "DELETE FROM wrp_provided_attestation " \
+                "WHERE wrp_id = %s " \
+                f"AND provided_attestation_id IN ({placeholders})"
+
+            params = [wrp_id] + provided_attestation_ids
+
+            cursor.execute(delete_query, params)
+
+            connection.commit()
+
+            deleted_count = cursor.rowcount
+
+            extra = {'code'}
+            logger.info(f"Wrp Intended Use associations removed successfully. Rows affected: {deleted_count}")
+
+            return deleted_count
+
+    except pymysql.MySQLError as e:
+        extra = {'code'}
+        logger.error(f"Error deleting Wrp Intended Use associations: {e}")
+
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+            
+def delete_wrp_intermediary(wrp_id, intermediary_wrp_ids):
+    if not intermediary_wrp_ids:
+        return 0
+
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            placeholders = ','.join(['%s'] * len(intermediary_wrp_ids))
+
+            delete_query = "DELETE FROM wrp_intermediary " \
+                "WHERE wrp_id = %s " \
+                f"AND intermediary_wrp_id IN ({placeholders})"
+
+            params = [wrp_id] + intermediary_wrp_ids
+
+            cursor.execute(delete_query, params)
+
+            connection.commit()
+
+            deleted_count = cursor.rowcount
+
+            extra = {'code'}
+            logger.info(f"Wrp intermediary Wrp associations removed successfully. Rows affected: {deleted_count}")
+
+            return deleted_count
+
+    except pymysql.MySQLError as e:
+        extra = {'code'}
+        logger.error(f"Error deleting Wrp intermediary Wrp associations: {e}")
+
     finally:
         if connection:
             cursor.close()
@@ -2240,6 +2475,80 @@ def insert_intended_use_credential(intended_use_id, credential_id):
             cursor.close()
             connection.close()
 
+def delete_intended_use_credential(intended_use_id, credential_ids):
+    if not credential_ids:
+        return 0
+
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            placeholders = ','.join(['%s'] * len(credential_ids))
+
+            delete_query = "DELETE FROM intended_use_credential " \
+                "WHERE intended_use_id = %s " \
+                f"AND credential_id IN ({placeholders})"
+
+            params = [intended_use_id] + credential_ids
+
+            cursor.execute(delete_query, params)
+
+            connection.commit()
+
+            deleted_count = cursor.rowcount
+
+            extra = {'code'}
+            logger.info(f"Intended Use - Credential associations removed successfully. Rows affected: {deleted_count}")
+
+            return deleted_count
+
+    except pymysql.MySQLError as e:
+        extra = {'code'}
+        logger.error(f"Error deleting Intended Use - Credential associations: {e}")
+
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+            
+def delete_intended_use_policy(intended_use_id, policy_ids):
+    if not policy_ids:
+        return 0
+
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            placeholders = ','.join(['%s'] * len(policy_ids))
+
+            delete_query = "DELETE FROM intended_use_policy " \
+                "WHERE intended_use_id = %s " \
+                f"AND policy_id IN ({placeholders})"
+
+            params = [intended_use_id] + policy_ids
+
+            cursor.execute(delete_query, params)
+
+            connection.commit()
+
+            deleted_count = cursor.rowcount
+
+            extra = {'code'}
+            logger.info(f"Intended Use - Policy associations removed successfully. Rows affected: {deleted_count}")
+
+            return deleted_count
+
+    except pymysql.MySQLError as e:
+        extra = {'code'}
+        logger.error(f"Error deleting Intended Use - Policy associations: {e}")
+
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
 ## -intended use-get
 def get_intended_use(user_id):
     try:
@@ -2257,6 +2566,7 @@ def get_intended_use(user_id):
                     mls.lang,
                     mls.content,
 
+                    pol.id,
                     pol.policy_uri,
                     pol.type,
 
@@ -2300,7 +2610,7 @@ def get_intended_use(user_id):
             for (
                 iu_id, identifier, created_at, revoked_at,
                 lang, content,
-                policy_uri, policy_type,
+                pol_id, policy_uri, policy_type,
                 cred_id, cred_format, cred_meta,
                 claim_path
             ) in rows:
@@ -2336,6 +2646,7 @@ def get_intended_use(user_id):
                     key = (policy_uri, policy_type)
                     if key not in iu["_policy_seen"]:
                         iu["privacyPolicy"].append({
+                            "policy_id": pol_id,
                             "policyURI": policy_uri,
                             "type": policy_type
                         })

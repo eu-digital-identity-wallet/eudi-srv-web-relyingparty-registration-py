@@ -844,7 +844,7 @@ def update_legal_person_law():
     
     #verification
     if user_id != db.check_legal_person(legal_person_id):
-        return error_invalid("Legal Entity id doesn't belong to this user")
+        return error_invalid("Legal Person id doesn't belong to this user")
     
     for law_id in law_ids:
         if user_id != db.check_law(law_id):
@@ -855,6 +855,41 @@ def update_legal_person_law():
         db.insert_legal_person_law(legal_person_id, law_id)
 
     return update_response("Legal person law associations updated successfully", len(law_ids))
+
+@rpr.route('/legal_person/remove_law', methods=['POST'])
+def remove_legal_person_law():
+
+    data = request.get_json(silent=True)
+   
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "legal_person_id", "law_ids"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    legal_person_id = data.get("legal_person_id")
+    law_ids = data.get("law_ids", [])
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    # verification
+    if user_id != db.check_legal_person(legal_person_id):
+        return error_invalid("Legal Person id doesn't belong to this user")
+    
+    for law_id in law_ids:
+        if user_id != db.check_law(law_id):
+            return error_invalid("law id doesn't belong to this user")
+        
+    deleted_count = db.delete_legal_person_laws(legal_person_id, law_ids)
+
+    return update_response(
+        "Legal person law associations removed successfully",
+        deleted_count
+    )
 
 ## -natural person
 @rpr.route('/natural_person/create', methods=['POST'])
@@ -1121,6 +1156,41 @@ def update_legal_entity_identifier():
 
     return update_response("Legal Entity Identifier associations updated successfully", len(identifier_ids))
 
+@rpr.route('/legal_entity/remove_identifier', methods=['POST'])
+def remove_legal_entity_remove_identifier():
+
+    data = request.get_json(silent=True)
+   
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "legal_entity_id", "identifier_ids"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    legal_entity_id = data.get("legal_entity_id")
+    identifier_ids = data.get("identifier_ids", [])
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    #verification
+    if user_id != db.check_legal_entity(legal_entity_id):
+        return error_invalid("Legal Entity id doesn't belong to this user")
+    
+    for identifier_id in identifier_ids:
+        if user_id != db.check_identifier(identifier_id):
+            return error_invalid("Identifier id doesn't belong to this user")
+        
+    deleted_count = db.delete_legal_entity_identifier(legal_entity_id, identifier_ids)
+
+    return update_response(
+        "Legal Entity Identifier associations removed successfully",
+        deleted_count
+    )
+
 ## -policy
 @rpr.route('/policy/create', methods=['POST'])
 def create_policy():
@@ -1314,6 +1384,43 @@ def update_provider_policy():
 
     return update_response("Provider Policy associations updated successfully", len(policy_ids))
 
+@rpr.route('/provider/remove_policy', methods=['POST'])
+def remove_provider_policy():
+    data = request.get_json(silent=True)
+   
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "provider_id", "policy_ids"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    provider_id = data.get("provider_id")
+    policy_ids = data.get("policy_ids", [])
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    #verification
+    if user_id != db.check_provider(provider_id):
+        return error_invalid("Provider id doesn't belong to this user")
+    
+    for policy_id in policy_ids:
+        row = db.check_policy(policy_id)
+        
+        if user_id[0] != row[0]:
+            return error_invalid("The Policy ID does not belong to this user")
+
+    #insert data base
+    deleted_count = db.delete_provider_policy(provider_id, policy_ids)
+
+    return update_response(
+        "Provider Policy associations removed successfully",
+        deleted_count
+    )
+
 ## -credential
 @rpr.route('/credential/create', methods=['POST'])
 def create_credential():
@@ -1486,7 +1593,6 @@ def list_intended_use():
 
     return list_response("Intended Use retrieved successfully.", result, "intended_use")
 
-
 @rpr.route('/intended_use/update_credential', methods=['POST'])
 def update_intended_use_credential():
     data = request.get_json(silent=True)
@@ -1548,7 +1654,7 @@ def update_intended_use_policy():
         
         if user_id[0] != row[0]:
             return error_invalid("The Policy ID does not belong to this user")
-        if row[1] not in cfgserv.intended_use["Type of Policy"]:
+        if row[1] not in cfgserv.intended_use["Type of Privacy Policy"]:
             return error_invalid(f"The policy has an incorrect type; it must be a policy with a type for 'Wallet Relying Party'(intention: wrp). Must be one of: {', '.join(cfgserv.relying_party['Type of Policy'])}")
 
     #insert data base
@@ -1556,6 +1662,78 @@ def update_intended_use_policy():
         db.insert_intended_use_policy(intended_use_id, policy_id)
 
     return update_response("Intended Use Policy associations updated successfully", len(policy_ids))
+
+@rpr.route('/intended_use/remove_credential', methods=['POST'])
+def remove_intended_use_credential():
+    data = request.get_json(silent=True)
+   
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "intended_use_id", "credential_ids"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    intended_use_id = data.get("intended_use_id")
+    credential_ids = data.get("credential_ids", [])
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    #verification
+    if user_id != db.check_intendedUse(intended_use_id):
+        return error_invalid("Intended Use id doesn't belong to this user")
+    
+    for credential_id in credential_ids:
+        if user_id != db.check_credentials(credential_id):
+            return error_invalid("Credential id doesn't belong to this user")
+        
+    #insert data base
+    deleted_count = db.delete_intended_use_credential(intended_use_id, credential_ids)
+
+    return update_response(
+        "Intended Use Credential associations removed successfully",
+        deleted_count
+    )
+
+@rpr.route('/intended_use/remove_policy', methods=['POST'])
+def remove_intended_use_policy():
+    data = request.get_json(silent=True)
+   
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "intended_use_id", "policy_ids"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    intended_use_id = data.get("intended_use_id")
+    policy_ids = data.get("policy_ids", [])
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    #verification
+    if user_id != db.check_intendedUse(intended_use_id):
+        return error_invalid("Provider id doesn't belong to this user")
+    
+    for policy_id in policy_ids:
+        row = db.check_policy(policy_id)
+        
+        if user_id[0] != row[0]:
+            return error_invalid("The Policy ID does not belong to this user")
+        
+    #insert data base  
+    deleted_count = db.delete_intended_use_policy(intended_use_id, policy_ids)
+
+    return update_response(
+        "Intended Use Policy associations removed successfully",
+        deleted_count
+    )
 
 ## -provided attestation
 @rpr.route('/provided_attestation/create', methods=['POST'])
@@ -1927,6 +2105,111 @@ def update_wrp_uses_intermediary():
         db.insert_wrp_intermediary(wrp_id, uses_intermediary_id)
 
     return update_response("Wallet Relying Party uses Intermediary associations updated successfully", len(uses_intermediary_ids))
+
+@rpr.route('/wallet_rp/remove_intended_use', methods=['POST'])
+def remove_wrp_intended_use():
+    data = request.get_json(silent=True)
+   
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "wrp_id", "intended_use_ids"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    wrp_id = data.get("wrp_id")
+    intended_use_ids = data.get("intended_use_ids", [])
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    #verification
+    if user_id != db.check_wrp(wrp_id):
+        return error_invalid("Wallet Relying Party id doesn't belong to this user")
+    
+    for intended_use_id in intended_use_ids:
+        if user_id != db.check_intendedUse(intended_use_id):
+            return error_invalid("Intended Use id doesn't belong to this user")
+        
+    #insert data base  
+    deleted_count = db.delete_wrp_intended_use(wrp_id, intended_use_ids)
+
+    return update_response(
+        "Wallet Relying Party Intended Use associations removed successfully",
+        deleted_count
+    )
+
+@rpr.route('/wallet_rp/remove_provided_attestation', methods=['POST'])
+def remove_wrp_provided_attestion():
+    data = request.get_json(silent=True)
+   
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "wrp_id", "provided_attestation_ids"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    wrp_id = data.get("wrp_id")
+    provided_attestation_ids = data.get("provided_attestation_ids", [])
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    #verification
+    if user_id != db.check_wrp(wrp_id):
+        return error_invalid("Wallet Relying Party id doesn't belong to this user")
+    
+    for provided_attestation_id in provided_attestation_ids:
+        if user_id != db.check_provided_attestation(provided_attestation_id):
+            return error_invalid("Provided Attestation id doesn't belong to this user")
+        
+    #insert data base
+    deleted_count = db.delete_wrp_provided_attestion(wrp_id, provided_attestation_ids)
+
+    return update_response(
+        "Wallet Relying Party Provided Attestation associations removed successfully",
+        deleted_count
+    )
+
+@rpr.route('/wallet_rp/remove_uses_intermediary', methods=['POST'])
+def remove_wrp_uses_intermediary():
+    data = request.get_json(silent=True)
+   
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(data, ["hash_pid", "wrp_id", "uses_intermediary_ids"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
+    hash_pid = data.get("hash_pid")
+    wrp_id = data.get("wrp_id")
+    uses_intermediary_ids = data.get("uses_intermediary_ids", [])
+    
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    #verification
+    if user_id != db.check_wrp(wrp_id):
+        return error_invalid("Wallet Relying Party id doesn't belong to this user")
+    
+    for uses_intermediary_id in uses_intermediary_ids:
+        if user_id != db.check_wrp(uses_intermediary_id):
+            return error_invalid("Wallet Relying Party id doesn't belong to this user")
+        
+    #insert data base
+    deleted_count = db.delete_wrp_intermediary(wrp_id, uses_intermediary_ids)
+
+    return update_response(
+        "Wallet Relying Party uses Intermediary associations removed successfully",
+        deleted_count
+    )
 
 @rpr.route('/list_claim', methods=['POST'])
 def list_claim():
