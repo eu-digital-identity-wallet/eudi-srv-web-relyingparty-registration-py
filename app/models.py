@@ -2268,8 +2268,37 @@ def check_wrp(id):
         if connection:
             cursor.close()
             connection.close()
-
             
+def get_wrp_intermediary(intermediary_wrp_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    wrpi.wrp_id
+
+                FROM wrp_intermediary wrpi
+
+                WHERE wrpi.intermediary_wrp_id = %s;
+                """
+            
+            cursor.execute(query, (intermediary_wrp_id))
+            row = cursor.fetchone()
+            if row:
+                return row
+            else:
+                return []
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+  
 def get_wrp_id(wrp_id):
     try:
         connection = conn()
@@ -2415,6 +2444,155 @@ def get_wrp_id(wrp_id):
             cursor.close()
             connection.close()
 
+  
+def get_wrp_intended_id(intended_use_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    wrp.id,
+                    wrp.provider_id,
+                    wrp.trade_name,
+                    wrp.is_psb,
+                    wrp.registry_uri,
+                    wrp.is_intermediary,
+                    wrp.supervisory_authority_id,
+
+                    su.uri,
+                    we.entitlement,
+
+                    wi.intermediary_wrp_id,
+
+                    mls.lang,
+                    mls.content,
+
+                    sa.name,
+                    sa.country,
+                    sae.email,
+                    sap.phone,
+                    saf.formURI
+
+                FROM wallet_relying_party wrp
+
+                LEFT JOIN wrp_intended_use wiu
+                    ON wiu.wrp_id = wrp.id
+
+                LEFT JOIN wrp_support_uri su
+                    ON su.wrp_id = wrp.id
+
+                LEFT JOIN wrp_entitlement we
+                    ON we.wrp_id = wrp.id
+
+                LEFT JOIN wrp_intermediary wi
+                    ON wi.wrp_id = wrp.id
+
+                LEFT JOIN wrp_srv_description wsd
+                    ON wsd.wrp_id = wrp.id
+
+                LEFT JOIN multilanguage_string mls
+                    ON mls.id = wsd.mls_id
+
+                LEFT JOIN supervisory_authority sa
+                    ON sa.id = wrp.supervisory_authority_id
+
+                LEFT JOIN supervisory_authority_email sae
+                    ON sae.authority_id = sa.id
+
+                LEFT JOIN supervisory_authority_phone sap
+                    ON sap.authority_id = sa.id
+
+                LEFT JOIN supervisory_authority_formuri saf
+                    ON saf.authority_id = sa.id
+
+                WHERE wiu.intended_use_id = %s;
+                """
+            
+            cursor.execute(query, (intended_use_id,))
+            rows = cursor.fetchall()
+
+            result = {}
+
+            for (
+                wrp_id, provider_id, trade_name,
+                is_psb, registry_uri, is_intermediary, sa_id,
+                support_uri, entitlement,
+                intermediary_id,
+                lang, content,
+                sa_name, sa_country,
+                sa_email, sa_phone, sa_form
+            ) in rows:
+
+                if wrp_id not in result:
+                    result[wrp_id] = {
+                        "wrp_id": wrp_id,
+                        "trade_name": trade_name,
+                        "isPSB": bool(is_psb),
+                        "registryURI": registry_uri,
+                        "isIntermediary": bool(is_intermediary),
+                        "provider_id": provider_id,
+
+                        "supportURI": [],
+                        "entitlements": [],
+                        "srvDescription": [],
+                        "usesIntermediary": [],
+
+                        "SupervisoryAuthority": None
+                    }
+
+                wrp = result[wrp_id]
+
+                # supportURI
+                if support_uri and support_uri not in wrp["supportURI"]:
+                    wrp["supportURI"].append(support_uri)
+
+                # entitlements
+                if entitlement and entitlement not in wrp["entitlements"]:
+                    wrp["entitlements"].append(entitlement)
+
+                # intermediary
+                if intermediary_id and intermediary_id not in wrp["usesIntermediary"]:
+                    wrp["usesIntermediary"].append(intermediary_id)
+
+                # srvDescription
+                if lang and content:
+                    obj = {"lang": lang, "content": content}
+                    if obj not in wrp["srvDescription"]:
+                        wrp["srvDescription"].append(obj)
+
+                # Supervisory Authority
+                if sa_name:
+                    if wrp["SupervisoryAuthority"] is None:
+                        wrp["SupervisoryAuthority"] = {
+                            "name": sa_name,
+                            "country": sa_country,
+                            "email": [],
+                            "phone": [],
+                            "formURI": []
+                        }
+
+                    sa = wrp["SupervisoryAuthority"]
+
+                    if sa_email and sa_email not in sa["email"]:
+                        sa["email"].append(sa_email)
+
+                    if sa_phone and sa_phone not in sa["phone"]:
+                        sa["phone"].append(sa_phone)
+
+                    if sa_form and sa_form not in sa["formURI"]:
+                        sa["formURI"].append(sa_form)
+
+            return list(result.values())
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
 
 ### -provided attestation-insert
 def insert_provided_attestation(format, meta, user_id):
@@ -2750,7 +2928,9 @@ def get_intended_use(user_id):
                     c.format,
                     c.meta,
 
-                    cl.path
+                    cl.path,
+                    
+                    wrpiu.wrp_id
 
                 FROM intended_use iu
 
@@ -2774,6 +2954,9 @@ def get_intended_use(user_id):
 
                 LEFT JOIN claim cl
                     ON cl.credential_id = c.id
+                    
+                LEFT JOIN wrp_intended_use wrpiu
+                    ON wrpiu.intended_use_id = iu.id
 
                 WHERE iu.user_id = %s;
             """
@@ -2788,7 +2971,8 @@ def get_intended_use(user_id):
                 lang, content,
                 pol_id, policy_uri, policy_type,
                 cred_id, cred_format, cred_meta,
-                claim_path
+                claim_path,
+                wrpiu_wrp_id
             ) in rows:
 
                 # Intended Use base
@@ -2802,7 +2986,8 @@ def get_intended_use(user_id):
                         "privacyPolicy": [],
                         "credentials": {},
                         "_purpose_seen": set(),
-                        "_policy_seen": set()
+                        "_policy_seen": set(),
+                        "wrp_id": wrpiu_wrp_id
                     }
 
                 iu = result[iu_id]
@@ -2898,6 +3083,156 @@ def check_intendedUse(id):
                 return row
             else:
                 return []
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def get_intended_use_id(intended_use_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    iu.id,
+                    iu.intended_use_identifier,
+                    iu.created_at,
+                    iu.revoked_at,
+
+                    mls.lang,
+                    mls.content,
+
+                    pol.id,
+                    pol.policy_uri,
+                    pol.type,
+
+                    c.id,
+                    c.format,
+                    c.meta,
+
+                    cl.path
+
+                FROM intended_use iu
+
+                LEFT JOIN intended_use_purpose iup
+                    ON iup.intended_use_id = iu.id
+
+                LEFT JOIN multilanguage_string mls
+                    ON mls.id = iup.mls_id
+
+                LEFT JOIN intended_use_policy iupol
+                    ON iupol.intended_use_id = iu.id
+
+                LEFT JOIN policy pol
+                    ON pol.id = iupol.policy_id
+                    
+                LEFT JOIN intended_use_credential iuc
+                    ON iuc.intended_use_id = iu.id
+
+                LEFT JOIN credential c
+                    ON c.id = iuc.credential_id 
+
+                LEFT JOIN claim cl
+                    ON cl.credential_id = c.id
+
+                WHERE iu.id = %s;
+            """
+            
+            cursor.execute(query, (intended_use_id,))
+            rows = cursor.fetchall()
+
+            result = {}
+
+            for (
+                iu_id, identifier, created_at, revoked_at,
+                lang, content,
+                pol_id, policy_uri, policy_type,
+                cred_id, cred_format, cred_meta,
+                claim_path
+            ) in rows:
+
+                # Intended Use base
+                if iu_id not in result:
+                    result[iu_id] = {
+                        "intended_use_id": iu_id,
+                        "intendedUseIdentifier": identifier,
+                        "createdAt": str(created_at),
+                        "revokedAt": str(revoked_at) if revoked_at else None,
+                        "purpose": [],
+                        "privacyPolicy": [],
+                        "credentials": {},
+                        "_purpose_seen": set(),
+                        "_policy_seen": set()
+                    }
+
+                iu = result[iu_id]
+
+                # PURPOSE
+                if lang and content:
+                    key = (lang, content)
+                    if key not in iu["_purpose_seen"]:
+                        iu["purpose"].append({
+                            "lang": lang,
+                            "content": content
+                        })
+                        iu["_purpose_seen"].add(key)
+
+                # POLICY
+                if policy_uri:
+                    key = (policy_uri, policy_type)
+                    if key not in iu["_policy_seen"]:
+                        iu["privacyPolicy"].append({
+                            "policy_id": pol_id,
+                            "policyURI": policy_uri,
+                            "type": policy_type
+                        })
+                        iu["_policy_seen"].add(key)
+
+                # CREDENTIALS
+                if cred_id:
+                    if cred_id not in iu["credentials"]:
+                        iu["credentials"][cred_id] = {
+                            "format": cred_format,
+                            "meta": cred_meta,
+                            "claims": [],
+                            "_claims_seen": set()
+                        }
+
+                    cred = iu["credentials"][cred_id]
+
+                    # CLAIMS
+                    if claim_path and claim_path not in cred["_claims_seen"]:
+                        cred["claims"].append({
+                            "path": claim_path
+                        })
+                        cred["_claims_seen"].add(claim_path)
+
+            # CLEAN FINAL
+            final_result = []
+
+            for iu in result.values():
+
+                # limpar sets internos
+                del iu["_purpose_seen"]
+                del iu["_policy_seen"]
+
+                # credentials -> lista + limpar sets internos
+                creds = []
+                for cred in iu["credentials"].values():
+                    del cred["_claims_seen"]
+                    creds.append(cred)
+
+                iu["credentials"] = creds
+
+                final_result.append(iu)
+
+            return final_result
 
     except pymysql.MySQLError as e:
         logger.error(f"Error: {e}")
@@ -3125,9 +3460,9 @@ def search_wrp_public(
 
         # filters
 
-        # if tradename:
-        #     query += " AND wrp.trade_name LIKE %s"
-        #     params.append(f"%{tradename}%")
+        if tradename:
+            query += " AND wrp.trade_name LIKE %s"
+            params.append(f"%{tradename}%")
 
         if isintermediary is not None:
             query += " AND wrp.is_intermediary = %s"
@@ -3157,43 +3492,43 @@ def search_wrp_public(
                 """
                 params.append(f"%{policy}%")
 
-        # if providesattestation:
-        #     query += """
-        #         AND wrp.id IN (
-        #             SELECT wrppa.wrp_id
-        #             FROM wrp_provided_attestation wrppa
-        #             JOIN provided_attestation pa 
-        #                 ON pa.id = wrppa.provided_attestation_id
-        #             WHERE pa.format LIKE %s
-        #         )
-        #     """
-        #     params.append(f"%{providesattestation}%")
+        if providesattestation:
+            query += """
+                AND wrp.id IN (
+                    SELECT wrppa.wrp_id
+                    FROM wrp_provided_attestation wrppa
+                    JOIN provided_attestation pa 
+                        ON pa.id = wrppa.provided_attestation_id
+                    WHERE pa.format LIKE %s
+                )
+            """
+            params.append(f"%{providesattestation}%")
 
-        # if intendeduseidentifier:
-        #     query += """
-        #         AND wrp.id IN (
-        #             SELECT wi.wrp_id
-        #             FROM wrp_intended_use wi
-        #             JOIN intended_use iu 
-        #                 ON iu.id = wi.intended_use_id
-        #             WHERE iu.intended_use_identifier LIKE %s
-        #         )
-        #     """
-        #     params.append(f"%{intendeduseidentifier}%")
+        if intendeduseidentifier:
+            query += """
+                AND wrp.id IN (
+                    SELECT wi.wrp_id
+                    FROM wrp_intended_use wi
+                    JOIN intended_use iu 
+                        ON iu.id = wi.intended_use_id
+                    WHERE iu.intended_use_identifier LIKE %s
+                )
+            """
+            params.append(f"%{intendeduseidentifier}%")
 
-        # if usesintermediary is not None:
-        #     if usesintermediary:
-        #         query += """
-        #             AND wrp.id IN (
-        #                 SELECT wrp_id FROM wrp_intermediary
-        #             )
-        #         """
-        #     else:
-        #         query += """
-        #             AND wrp.id NOT IN (
-        #                 SELECT wrp_id FROM wrp_intermediary
-        #             )
-        #         """
+        if usesintermediary is not None:
+            if usesintermediary:
+                query += """
+                    AND wrp.id IN (
+                        SELECT wrp_id FROM wrp_intermediary
+                    )
+                """
+            else:
+                query += """
+                    AND wrp.id NOT IN (
+                        SELECT wrp_id FROM wrp_intermediary
+                    )
+                """
 
         # identifier (legal_entity_identifier)
         if identifier:

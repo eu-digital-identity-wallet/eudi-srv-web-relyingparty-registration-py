@@ -2307,13 +2307,13 @@ def search_wrp_public():
 
     identifier = request.args.get("identifier")
     legalname = request.args.get("legalname")
-    #tradename = request.args.get("tradename")
+    tradename = request.args.get("tradename")
     policy = request.args.get("policy")
     entitlement = request.args.get("entitlement")
     providesattestation = request.args.get("providesattestation")
     intendeduseidentifier = request.args.get("intendeduseidentifier")
     isintermediary = request.args.get("isintermediary")
-    #usesintermediary = request.args.get("usesintermediary")
+    usesintermediary = request.args.get("usesintermediary")
 
     if isintermediary is not None:
         if isintermediary.lower() == "true":
@@ -2326,13 +2326,13 @@ def search_wrp_public():
     result = db.search_wrp_public(
         identifier=identifier,
         legalname=legalname,
-        #tradename=tradename,
+        tradename=tradename,
         policy=policy,
         entitlement=entitlement,
-        #providesattestation=providesattestation,
-        #intendeduseidentifier=intendeduseidentifier,
+        providesattestation=providesattestation,
+        intendeduseidentifier=intendeduseidentifier,
         isintermediary=isintermediary,
-        #usesintermediary=usesintermediary
+        usesintermediary=usesintermediary
     )
     
     final_result= json.dumps(result)
@@ -2452,7 +2452,6 @@ def wrp_access_certificate():
 
     #uniformResourceIdentifier
     supportURI = wrp[0]["supportURI"][0]
-    
 
     legal_entity = db.get_legal_entity_id(wrp[0]["provider_id"])
     
@@ -2565,247 +2564,33 @@ def wrp_access_certificate():
         }
     })
 
-
-
-@rpr.route("/intended_use/certificate", methods=["GET"])
-def asdintended_use_registration_certificate():
-    """
-Retrieve Intended Use Certificate
----
-tags:
-  - Intended Use
-consumes:
-  - application/json
-produces:
-  - application/json
-parameters:
-  - in: body
-    name: body
-    required: true
-    schema:
-      type: object
-      required:
-        - hash_pid
-        - intended_use
-      properties:
-        hash_pid:
-          type: string
-          description: User identifier obtained from wallet login
-          example: abc123hashpid
-
-        intended_use:
-          type: integer
-          description: ID of the Intended Use whose certificate will be retrieved
-          example: 3
-
-responses:
-  200:
-    description: Intended Use certificate retrieved successfully
-    schema:
-      type: object
-      properties:
-        status:
-          type: string
-          example: success
-        code:
-          type: integer
-          example: 200
-        data:
-          type: object
-          properties:
-            filename:
-              type: string
-              example: document_with_signature.json
-            file_base64:
-              type: string
-              description: Base64 encoded file containing the generated document
-              example: ewoJImRhdGEiOiAiZXhhbX...
-            cose_base64:
-              type: string
-              description: Base64 encoded COSE signature of the document
-              example: eyJhbGciOiAiRVMyNTYifQ...
-
-  400:
-    description: Invalid request or validation error
-    schema:
-      type: object
-      properties:
-        status:
-          type: string
-          example: error
-        code:
-          type: integer
-          example: 400
-        message:
-          type: string
-          example: Missing required fields.
-        data:
-          type: object
-          properties:
-            missing_fields:
-              type: array
-              items:
-                type: string
-              example:
-                - intended_use
-
-  400_invalid_hash_pid:
-    description: Invalid hash_pid
-    schema:
-      type: object
-      properties:
-        status:
-          type: string
-          example: error
-        code:
-          type: integer
-          example: 400
-        message:
-          type: string
-          example: Invalid hash_pid
-        data:
-          type: object
-          properties:
-            hash_pid:
-              type: string
-              example: abc123hashpid
-
-  400_invalid_intended_use:
-    description: Intended Use does not exist
-    schema:
-      type: object
-      properties:
-        status:
-          type: string
-          example: error
-        code:
-          type: integer
-          example: 400
-        message:
-          type: string
-          example: Intended Use do not Exist
-        data:
-          type: object
-          properties:
-            intended_use:
-              type: integer
-              example: 3
-
-  400_not_user:
-    description: Intended Use does not belong to the authenticated user
-    schema:
-      type: object
-      properties:
-        status:
-          type: string
-          example: error
-        code:
-          type: integer
-          example: 400
-        message:
-          type: string
-          example: Intended Use do not belong to this User.
-        data:
-          type: object
-          properties:
-            intended_use:
-              type: integer
-              example: 3
-"""
+@rpr.route("/intended_use/certificate", methods=["POST"])
+def intended_use_registration_certificate():
 
     data = request.get_json(silent=True)
-
+        
     if not data:
-        return {
-                "status": "error",
-                "code": 400,
-                "message": "Invalid or missing JSON body"
-            }, 400
+        return error_response("Invalid or missing JSON body")
 
+    missing = validate_required_fields(data, ["hash_pid", "intended_use_id"])
+    if missing:
+        return error_response("Missing required fields.", missing)
+    
     hash_pid = data.get("hash_pid")
-    intended_use = data.get("intended_use")
+    intended_use_id = data.get("intended_use_id")
 
-    required_fields = {
-        "hash_pid": hash_pid,
-        "intended_use": intended_use,
-    }
-
-    missing_fields = [name for name, value in required_fields.items() if not value]
-
-    if missing_fields:
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Missing required fields.",
-            "data": {
-                "missing_fields": missing_fields
-            }
-        }, 400
-    
     user_id = db.check_user(hash_pid)
-    
     if user_id is None:
-        
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Invalid hash_pid",
-            "data": {
-                "hash_pid": hash_pid
-            }
-        }, 400
+        return error_invalid("Invalid hash_pid")
     
-    intended_use_data=db.get_intended_use(intended_use)
-
-    if intended_use_data is None:
-        
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Intended Use do not Exist",
-            "data": {
-                "intended_use": intended_use
-            }
-        }, 400
+    if user_id != db.check_intendedUse(intended_use_id):
+        return error_invalid("Intended Use id doesn't belong to this user")
     
-    if intended_use_data[0]["user_id"] is not user_id:
-        
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Intended Use do not belong to this User.",
-            "data": {
-                "intended_use": intended_use
-            }
-        }, 400
+    intended_use = db.get_intended_use_id(intended_use_id)
 
-    RP_data = db.get_rp_certificate(intended_use_data[0]["wrp"])
-    if RP_data is None:
-        
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Intended Use do not have associated Relying Party."
-        }, 400
+    wrp = db.get_wrp_intended_id(intended_use_id)
 
-    legal_entity_data = db.get_legal_entity(RP_data[0]["supervisorAuthority"])
-    if legal_entity_data is None:
-        
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Relying Parties do not have associated Legal Entity."
-        }, 400
-
-    credentials_data = db.get_credential(intended_use_data[0]["intendeduse_id"])
-    if credentials_data is None:
-        
-        return {
-            "status": "error",
-            "code": 400,
-            "message": "Intended Use do not have associated Credential."
-        }, 400
-
+    legal_entity = db.get_legal_entity_id(wrp[0]["provider_id"])
 
 # #if legal person
 # legal_person_data=get_legal_person_data()
@@ -2828,17 +2613,19 @@ responses:
 # info_uri=legal_entity_data["info_uri"]
 # country=legal_entity_data["country"]
 
-    name=RP_data[0]["tradeName"]
-    supportURI=RP_data[0]["supportURI"]
-    purpose=intended_use_data[0]["purpose"]
-    info_uri=legal_entity_data[0]["infoURI"]
-    country=legal_entity_data[0]["country"]
+    name = wrp[0]["trade_name"]
+    supportURI = wrp[0]["supportURI"][0]
+    purpose = intended_use[0]["purpose"]
+    info_uri = legal_entity[0]["infoURI"][0]
+    country = legal_entity[0]["country"]
 
 # id=legal_entity_data["identifier"]
 # privacy_policy=intended_use_data["privacyPolicy"]
 
-    id=legal_entity_data[0]["identifier"]
-    privacy_policy=intended_use_data[0]["type_policy"]
+    id = legal_entity[0]["identifier"][0]["identifier"]
+
+    #id = legal_entity_data[0]["identifier"]
+    privacy_policy = intended_use[0]["privacyPolicy"][0]["type"]
 
 # # definir de acordo com os dados do certificado
 # # policy_id=certificate_policy_id
@@ -2849,10 +2636,11 @@ responses:
 # public_body=RP_data["isPSB"]
 # service=RP_data["srvDescription"]
 
-    entitlement=RP_data[0]["entitlement"]
-    providesAttestations=RP_data[0]["providesAttestations"]
-    public_body=RP_data[0]["isPSB"]
-    service=RP_data[0]["srvDescription"]
+    entitlement = wrp[0]["entitlements"]
+    # if wrp[0]["providesAttestations"]:
+    #     providesAttestations = wrp[0]["providesAttestations"]
+    public_body = wrp[0]["isPSB"]
+    service = wrp[0]["srvDescription"]
 
 # #A URI to a status list presenting information about validity of the WRPRC. 
 # #status=
@@ -2868,8 +2656,11 @@ responses:
         "http://data.europa.eu/eudi/id/TIN":"TIN",
         "http://data.europa.eu/eudi/id/Excise":"EXC"
     }
+    
+    identifier = legal_entity[0]["identifier"][0]
+    sub_id = TypeIdentifier[identifier["type"]] + '-' + id
 
-    sub_id = TypeIdentifier[legal_entity_data[0]["identifierType"]] + '-' + id
+    #sub_id = TypeIdentifier[legal_entity[0]["identifierType"]] + '-' + id
 
     # json_header = { "typ": "rc-wrp+jwt",
     #             "alg": "ES256", 
@@ -2885,7 +2676,7 @@ responses:
     data={
         "country":"FC",
         "doctype":"wrprc",
-        "expiry_date":"2030-11-11"
+        "expiry_date":datetime.utcfromtimestamp(iat).strftime("%Y-%m-%d")
     }
 
     response = requests.post(cfgserv.url_statuslist, headers=headers, data=data)
@@ -2894,6 +2685,12 @@ responses:
 
     status_idx=status["status_list"]["idx"]
     status_uri=status["status_list"]["uri"]
+
+    credentials = [
+        cred
+        for item in intended_use
+        for cred in item.get("credentials", [])
+    ]
 
     json_payload = { 
                         "name": name,
@@ -2904,11 +2701,8 @@ responses:
                         "privacy_policy": privacy_policy, 
                         "policy_id": [ "{ itu-t(0) identified-organization(4) etsi(0) eudiwrpa(19475) policy-identifiers(3) wrprc (1)}" ],
                         "iat": iat, 
-                        "credentials": credentials_data,
+                        "credentials": credentials,
                         "entitlements": entitlement,
-                        "provides_attestations": [ { 
-                                                    "format": credentials_data[0]["format"], "meta": { "vct_values": [ credentials_data[0]["meta"] ] } 
-                        } ],
                         "public_body": False,
                         "service": service,
                         "supportURI":supportURI,
@@ -2919,12 +2713,34 @@ responses:
                         }
         }
     
-    if legal_entity_data[0]["legalperson_id"] is None:
-        natural_person = db.get_natural_person(legal_entity_data[0]["naturalperson_id"])
+    if wrp[0].get("providesAttestations"):
+        json_payload["provides_attestations"] = wrp[0]["providesAttestations"]
+    
+    sa = wrp[0].get("SupervisoryAuthority")
+    if sa:
+        supervisory_authority = {}
+
+        if sa.get("email"):
+            supervisory_authority["email"] = sa["email"][0]
+
+        if sa.get("phone"):
+            supervisory_authority["phone"] = sa["phone"][0]
+
+        if sa.get("formURI"):
+            supervisory_authority["uri"] = sa["formURI"][0]
+
+        if supervisory_authority:
+            json_payload["supervisory_Authority"] = supervisory_authority
+    
+    if legal_entity[0]["LegalPerson"] is None:
         #se user for natural person
-        givenName=natural_person[0]["givenName"]
+        givenName=legal_entity[0]["NaturalPerson"]["givenName"]
         #surname
-        surname=natural_person[0]["familyName"]
+        surname=legal_entity[0]["NaturalPerson"]["familyName"]
+
+        # givenName=legal_entity[0]["givenName"]
+        # #surname
+        # surname=natural_person[0]["familyName"]
         certificate_policy = "itu-t(0) identified-organization(4) etsi(0) eudiwrp(194118) policy-identifiers(1) ncp-natural (1)"
         json_payload.update({
             "sub_gn": givenName,
@@ -2934,26 +2750,28 @@ responses:
 
         
     else:
-        legal_person = db.get_legal_person(legal_entity_data[0]["legalperson_id"])
         #se user for legal person
         #dados da legal person
         #organizationName
-        legalName=legal_person[0]["legalName"]
+        
+        legalName = legal_entity[0]["LegalPerson"]["legalName"][0]
+        #legalName=legal_person[0]["legalName"]
         certificate_policy = "itu-t(0) identified-organization(4) etsi(0) eudiwrp(194118) policy-identifiers(1) ncp-legal (2)"
         json_payload.update({
             "sub_ln": legalName,
             "certificate_policy":certificate_policy
         })
-
-    if RP_data[0]["usesIntermediary"] != None:
-        rp_intermediary = db.get_rp_certificate(RP_data[0]["usesIntermediary"])
-        legalentity_intermediary = db.get_legal_entity_info_edit(rp_intermediary[0]["supervisorAuthority"])
-        aux = TypeIdentifier[legalentity_intermediary[0]['identifierType']] + '-' + legalentity_intermediary[0]['identifier']
+        
+    if db.get_wrp_intermediary(wrp[0]["wrp_id"]) != None:
+        
+        rp_intermediary = db.get_wrp_id(db.get_wrp_intermediary(wrp[0]["wrp_id"]))
+        legalentity_intermediary = db.get_legal_entity_id(rp_intermediary[0]["provider_id"])
+        aux = TypeIdentifier[legalentity_intermediary[0]["identifier"][0]["type"]] + '-' + legalentity_intermediary[0]["identifier"][0]['identifier']
 
         json_payload.update({
             "intermediary":{
                 "sub":aux,
-                "sname":legalentity_intermediary[0]["tradeName"]
+                "sname":rp_intermediary[0]["trade_name"]
             }
         })
     
@@ -6754,8 +6572,8 @@ responses:
         }
     }, 201
    
-@rpr.route("/intended_use/certificate", methods=["GET"])
-def intended_use_registration_certificate():
+#@rpr.route("/intended_use/certificate", methods=["GET"])
+def adasdintended_use_registration_certificate():
     """
 Retrieve Intended Use Certificate
 ---
