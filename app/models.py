@@ -1118,6 +1118,36 @@ def get_legal_entity_id(provider_id):
         if connection:
             cursor.close()
             connection.close()
+   
+def get_identifiers_legal_entity(legal_entity_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                    SELECT 
+                        lei.identifier_id
+
+                    FROM legal_entity_identifier lei
+
+                    WHERE lei.legal_entity_id = %s;
+                    """
+
+            cursor.execute(query, (legal_entity_id,))
+            row = cursor.fetchall()
+            if row:
+                return row
+            else:
+                return []
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
 
 ## -identifier-insert
 def insert_identifier(identifier, type, user_id):
@@ -1365,6 +1395,36 @@ def check_provider(id):
 
             cursor.execute(query, (id,))
             row = cursor.fetchone()
+            if row:
+                return row
+            else:
+                return []
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def get_provider_policy(provider_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """ 
+                SELECT 
+                    pp.policy_id
+                    
+                FROM provider_policy pp
+
+                WHERE pp.provider_id = %s
+            """
+
+            cursor.execute(query, (provider_id,))
+            row = cursor.fetchall()
             if row:
                 return row
             else:
@@ -3062,6 +3122,66 @@ def get_intended_use(user_id):
             cursor.close()
             connection.close()
 
+def get_intended_use_credential(intended_use_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    iuc.credential_id
+
+                FROM intended_use_credential iuc
+
+                WHERE iuc.intended_use_id = %s;
+            """
+            
+            cursor.execute(query, (intended_use_id,))
+            row = cursor.fetchall()
+            if row:
+                return row
+            else:
+                return []
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def get_intended_use_policy(intended_use_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """ 
+                SELECT 
+                    iup.policy_id
+                    
+                FROM intended_use_policy iup
+
+                WHERE iup.intended_use_id = %s
+            """
+
+            cursor.execute(query, (intended_use_id,))
+            row = cursor.fetchall()
+            if row:
+                return row
+            else:
+                return []
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
 def check_intendedUse(id):
     try:
         connection = conn()
@@ -3078,6 +3198,96 @@ def check_intendedUse(id):
             """
             
             cursor.execute(query, (id,))
+            row = cursor.fetchone()
+            if row:
+                return row
+            else:
+                return []
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+    
+def check_wrp_intendedUse(iu_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    wiu.wrp_id
+
+                FROM wrp_intended_use wiu
+
+                WHERE wiu.intended_use_id = %s;
+            """
+            
+            cursor.execute(query, (iu_id,))
+            row = cursor.fetchone()
+            if row:
+                return row
+            else:
+                return []
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def get_wrp_intendedUse(wrp_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    wiu.intended_use_id
+
+                FROM wrp_intended_use wiu
+
+                WHERE wiu.wrp_id = %s;
+            """
+            
+            cursor.execute(query, (wrp_id,))
+            row = cursor.fetchall()
+            if row:
+                return row
+            else:
+                return []
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def check_wrp_intermediary(intermediary_wrp_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
+                    wrpi.intermediary_wrp_id
+
+                FROM wrp_intermediary wrpi
+
+                WHERE wrpi.intermediary_wrp_id = %s;
+            """
+            
+            cursor.execute(query, (intermediary_wrp_id,))
             row = cursor.fetchone()
             if row:
                 return row

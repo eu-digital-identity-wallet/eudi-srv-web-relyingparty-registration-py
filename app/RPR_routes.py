@@ -781,7 +781,7 @@ def create_legal_person():
         for law in laws:
             if law:
                 if user_id != db.check_law(law):
-                    return error_invalid("law id doesn't belong to this user")
+                    return error_invalid(f"law id {law} doesn't belong to this user")
     
     #inserts data base
     for legalPerson in legalPersons:
@@ -844,11 +844,11 @@ def update_legal_person_law():
     
     #verification
     if user_id != db.check_legal_person(legal_person_id):
-        return error_invalid("Legal Person id doesn't belong to this user")
+        return error_invalid(f"Legal Person id {legal_person_id} doesn't belong to this user")
     
     for law_id in law_ids:
         if user_id != db.check_law(law_id):
-            return error_invalid("law id doesn't belong to this user")
+            return error_invalid(f"law id {law_id} doesn't belong to this user")
         
     #insert data base
     for law_id in law_ids:
@@ -878,11 +878,11 @@ def remove_legal_person_law():
     
     # verification
     if user_id != db.check_legal_person(legal_person_id):
-        return error_invalid("Legal Person id doesn't belong to this user")
+        return error_invalid(f"Legal Person id {legal_person_id} doesn't belong to this user")
     
     for law_id in law_ids:
         if user_id != db.check_law(law_id):
-            return error_invalid("law id doesn't belong to this user")
+            return error_invalid(f"law id {law_id} doesn't belong to this user")
         
     deleted_count = db.delete_legal_person_laws(legal_person_id, law_ids)
 
@@ -1050,20 +1050,25 @@ def create_legal_entity():
         identifier_ids = aux.get("identifiers", [])
         country = aux.get("country")
 
+        if legal_person_id and natural_person_id:
+            return error_response("There can't be two different types of people", "legal_person_id or natural_person_id")
+        if not legal_person_id or not natural_person_id:
+            return error_response("Missing required fields.", "legal_person_id or natural_person_id")
+
         if country not in cfgserv.eu_countries:
                 return error_invalid(f"Invalid Country. Must be one of: {', '.join(cfgserv.eu_countries)}")
 
         if natural_person_id:
             if user_id != db.check_natural_person(natural_person_id):
-                return error_invalid("The natural person ID does not belong to this user")
+                return error_invalid(f"The natural person ID {natural_person_id} does not belong to this user")
 
         if legal_person_id: 
             if user_id != db.check_legal_person(legal_person_id):
-                return error_invalid("The legal person ID does not belong to this user")
+                return error_invalid(f"The legal person ID {legal_person_id} does not belong to this user")
         
         for identifier_id in identifier_ids:
             if user_id != db.check_identifier(identifier_id):
-                return error_invalid("The identifier ID does not belong to this user")
+                return error_invalid(f"The identifier ID {identifier_id} does not belong to this user")
 
     #insert data base
     for aux in legal_entity:
@@ -1144,11 +1149,11 @@ def update_legal_entity_identifier():
     
     #verification
     if user_id != db.check_legal_entity(legal_entity_id):
-        return error_invalid("Legal Entity id doesn't belong to this user")
+        return error_invalid(f"Legal Entity id {legal_entity_id} doesn't belong to this user")
     
     for identifier_id in identifier_ids:
         if user_id != db.check_identifier(identifier_id):
-            return error_invalid("Identifier id doesn't belong to this user")
+            return error_invalid(f"Identifier id {identifier_id} doesn't belong to this user")
         
     #insert data base
     for identifier_id in identifier_ids:
@@ -1171,20 +1176,46 @@ def remove_legal_entity_remove_identifier():
     hash_pid = data.get("hash_pid")
     legal_entity_id = data.get("legal_entity_id")
     identifier_ids = data.get("identifier_ids", [])
+
+    #verification
+    if not isinstance(identifier_ids, list) or not identifier_ids:
+        return error_invalid("identifier_ids must be a non-empty list")
+
+    identifier_ids = list(set(identifier_ids))
     
     user_id = db.check_user(hash_pid)
     if user_id is None:
         return error_invalid("Invalid hash_pid")
     
-    #verification
     if user_id != db.check_legal_entity(legal_entity_id):
-        return error_invalid("Legal Entity id doesn't belong to this user")
-    
+        return error_invalid(f"Legal Entity id {legal_entity_id} doesn't belong to this user")
+     
     for identifier_id in identifier_ids:
         if user_id != db.check_identifier(identifier_id):
-            return error_invalid("Identifier id doesn't belong to this user")
-        
-    deleted_count = db.delete_legal_entity_identifier(legal_entity_id, identifier_ids)
+            return error_invalid(f"Identifier {identifier_id} doesn't belong to this user")
+
+    current_identifiers = db.get_identifiers_legal_entity(legal_entity_id)
+
+    current_ids = {row[0] for row in current_identifiers}
+
+    if not current_ids:
+        return error_invalid("Legal Entity has no identifiers (invalid state)")
+
+    valid_identifiers_to_remove = [
+        i for i in identifier_ids if i in current_ids
+    ]
+
+    if not valid_identifiers_to_remove:
+        return error_invalid("None of the provided identifiers are associated with this Legal Entity")
+
+    if len(current_ids) - len(valid_identifiers_to_remove) < 1:
+        return error_invalid("A Legal Entity must have at least one identifier")
+
+    #delete
+    deleted_count = db.delete_legal_entity_identifier(
+        legal_entity_id,
+        valid_identifiers_to_remove
+    )
 
     return update_response(
         "Legal Entity Identifier associations removed successfully",
@@ -1297,14 +1328,14 @@ def create_provider():
             row = db.check_policy(policy_id)
             
             if user_id[0] != row[0]:
-                return error_invalid("The Policy ID does not belong to this user")
+                return error_invalid(f"The Policy ID {policy_id} does not belong to this user")
             
             if row[1] not in cfgserv.relying_party["Type of Policy"]:
                 return error_invalid(f"The policy has an incorrect type; it must be a policy with a type for 'Wallet Relying Party'(intention: wrp). Must be one of: {', '.join(cfgserv.relying_party['Type of Policy'])}")
 
         legalEntityId = provider.get("legalEntityId")
         if user_id != db.check_legal_entity(legalEntityId):
-            return error_invalid("The Legal Entity ID does not belong to this user")
+            return error_invalid(f"The Legal Entity ID {legalEntityId} does not belong to this user")
             
     #insert data base
     for provider in providers:
@@ -1368,13 +1399,13 @@ def update_provider_policy():
     
     #verification
     if user_id != db.check_provider(provider_id):
-        return error_invalid("Provider id doesn't belong to this user")
+        return error_invalid(f"Provider id {provider_id} doesn't belong to this user")
     
     for policy_id in policy_ids:
         row = db.check_policy(policy_id)
         
         if user_id[0] != row[0]:
-            return error_invalid("The Policy ID does not belong to this user")
+            return error_invalid(f"The Policy ID {policy_id} does not belong to this user")
         if row[1] not in cfgserv.relying_party["Type of Policy"]:
             return error_invalid(f"The policy has an incorrect type; it must be a policy with a type for 'Wallet Relying Party'(intention: wrp). Must be one of: {', '.join(cfgserv.relying_party['Type of Policy'])}")
 
@@ -1383,9 +1414,9 @@ def update_provider_policy():
         db.insert_provider_policy(provider_id, policy_id)
 
     return update_response("Provider Policy associations updated successfully", len(policy_ids))
-
 @rpr.route('/provider/remove_policy', methods=['POST'])
 def remove_provider_policy():
+
     data = request.get_json(silent=True)
    
     if not data:
@@ -1398,23 +1429,45 @@ def remove_provider_policy():
     hash_pid = data.get("hash_pid")
     provider_id = data.get("provider_id")
     policy_ids = data.get("policy_ids", [])
+
+    if not isinstance(policy_ids, list) or not policy_ids:
+        return error_invalid("policy_ids must be a non-empty list")
+
+    policy_ids = list(set(policy_ids))
     
     user_id = db.check_user(hash_pid)
     if user_id is None:
         return error_invalid("Invalid hash_pid")
     
-    #verification
     if user_id != db.check_provider(provider_id):
-        return error_invalid("Provider id doesn't belong to this user")
+        return error_invalid(f"Provider id {provider_id} doesn't belong to this user")
     
     for policy_id in policy_ids:
         row = db.check_policy(policy_id)
-        
-        if user_id[0] != row[0]:
-            return error_invalid("The Policy ID does not belong to this user")
+        if not row[0] or user_id[0] != row[0]:
+            return error_invalid(f"Policy {policy_id} doesn't belong to this user")
 
-    #insert data base
-    deleted_count = db.delete_provider_policy(provider_id, policy_ids)
+    current_policies = db.get_provider_policy(provider_id)
+
+    current_policy_ids = {row[0] for row in current_policies}
+
+    if not current_policy_ids:
+        return error_invalid("Provider has no policies (invalid state)")
+
+    valid_policies_to_remove = [
+        p for p in policy_ids if p in current_policy_ids
+    ]
+
+    if not valid_policies_to_remove:
+        return error_invalid("None of the provided policies are associated with this provider")
+
+    if len(current_policy_ids) - len(valid_policies_to_remove) < 1:
+        return error_invalid("A Provider must have at least one policy")
+
+    deleted_count = db.delete_provider_policy(
+        provider_id,
+        valid_policies_to_remove
+    )
 
     return update_response(
         "Provider Policy associations removed successfully",
@@ -1535,7 +1588,7 @@ def create_intended_use():
             row = db.check_policy(privacyPolicy_id)
             
             if user_id[0] != row[0]:
-                return error_invalid("The Policy ID does not belong to this user")
+                return error_invalid(f"The Policy ID {privacyPolicy_id} does not belong to this user")
             
             if row[1] not in cfgserv.intended_use["Type of Privacy Policy"]:
                 return error_invalid( f"The policy has an incorrect type; it must be a policy with a type for 'Wallet Relying Party'(intention: wrp). Must be one of: {', '.join(cfgserv.relying_party['Type of Policy'])}")
@@ -1543,7 +1596,7 @@ def create_intended_use():
         credential_ids = intended_use.get("credential_ids", [])
         for credential_id in credential_ids:
             if user_id != db.check_credentials(credential_id):
-                return error_invalid("The Credential ID does not belong to this user.")
+                return error_invalid(f"The Credential ID {credential_id} does not belong to this user.")
             
     #insert data base
     for intended_use in intended_uses:
@@ -1614,11 +1667,11 @@ def update_intended_use_credential():
     
     #verification
     if user_id != db.check_intendedUse(intended_use_id):
-        return error_invalid("Intended Use id doesn't belong to this user")
+        return error_invalid(f"Intended Use id {intended_use_id} doesn't belong to this user")
     
     for credential_id in credential_ids:
         if user_id != db.check_credentials(credential_id):
-            return error_invalid("Credential id doesn't belong to this user")
+            return error_invalid(f"Credential id {credential_id} doesn't belong to this user")
         
     #insert data base
     for credential_id in credential_ids:
@@ -1647,13 +1700,13 @@ def update_intended_use_policy():
     
     #verification
     if user_id != db.check_intendedUse(intended_use_id):
-        return error_invalid("Provider id doesn't belong to this user")
+        return error_invalid(f"Intended Use id {intended_use_id} doesn't belong to this user")
     
     for policy_id in policy_ids:
         row = db.check_policy(policy_id)
         
         if user_id[0] != row[0]:
-            return error_invalid("The Policy ID does not belong to this user")
+            return error_invalid(f"The Policy ID {policy_id} does not belong to this user")
         if row[1] not in cfgserv.intended_use["Type of Privacy Policy"]:
             return error_invalid(f"The policy has an incorrect type; it must be a policy with a type for 'Wallet Relying Party'(intention: wrp). Must be one of: {', '.join(cfgserv.relying_party['Type of Policy'])}")
 
@@ -1684,11 +1737,28 @@ def remove_intended_use_credential():
     
     #verification
     if user_id != db.check_intendedUse(intended_use_id):
-        return error_invalid("Intended Use id doesn't belong to this user")
+        return error_invalid(f"Intended Use id {intended_use_id} doesn't belong to this user")
     
     for credential_id in credential_ids:
         if user_id != db.check_credentials(credential_id):
-            return error_invalid("Credential id doesn't belong to this user")
+            return error_invalid(f"Credential id {credential_id} doesn't belong to this user")
+
+    current_credentials = db.get_intended_use_credential(intended_use_id)
+
+    current_credential_ids = {row[0] for row in current_credentials}
+
+    if not current_credential_ids:
+        return error_invalid("Provider has no credentials (invalid state)")
+
+    valid_credentials_to_remove = [
+        p for p in credential_ids if p in current_credential_ids
+    ]
+
+    if not valid_credentials_to_remove:
+        return error_invalid("None of the provided credentials are associated with this Intended Use")
+
+    if len(current_credential_ids) - len(valid_credentials_to_remove) < 1:
+        return error_invalid("A Intended Use must have at least one Credential")
         
     #insert data base
     deleted_count = db.delete_intended_use_credential(intended_use_id, credential_ids)
@@ -1719,13 +1789,30 @@ def remove_intended_use_policy():
     
     #verification
     if user_id != db.check_intendedUse(intended_use_id):
-        return error_invalid("Provider id doesn't belong to this user")
+        return error_invalid(f"Intended Use id {intended_use_id} doesn't belong to this user")
     
     for policy_id in policy_ids:
         row = db.check_policy(policy_id)
         
         if user_id[0] != row[0]:
-            return error_invalid("The Policy ID does not belong to this user")
+            return error_invalid(f"The Policy ID {policy_id} does not belong to this user")
+        
+    current_policies = db.get_intended_use_policy(intended_use_id)
+
+    current_policy_ids = {row[0] for row in current_policies}
+
+    if not current_policy_ids:
+        return error_invalid("Intended Use has no policies (invalid state)")
+
+    valid_policies_to_remove = [
+        p for p in policy_ids if p in current_policy_ids
+    ]
+
+    if not valid_policies_to_remove:
+        return error_invalid("None of the provided policies are associated with this Intended Use")
+
+    if len(current_policy_ids) - len(valid_policies_to_remove) < 1:
+        return error_invalid("A Intended Use must have at least one policy")
         
     #insert data base  
     deleted_count = db.delete_intended_use_policy(intended_use_id, policy_ids)
@@ -1821,7 +1908,13 @@ def create_supervisory_authority():
         missing = validate_required_fields(aux, ["name", "country"])
         if missing:
             return error_response("Missing required fields.", missing)
+        
+        emails = aux.get("email", [])
+        formuris = aux.get("formURI", [])
+        phones = aux.get("phone", [])
 
+        if not emails and not formuris and not phones:
+            return error_response("Needs to existe at least one of the fields.", "email, formURI or phone")
     
     #insert data base
     for aux in supervisoryAuthority:
@@ -1896,7 +1989,7 @@ def create_wrp():
     for wrp in wrps:
         missing = validate_required_fields(wrp, ["supportURI", "provider_id", "supportURI", "srvDescription", 
                                                  "intendedUse_ids", "isPSB", "entitlements", 
-                                                 "supervisoryAuthority", "registryURI", "isIntermediary"])
+                                                 "supervisoryAuthority", "registryURI"])
         if missing:
             return error_response("Missing required fields.", missing)
         
@@ -1909,24 +2002,30 @@ def create_wrp():
         srvDescriptions = wrp.get("srvDescription", [])
         
         if user_id != db.check_supervisory_authority(supervisoryAuthority):
-            return error_invalid("The supervisoryAuthority ID does not belong to this user")
+            return error_invalid(f"The supervisoryAuthority ID {supervisoryAuthority} does not belong to this user")
         
         if usesIntermediarys:
             for usesIntermediary in usesIntermediarys:
                 if user_id != db.check_wrp(usesIntermediary):
-                    return error_invalid("The usesIntermediary ID does not belong to this user")
-        
+                    return error_invalid(f"The usesIntermediary ID {usesIntermediary} does not belong to this user")
+                
+                if db.check_wrp_intermediary(usesIntermediary) != []:
+                    return error_invalid(f"The usesIntermediary ID {usesIntermediary} already is a Intermediary")
+
         if providesAttestations_ids:
             for providesAttestations_id in providesAttestations_ids:
                 if user_id != db.check_provided_attestation(providesAttestations_id):
-                    return error_invalid("The providesAttestations ID does not belong to this user")
+                    return error_invalid(f"The providesAttestations ID {providesAttestations_id} does not belong to this user")
         
         if user_id != db.check_provider(provider_id):
-                return error_invalid("The Provider ID does not belong to this user")
+                return error_invalid(f"The Provider ID {provider_id} does not belong to this user")
         
         for intendedUse_id in intendedUse_ids:
             if user_id != db.check_intendedUse(intendedUse_id):
-                return error_invalid("The intendedUse ID does not belong to this user")
+                return error_invalid(f"The intendedUse ID {intendedUse_id} does not belong to this user")
+
+            if db.check_wrp_intendedUse(intendedUse_id) != None:
+                return error_invalid(f"Intended Use id {intendedUse_id} already belongs to other wallet relying party")
         
         for entitlement in entitlements:
             if entitlement not in cfgserv.relying_party["Entitlement"]:
@@ -1947,7 +2046,7 @@ def create_wrp():
         supportURIs = wrp.get("supportURI", [])
         srvDescriptions = wrp.get("srvDescription", [])
         isPSB = wrp.get("isPSB")
-        isIntermediary = wrp.get("isIntermediary")
+        isIntermediary = True
         entitlements = wrp.get("entitlements", [])
         usesIntermediarys = wrp.get("usesIntermediary", [])
         providesAttestations_ids = wrp.get("providesAttestations_id", [])
@@ -1955,6 +2054,9 @@ def create_wrp():
         supervisoryAuthority = wrp.get("supervisoryAuthority")
         provider_id = wrp.get("provider_id")
         intendedUse_ids = wrp.get("intendedUse_ids", [])
+
+        if usesIntermediarys:
+            isIntermediary = False
 
         wrp_id = db.insert_wrp(provider_id, tradeName, isPSB, registryURI, isIntermediary, supervisoryAuthority, user_id)
         result.append(wrp_id)
@@ -2028,12 +2130,15 @@ def update_wrp_intended_use():
     
     #verification
     if user_id != db.check_wrp(wrp_id):
-        return error_invalid("Wallet Relying Party id doesn't belong to this user")
+        return error_invalid(f"Wallet Relying Party id {wrp_id} doesn't belong to this user")
     
     for intended_use_id in intended_use_ids:
         if user_id != db.check_intendedUse(intended_use_id):
-            return error_invalid("Intended Use id doesn't belong to this user")
-        
+            return error_invalid(f"Intended Use id {intended_use_id} doesn't belong to this user")
+
+        if db.check_wrp_intendedUse(intended_use_id) != None:
+            return error_invalid(f"Intended Use id {intended_use_id} already belongs to other wallet relying party")
+
     #insert data base
     for intended_use_id in intended_use_ids:
         db.insert_wrp_intended_use(wrp_id, intended_use_id)
@@ -2061,11 +2166,11 @@ def update_wrp_provided_attestion():
     
     #verification
     if user_id != db.check_wrp(wrp_id):
-        return error_invalid("Wallet Relying Party id doesn't belong to this user")
+        return error_invalid(f"Wallet Relying Party id {wrp_id} doesn't belong to this user")
     
     for provided_attestation_id in provided_attestation_ids:
         if user_id != db.check_provided_attestation(provided_attestation_id):
-            return error_invalid("Provided Attestation id doesn't belong to this user")
+            return error_invalid(f"Provided Attestation id {provided_attestation_id} doesn't belong to this user")
         
     #insert data base
     for provided_attestation_id in provided_attestation_ids:
@@ -2094,11 +2199,14 @@ def update_wrp_uses_intermediary():
     
     #verification
     if user_id != db.check_wrp(wrp_id):
-        return error_invalid("Wallet Relying Party id doesn't belong to this user")
+        return error_invalid(f"Wallet Relying Party id {wrp_id} doesn't belong to this user")
     
     for uses_intermediary_id in uses_intermediary_ids:
         if user_id != db.check_wrp(uses_intermediary_id):
-            return error_invalid("Wallet Relying Party id doesn't belong to this user")
+            return error_invalid(f"Wallet Relying Party id {uses_intermediary_id} doesn't belong to this user")
+        
+        if db.check_wrp_intermediary(uses_intermediary_id) != []:
+            return error_invalid(f"The usesIntermediary ID {uses_intermediary_id} already is a Intermediary")
         
     #insert data base
     for uses_intermediary_id in uses_intermediary_ids:
@@ -2127,11 +2235,28 @@ def remove_wrp_intended_use():
     
     #verification
     if user_id != db.check_wrp(wrp_id):
-        return error_invalid("Wallet Relying Party id doesn't belong to this user")
+        return error_invalid(f"Wallet Relying Party id {wrp_id} doesn't belong to this user")
     
     for intended_use_id in intended_use_ids:
         if user_id != db.check_intendedUse(intended_use_id):
-            return error_invalid("Intended Use id doesn't belong to this user")
+            return error_invalid(f"Intended Use id {intended_use_id} doesn't belong to this user")
+        
+    current_intended_use = db.get_wrp_intendedUse(wrp_id)
+
+    current_intended_use_ids = {row[0] for row in current_intended_use}
+
+    if not current_intended_use_ids:
+        return error_invalid("Wallet Relying Party has no intended use (invalid state)")
+
+    valid_intended_use_to_remove = [
+        p for p in intended_use_ids if p in current_intended_use_ids
+    ]
+
+    if not valid_intended_use_to_remove:
+        return error_invalid("None of the provided Intended Uses are associated with this Wallet Relying Party")
+
+    if len(current_intended_use_ids) - len(valid_intended_use_to_remove) < 1:
+        return error_invalid("A Wallet Relying Party must have at least one Intended Use")
         
     #insert data base  
     deleted_count = db.delete_wrp_intended_use(wrp_id, intended_use_ids)
@@ -2162,11 +2287,11 @@ def remove_wrp_provided_attestion():
     
     #verification
     if user_id != db.check_wrp(wrp_id):
-        return error_invalid("Wallet Relying Party id doesn't belong to this user")
+        return error_invalid(f"Wallet Relying Party id {wrp_id} doesn't belong to this user")
     
     for provided_attestation_id in provided_attestation_ids:
         if user_id != db.check_provided_attestation(provided_attestation_id):
-            return error_invalid("Provided Attestation id doesn't belong to this user")
+            return error_invalid(f"Provided Attestation id {provided_attestation_id} doesn't belong to this user")
         
     #insert data base
     deleted_count = db.delete_wrp_provided_attestion(wrp_id, provided_attestation_ids)
@@ -2197,11 +2322,11 @@ def remove_wrp_uses_intermediary():
     
     #verification
     if user_id != db.check_wrp(wrp_id):
-        return error_invalid("Wallet Relying Party id doesn't belong to this user")
+        return error_invalid(f"Wallet Relying Party id {wrp_id} doesn't belong to this user")
     
     for uses_intermediary_id in uses_intermediary_ids:
         if user_id != db.check_wrp(uses_intermediary_id):
-            return error_invalid("Wallet Relying Party id doesn't belong to this user")
+            return error_invalid(f"Wallet Relying Party id {uses_intermediary_id} doesn't belong to this user")
         
     #insert data base
     deleted_count = db.delete_wrp_intermediary(wrp_id, uses_intermediary_ids)
@@ -2430,7 +2555,7 @@ def wrp_access_certificate():
         return error_invalid("Invalid hash_pid")
     
     if user_id != db.check_wrp(wrp_id):
-        return error_invalid("Wallet Relying Party id doesn't belong to this user")
+        return error_invalid(f"Wallet Relying Party id {wrp_id} doesn't belong to this user")
 
     wrp = db.get_wrp_id(wrp_id)
 
@@ -2584,7 +2709,7 @@ def intended_use_registration_certificate():
         return error_invalid("Invalid hash_pid")
     
     if user_id != db.check_intendedUse(intended_use_id):
-        return error_invalid("Intended Use id doesn't belong to this user")
+        return error_invalid(f"Intended Use id {intended_use_id} doesn't belong to this user")
     
     intended_use = db.get_intended_use_id(intended_use_id)
 
