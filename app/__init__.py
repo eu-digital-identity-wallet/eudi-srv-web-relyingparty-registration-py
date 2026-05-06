@@ -43,7 +43,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography import x509
 from app_config.config import ConfService as cfgserv
-from flask_swagger_ui import get_swaggerui_blueprint
+from flasgger import Swagger
 
 import os
 import time
@@ -199,30 +199,23 @@ def initialize_db():
 def create_app():
 
     app = Flask(__name__, instance_relative_config=True)
-    Swagger(app)
+
+    Swagger(app, template_file="swagger/api.yaml")
+
     app.config['SECRET_KEY'] = ConfService.secret_key
 
-    #app.register_error_handler(Exception, handle_exception)
     app.register_error_handler(404, page_not_found)
-    SWAGGER_URL = "/swagger"
-    API_URL = cfgserv.service_url + "static/swagger.json"
-    swagger_ui_blueprint = get_swaggerui_blueprint(
-        SWAGGER_URL, API_URL,
-        config={"app_name": "My Flask API"}
-    )
+
     from . import (RPR_routes)
-
     app.register_blueprint(RPR_routes.rpr)
-    app.register_blueprint(swagger_ui_blueprint, url_prefix=SWAGGER_URL)
 
-    # config session
+    # session
     app.config["SESSION_FILE_THRESHOLD"] = 50
     app.config["SESSION_PERMANENT"] = False
     app.config["SESSION_TYPE"] = "filesystem"
     app.config.update(SESSION_COOKIE_SAMESITE="None", SESSION_COOKIE_SECURE=True)
     Session(app)
 
-    # CORS is a mechanism implemented by browsers to block requests from domains other than the server's one.
     CORS(app, supports_credentials=True)
 
     return app
