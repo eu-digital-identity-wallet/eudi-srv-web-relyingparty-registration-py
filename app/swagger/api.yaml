@@ -1882,7 +1882,7 @@ paths:
       summary: Create Wallet Relying Party
       description: Create one or more Wallet Relying Parties with full configuration (provider, intended uses, attestations, etc.)
       tags:
-        - Wallet RP
+        - WalletRelyingParty
 
       parameters:
         - in: body
@@ -2007,7 +2007,7 @@ paths:
     post:
       summary: List Wallet Relying Parties
       tags:
-        - Wallet RP
+        - WalletRelyingParty
 
       parameters:
         - in: body
@@ -2030,7 +2030,7 @@ paths:
     post:
       summary: Add Intended Uses to WRP
       tags:
-        - Wallet RP
+        - WalletRelyingParty
 
       parameters:
         - in: body
@@ -2125,7 +2125,7 @@ paths:
       summary: Remove Intended Uses from WRP
       description: A Wallet Relying Party must always have at least one Intended Use
       tags:
-        - Wallet RP
+        - WalletRelyingParty
 
       parameters:
         - in: body
@@ -2407,4 +2407,149 @@ paths:
                   details: identifier
 
         "500":
+          description: Internal server error
+          
+  /intended_use/certificate:
+    post:
+      tags:
+        - Certificates
+      summary: Generate Intended Use Registration Certificate
+      description: |
+        Generates a signed certificate (JAdES + COSE) for a given Intended Use.
+        Returns both the signed document and COSE payload encoded in base64.
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - intended_use_id
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              intended_use_id:
+                type: integer
+                example: 10
+
+      responses:
+        200:
+          description: Certificate generated successfully
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                example: success
+
+              code:
+                type: integer
+                example: 200
+
+              data:
+                type: object
+                properties:
+                  filename:
+                    type: string
+                    example: document_with_signature.json
+
+                  file_base64:
+                    type: string
+                    example: BASE64_ENCODED_SIGNED_DOCUMENT
+
+                  cose_base64:
+                    type: string
+                    example: BASE64_ENCODED_COSE
+                    
+  /wallet_rp/certificate:
+    post:
+      tags:
+        - Certificates
+
+      summary: Generate Wallet Relying Party Certificate (PKCS#12)
+
+      description: |
+        Generates a certificate for a Wallet Relying Party using EJBCA.
+        Returns a PKCS#12 (.p12) file encoded in base64.
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - wrp_id
+              - password
+
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: User session identifier
+
+              wrp_id:
+                type: integer
+                example: 5
+                description: Wallet Relying Party identifier
+
+              password:
+                type: string
+                example: "StrongPassword123!"
+                description: Password used to encrypt the PKCS#12 file
+
+      responses:
+        200:
+          description: Certificate generated successfully
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                example: success
+
+              code:
+                type: integer
+                example: 200
+
+              data:
+                type: object
+                properties:
+                  filename:
+                    type: string
+                    example: document_with_signature.json
+
+                  file_base64:
+                    type: string
+                    example: BASE64_ENCODED_P12_FILE
+
+        400:
+          description: Missing required fields
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                example: error
+
+              message:
+                type: string
+                example: Missing required fields.
+
+              details:
+                type: string
+                example: wrp_id
+
+        401:
+          description: Invalid hash_pid
+
+        403:
+          description: Resource does not belong to the authenticated user
+
+        500:
           description: Internal server error

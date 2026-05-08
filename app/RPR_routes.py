@@ -2392,6 +2392,7 @@ def wrp_access_certificate():
     certificateRequestString = "-----BEGIN CERTIFICATE REQUEST-----\n"+ base64.b64encode(certificateRequest).decode("utf-8") + "\n"+ "-----END CERTIFICATE REQUEST-----"
     certificateAuthorityName = getCertificateAuthorityName(country)
     certificateRequestBody = getJsonBody(certificateRequestString, certificateAuthorityName, country)
+
     postUrl = "https://" + ejbca.cahost + "/ejbca/ejbca-rest-api/v1" + ejbca.endpoint
 
     headers ={

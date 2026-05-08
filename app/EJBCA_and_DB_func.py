@@ -178,7 +178,7 @@ def generateCertificateRequest(priv_key, commonName, countryName, uniformResourc
        (NameOID.ORGANIZATION_NAME, organizationName),
         #x509.NameAttribute(NameOID.ORGANIZATION_IDENTIFIER, organizationIdentifier),
        (NameOID.SERIAL_NUMBER, serialNumber),
-       (NameOID.SERIAL_NUMBER, organizationIdentifier),
+       (NameOID.ORGANIZATION_IDENTIFIER, organizationIdentifier),
        #(ObjectIdentifier("2.5.4.20"), phone),
        (NameOID.ORGANIZATIONAL_UNIT_NAME, organizationalUnit)
     ]
