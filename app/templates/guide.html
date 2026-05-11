@@ -1,795 +1,557 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="utf-8">
-    <meta name="Title" content="Request PID" />
-    <meta name="Keywords" content="EUDI Wallet, PID, Enrolment" />
-    <meta name="Description" content="Request PID for EUDI Wallet" />
-    <meta name="robots" content="noindex, nofollow" />
-    <meta http-equiv="Cache-Control" content="no-cache,no-store,must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}" type="image/vnd.microsoft.icon" />
-    <link rel="icon" href="{{ url_for('static', filename='images/favicon.gif') }}" type="image/gif" />
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/apple-touch-icon.png') }}" />
-    <link href="{{ url_for('static', filename='bootstrap-3.4.1-dist/css/bootstrap.min.css') }}" rel="stylesheet" type="text/css" />
-    <link href="{{ url_for('static', filename='css/stylesheets/custom/custom_en_9.7.1.20.1679559965505.css') }}" media="all" rel="stylesheet" type="text/css" />
-    <link href="{{ url_for('static', filename='fontawesome-free-5.15.4-web/css/fontawesome.min.css') }}" rel="stylesheet" type="text/css" />
-    <script type="text/javascript" id="jqueryId" src="{{ url_for('static', filename='scripts/jquery/jquery-3.6.3.min.js') }}" charset="UTF-8"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WRP Registry Guide</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f5f7fa;
+      color: #1e293b;
+      line-height: 1.6;
+    }
 
-    <script type="text/javascript" src="{{ url_for('static', filename='scripts/promiz/promiz-1.0.6.js') }}" charset="UTF-8"></script>
-    <!--
-    <script type="text/javascript" src="https://webgate.ec.europa.eu/cas/scripts/sha3/sha3_en_9.7.1.20.1679559965505.js" integrity="sha256-CtgtQUShEl8dHOb+FeLo3tfArvxek4PGiS6UGczk5OY= sha384-DUt2v30t+xTbxAyvcy9BpswNEUrWJT8Fl1P1Fc+ScGgcUzrwtm2idVOj35m6NisW sha512-HrljBBDmVHa8MfWcgNifCVutUrKi/3eutVkadMdDUAP3dcraj6n1u2mx5J+UkkRFwYnEoCpFabG46Jxp8EdDnQ==" charset="UTF-8"></script>
-    <script type="text/javascript" src="https://webgate.ec.europa.eu/cas/scripts/static-validator/static-validator_en_9.7.1.20.1679559965505.js" integrity="sha256-hBVKKp1NO+Jxso6WVWYJzYcEyGudrlIJwUpEDp1Zf5E= sha384-my8RgF2Pk8SwCkcpI3HRVX8PX5QyMv+tlmLwVhekljHUBgLVcNe8PxqjYnn9lhUw sha512-VvLFAJWMDPOVXf6HAWnhROxaXLFB0LZWzeglGtlliYHLLEQzrV3N9ixrCfPg3LOrfxtyifR4xdI9+QL2QxRoKw==" charset="UTF-8"></script>
--->
+    header {
+      background: #0f172a;
+      color: white;
+      padding: 40px 20px;
+      text-align: center;
+    }
 
-    <script type="text/javascript" src="{{ url_for('static', filename='bootstrap-3.4.1-dist/js/bootstrap.min.js') }}" charset="UTF-8" defer="true"></script>
+    header h1 {
+      margin: 0;
+      font-size: 2.5rem;
+    }
 
-    <!--
-    <script type="text/javascript" src="https://webgate.ec.europa.eu/cas/scripts/screen/screen_en_9.7.1.20.1679559965505.js" integrity="sha256-Bt/KIz2P8ILyeohGr85rPLuC6V7lURI5hYwMKIDc2zw= sha384-Mm+L2nENQ0OpPq7RNoEtQVUpvJPZF+lp01OK3yDSCZBHNQFEMT+buBppzOCO2FVk sha512-OdapdrhB9SEwj64seVqqRD2sJWGAC02OvoKuc8nev/DYqy10gviD21XH+wsZcwKI5yVUpcUa215v7PBkJUJ40g==" charset="UTF-8" defer="true"></script>
-    <script type="text/javascript" src="https://webgate.ec.europa.eu/cas/scripts/contrast/contrast_en_9.7.1.20.1679559965505.js" integrity="sha256-s379ROUOzGyyK1H8neCEIRKo3wQnabmtXqp1Moh0Vo8= sha384-O7XOTZyM/toKPrGBJBI379zpo4nUxnJT3eUq1dgPwDkuzeJ3N8alAprhuAD3UKhT sha512-nsaRCL+FvdZ0S0dy8btbepr17GnX//XjBpJfr/UYDKpwS2tRUaYs4u8vh8RikLSgKudgRt39EeBuKvkWaCoGPA==" charset="UTF-8" defer="true"></script>
-    -->
-    <script type="text/javascript" src="{{ url_for('static', filename='scripts/html5shiv/html5shiv-3.7.3.js') }}" charset="UTF-8"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='scripts/respond/respond-1.4.2.js') }}" charset="UTF-8"></script>
-    <meta name="referrer" content="no-referrer">
-    <!--
-    <script type="text/javascript" src="https://webgate.ec.europa.eu/cas/scripts/framekiller/framekiller_en_9.7.1.20.1679559965505.js" integrity="sha256-4eAcfcjcYggBc15lar0Ti3diGjQ2qnhfNeAQo2n7f+g= sha384-OOLLE3ikdVyR66gGCHsB/hGYstmmpUtONQOe/U8tP/PRXocqpI43ariFDGzKFcIG sha512-/7sPyYaEFDxkPyGQzkLKHSi/RSXBAbR5BjZLgUtkaRx8Qk4SROLIH96d+7bbkpU61osJDdB9gyjtilpPIFnF6w==" charset="UTF-8"></script>
-    -->
-    <script type="text/javascript" src="{{ url_for('static', filename='scripts/loc/loc_en_9.7.1.20.1679559965505.js') }}" charset="UTF-8"></script>
-    <!--
-    <script type="text/javascript" src="https://webgate.ec.europa.eu/cas/scripts/locval/locval_en_9.7.1.20.1679559965505.js" integrity="sha256-fGdBvjTPjOPZBmgDo8xMKgZUwmXXCzYZ+BbHErfhc/Q= sha384-Y9eAdYjT/TZ0VPUxw3Ex/TVSZZzPsV1mRoKD0BTkrQn0L615z24j26O2CZdT1Xl+ sha512-T9HoOOy1OkJ0l1GWqvT2RAR9frKd4zImDm1uyHxjmB/nxNBhmdjEhR9MckiWiNv2/UrFrMZJwSMB4Po/ExbFOw==" charset="UTF-8"></script>
--->
+    header p {
+      margin-top: 10px;
+      opacity: 0.9;
+    }
 
-    <title>API Usage Guide</title>
-    <style>
-        .step{
-            display:none;
-        }
+    nav {
+      position: sticky;
+      top: 0;
+      background: white;
+      border-bottom: 1px solid #dbeafe;
+      padding: 10px 20px;
+      z-index: 100;
+    }
 
-        .step.active{
-            display:block;
-        }
+    nav ul {
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      padding: 0;
+      margin: 0;
+    }
 
-        .buttons{
-            margin-top:20px;
-        }
-    </style>
+    nav a {
+      text-decoration: none;
+      color: #2563eb;
+      font-weight: bold;
+    }
+
+    main {
+      max-width: 1200px;
+      margin: auto;
+      padding: 30px 20px;
+    }
+
+    section {
+      background: white;
+      padding: 25px;
+      margin-bottom: 25px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    h2 {
+      margin-top: 0;
+      color: #0f172a;
+    }
+
+    h3 {
+      color: #1e3a8a;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 15px;
+      overflow-x: auto;
+      border-radius: 8px;
+    }
+
+    code {
+      font-family: Consolas, monospace;
+    }
+
+    .endpoint {
+      border-left: 5px solid #2563eb;
+      padding-left: 15px;
+      margin-bottom: 25px;
+    }
+
+    .method {
+      display: inline-block;
+      background: #2563eb;
+      color: white;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      margin-bottom: 10px;
+    }
+
+    .note {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 15px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 30px;
+      color: #64748b;
+    }
+  </style>
 </head>
 <body>
-    
-    <h1>API Usage Guide</h1>
-    
-    <div class="buttons">
-        <button id="prevBtn" onclick="prevStep()">Previous</button>
-        <button id="nextBtn" onclick="nextStep()">Next</button>
-        <button id="home" onclick="home()">Back to Home</button>
 
-    </div>
+  <header>
+    <h1>WRP Registry Guide</h1>
+    <p>Step-by-step guide for authentication, entity creation, management and certificate generation.</p>
+  </header>
 
-    <div class="step active">
+  <nav>
+    <ul>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#authentication">Authentication</a></li>
+      <li><a href="#workflow">Recommended Workflow</a></li>
+      <li><a href="#examples">Examples</a></li>
+      <li><a href="#certificates">Certificates</a></li>
+      <li><a href="#swagger">Swagger</a></li>
+    </ul>
+  </nav>
 
-        <h2>Step 1 - Introduction</h2>
-        <p>
-            This page provides a step-by-step guide on how to use the available API endpoints.
-            For the full API specification please refer to the Swagger documentation available at:
-        </p>
-        
-        <p>
-            <b>/apidocs/</b>
-        </p>
-        <p>
-            This guide provides a practical overview of the available API endpoints and demonstrates how they can be used.
-            The endpoints described in this guide are generally independent and do not require a strict execution order. Each endpoint can be used individually as long as its required parameters and conditions are satisfied.
-            Some endpoints are designed to complement others and may typically be used together as part of a broader workflow. Nevertheless, any endpoint can be executed independently, provided that its specific requirements are fulfilled.
-        </p>
-    </div>
+  <main>
 
-    <div class="step">
-        <h2>Step 1 - User Registration</h2>
-        <p>
-            To start using the service, you must first register a user.
-            <br>
-            Go to:
-            <br>
-            <b>https://dev.registry.serviceproviders.eudiw.dev/authentication</b>
-        </p>
+    <section id="overview">
+      <h2>Overview</h2>
+
+      <p>
+        The WRP Registry API allows users to authenticate using PID/OID4VP,
+        manage legal entities and wallet relying parties, and generate certificates.
+      </p>
+
+      <div class="note">
+        The API follows a hierarchical structure:
+        <br><br>
+        <strong>Person → Legal Entity → Provider → Wallet Relying Party → Intended Use → Credential</strong>
+      </div>
+    </section>
+
+    <section id="authentication">
+      <h2>Authentication Flow</h2>
+
+      <div class="endpoint">
+        <span class="method">GET</span>
+        <h3>/authentication</h3>
 
         <p>
-            This endpoint will initiate the authentication process and return a JSON response containing:
+          Starts the authentication flow and returns a QR Code together with a presentation ID.
         </p>
+
+        <pre><code>GET /authentication</code></pre>
+      </div>
+
+      <div class="endpoint">
+        <span class="method">GET</span>
+        <h3>/pid_authorization</h3>
+
+        <p>
+          Verifies whether the PID authentication flow has been completed.
+        </p>
+      </div>
+
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/getpidoid4vp</h3>
+
+        <p>
+          Retrieves PID information and returns the user <code>hash_pid</code>.
+        </p>
+      </div>
+    </section>
+
+    <section id="workflow">
+      <h2>Recommended Workflow</h2>
+
+      <ol>
+        <li>Authenticate using the PID/OID4VP flow.</li>
+        <li>Create Law.</li>
+        <li>Create Legal Person.</li>
+        <li>Create Identifiers.</li>
+        <li>Create Natural Person or Legal Person.</li>
+        <li>Create a Legal Entity.</li>
+        <li>Create Policies (wrp).</li>
+        <li>Create a Provider.</li>
+        <li>Create Credential</li>
+        <li>Create Policies (intended_use).</li>
+        <li>Create Intended Uses.</li>
+        <li>Create Provided Attestations.</li>
+        <li>Create Supervisory Authorities.</li>
+        <li>Create Wallet Relying Parties.</li>
+        <li>Generate certificates.</li>
+      </ol>
+    </section>
+
+    <section id="examples">
+      <h2>Example Requests</h2>
+
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/law/create</h3>
 
         <pre><code>
         {
-            "QR_code_url": "https://example.com/qr/123456",
-            "presentation_id": "550e8400-e29b-41d4-a716-446655440000"
+          "hash_pid": "abc123hash",
+          "law": [
+            {
+              "legalBasis": [
+                "consent",
+                "contract"
+              ],
+              "legislativeIdentifier": "GDPR-ART-6"
+            }
+          ]
         }
         </code></pre>
-
-        <p>
-            <b>Notes:</b><br>
-            - The <b>QR_code_url</b> should be used to display the QR code to the user for authentication.<br>
-            - The <b>presentation_id</b> is required for the next steps of the authentication flow.
-        </p>
-        
-    </div>
-        
-    <div class="step">
-        <h2>Step 2 - PID Authorization</h2>
-        <p>
-            After receiving the <b>presentation_id</b> from Step 1, you must call the following endpoint:
-            <br>
-            <b>/pid_authorization</b>
-        </p>
-
-        <p>
-            This request must include the <b>presentation_id</b> as a query parameter.
-        </p>
-
-        <p>
-            Example request:
-        </p>
+      </div>
+      
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/legal_person/create</h3>
 
         <pre><code>
-            /pid_authorization?presentation_id=&lt;presentation_id from step 1&gt;
-        </code></pre>
-
-        <p>
-            You must wait until the authentication process is completed successfully.
-            Once successful, the endpoint will return:
-        </p>
-
-        <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "legalPerson": [
             {
-                "message": {
-                    "message": "Sucess"
+              "law": [1],
+              "legalName": [
+                "Company A",
+                "Company B"
+              ]
+            }
+          ]
+        }
+        </code></pre>
+      </div>
+      
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/identifier/create</h3>
+
+        <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "identifier": [
+            {
+              "identifier": "PT123456789",
+              "type": "http://data.europa.eu/eudi/id/EORI-No"
+            }
+          ]
+        }
+        </code></pre>
+      </div>
+      
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/legal_entity/create</h3>
+
+        <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "legal_entity": [
+            {
+              "country": "PT",
+              "email": [
+                "test@email.com"
+              ],
+              "identifiers": [
+                1
+              ],
+              "infoURI": [
+                "https://example.com"
+              ],
+              "legal_person_id": 1,
+              "phone": [
+                "+351912345678"
+              ],
+              "postalAddress": [
+                "Rua A, Porto"
+              ]
+            }
+          ]
+        }
+        </code></pre>
+      </div>
+
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/policy/create</h3>
+
+        <pre><code>
+        {
+          "hash_pid": "{{hash_pid}}",
+          "policy": [
+              {  
+                  "intention": "wrp",
+                  "policyURI": "policy",
+                  "type": "http://data.europa.eu/eudi/policy/trust-service-practice-statement"
+              }
+          ]
+        }
+        </code></pre>
+      </div>
+
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/provider/create</h3>
+
+        <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "provider": [
+            {
+              "legalEntityId": 1,
+              "policy_id": [
+                1
+              ],
+              "providerType": "WALLET_PROVIDER",
+              "x5c": [
+                "MIIC...base64cert1",
+                "MIIC...base64cert2"
+              ]
+            }
+          ]
+        }
+        </code></pre>
+      </div>
+      
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/credential/create</h3>
+
+        <pre><code>
+        {
+          "credentials": [
+            {
+              "claims": [
+                {
+                  "path": "credentialSubject.name"
                 }
+              ],
+              "format": "jwt_vc",
+              "meta": {
+                "name": "PID Credential",
+                "version": "1.0"
+              }
             }
-        </code></pre>
-
-        <p>
-            Only after receiving this response should you proceed to the next step.
-        </p>
-    </div>
-    <div class="step">
-        <h2>Step 3 - Retrieve hash_pid</h2>
-        <p>
-            After successful authorization in Step 2, you must call the following endpoint:
-            <br>
-            <b>/getpidoid4vp</b>
-        </p>
-
-        <p>
-            This request must include the <b>presentation_id</b> as a query parameter, just like in the previous step.
-        </p>
-
-        <p>
-            Example request:
-        </p>
-
-        <pre><code>
-            /getpidoid4vp?presentation_id=&lt;presentation_id from step 1&gt;
-        </code></pre>
-
-        <p>
-            If everything is successful, the endpoint will return the <b>hash_pid</b>:
-        </p>
-
-        <pre><code>
-            abc123hashpid
-        </code></pre>
-
-        <p>
-            <b>Notes:</b><br>
-            - The <b>hash_pid</b> is required for all subsequent endpoints.<br>
-            - You should store this value securely, as it represents the authenticated user.
-        </p>
-    </div>
-
-    <div class="step">
-        <h2>Step 4 - Create a Person</h2>
-        <p>
-            Once you have your <b>hash_pid</b>, you can start using all available endpoints.
-            The first step is to <b>create a person</b>, which can either be a <b>Natural Person</b> or a <b>Legal Person</b>, each with its own specific attributes.
-        </p>
-
-        <h3>Natural Person</h3>
-        Let's start with Natural Person.<br>
-        <br>
-        The endpoint is <b>/natural_person/add_natural_person_db</b>
-        <br>
-
-        You need to send a JSON payload in the request body:<br>
-        <pre><code>
-        {
-            "birthdate": "1990-01-01",
-            "birthplace": "Lisbon",
-            "family_name": "Doe",
-            "given_name": "John",
-            "hash_pid": "&lt;hash_pid from step 1&gt;"
+          ],
+          "hash_pid": "abc123hash"
         }
         </code></pre>
-        <p>
-            Once the request is successfully processed, you will receive the response message:  
-            <b>"Natural Person successfully created."</b>
-        </p>
-    
-        <h3>Legal Person</h2>
-        <p>
-            Use the endpoint <b>/legal_person/add_legal_person_db</b> to create a Legal Person.<br>
-            Send the following JSON in the request body:
-        </p>
-        <pre><code>
-        {
-            "established_by_law": "Commercial Law Article 10",
-            "hash_pid": "&lt;hash_pid from step 1&gt;",
-            "lang": "EN",
-            "legal_name": "ACME Corporation"
-        }
-        </code></pre>
-        <p>
-            Once the request is successfully processed, you will receive the response message:  
-            <b>"Legal Person successfully created."</b>
-        </p>
-
-    </div>
-
-    <div class="step">
-        <h2>Step 5 - Creating a Legal Entity</h2>
-        <p>
-            Use the endpoint <b>/legal_entity/add_legal_entity_db</b> to create a Legal Entity.  
-            Send the following JSON in the request body:
-        </p>
-            <pre><code>
-            {
-                "address": "123 Main Street, City, Country",
-                "country": "EU",
-                "email": "contact@acme.com",
-                "hash_pid": "&lt;hash_pid from step 1&gt;",
-                "identifier": "123456789",
-                "information_URI": "https://acme.com/info",
-                "phone_number": "+123456789",
-                "type_of_identifier": "http://data.europa.eu/eudi/id/EORI-No"
-            }
-        </code></pre>
-        <p>
-            Once the request is successfully processed, you will receive the response message:  
-            <b>"Legal Entity successfully created."</b>
-        </p>
-    </div>
-
-    <div class="step">
-        <h2>Step 6 - Listing Persons and Legal Entities</h2>
-        <p>
-            Now that you have created your Natural Persons or Legal Persons and Legal Entities, the next step is to list them and prepare for establishing relationships.
-        </p>
-
-        <p>
-            For both endpoints, the body of the request should be a JSON containing your hash_pid from Step 1:
-        </p>
+      </div>
+      
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/policy/create</h3>
 
         <pre><code>
         {
-            "hash_pid": "&lt;hash_pid from step 1&gt;"
+          "hash_pid": "{{hash_pid}}",
+          "policy": [
+              {  
+                  "intention": "intended_use",
+                  "policyURI": "policy",
+                  "type": "http://data.europa.eu/eudi/policy/trust-service-practice-statement"
+              }
+          ]
         }
         </code></pre>
+      </div>
+      
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/intended_use/create</h3>
 
-        <h3>Natural Person</h3>
-        <p>
-            Use the endpoint <b>/natural_person/list</b> to view all Natural Persons and all available Legal Entities.<br> 
-            When reviewing the list, pay special attention to:
-        </p>
-        <ul>
-            <li><b>natural person id</b>: the ID of the Natural Person you want to use</li>
-            <li><b>legal entity id</b>: the IDs of the Legal Entities you want to associate</li>
-        </ul>
-        <p>
-            Note that a Legal Entity may already be associated with another Natural Person.<br>
-            If you associate a Legal Entity that already has its <b>associated</b> field set to True, the previous association will be replaced with the new one.
-        </p>
-
-        <h3>Legal Person</h3>
-        <p>
-            Use the endpoint <b>/legal_person/list</b> to view all Legal Persons and all available Legal Entities.<br>  
-            When reviewing the list, pay special attention to:
-        </p>
-        <ul>
-            <li><b>legal person id</b>: the ID of the Legal Person you want to use</li>
-            <li><b>legal entity id</b>: the IDs of the Legal Entities you want to associate</li>
-        </ul>
-        <p>
-            Similarly, if a Legal Entity is already associated with another Legal Person, assigning it to a new Legal Person will replace the previous association.
-        </p>
-    </div>
-    <div class="step">
-        <h2>Step 7 - Associating Legal Entities with Persons</h2>
-        <p>
-            After listing your Natural Persons, Legal Persons and Legal Entities in Step 4, the next step is to establish associations between them.<br>  
-            You can associate either a Legal Person or a Natural Person with one or more Legal Entities.
-        </p>
-
-        <h3>Natural Person</h3>
-        <p>
-            To associate a Natural Person with Legal Entities, use the endpoint <b>/natural_person/ui_update_legal_entities</b>.<br> 
-            Example JSON body:
-        </p>
         <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "intended_uses": [
             {
-                "hash_pid": "&lt;hash_pid from step 1&gt;",
-                "natural_person": 1,
-                "legal_entities_ids": [1]
-            }
-        </code></pre>
-        <p>
-            Note that <b>legal_entities_ids</b> must always be an array <code>[]</code>, even if you are associating only one Legal Entity.<br>
-            To associate multiple Legal Entities with a Natural Person, include all their IDs inside the array, separated by commas, like this:<br>
-        </p>
-        <pre><code>"legal_entities_ids": [1, 2, 3, 4]</code></pre>
-        <p>
-            If the association is successful, you will receive the message:<br>
-            <b>"Associations updated successfully"</b>.
-        </p>
-
-        <h3>Legal Person</h3>
-        <p>
-            To associate a Legal Person with Legal Entities, use the endpoint <b>/legal_person/ui_update_legal_entities</b>.<br>  
-            Example JSON body:
-        </p>
-        <pre><code>
-            {
-                "hash_pid": "&lt;hash_pid from step 1&gt;",
-                "legal_person": 1,
-                "legal_entities_ids": [1]
-            }
-        </code></pre>
-        <p>
-            Just like with Natural Persons, the <b>legal_entities_ids</b> field must be an array.<br>  
-            To associate multiple Legal Entities with a Legal Person, include all IDs inside the array, separated by commas:
-        </p>
-        <pre><code>"legal_entities_ids": [1, 2, 3, 4]</code></pre>
-        <p>
-            If the association is successful, you will receive the message:<br>
-            <b>"Associations updated successfully"</b>.
-        </p>
-    </div>
-    <div class="step">
-        <h2>Step 8 - Creating a Relying Party</h2>
-        <p>
-            This endpoint allows you to create a Relying Party that can later be associated with a Legal Entity.
-        </p>
-
-        <p>
-            To create a Relying Party, use the endpoint <b>/RP/add_RP_db</b>.<br>
-            Example JSON body:
-        </p>
-
-        <pre><code>
-            {
-                "hash_pid": "&lt;hash_pid from step 1&gt;",
-                "trade_name": "ACME RP Services",
-                "srvDescription": "Provides authentication services for ACME users.",
-                "srvDescription_lang": "EU",
-                "entitlement": "http://data.europa.eu/eudi/entitlement/Service_Provider",
-                "type_of_policy": "http://data.europa.eu/eudi/policy/trust-service-practice-statement",
-                "policy_uri": "https://acme.com/policy",
-                "registry_uri": "https://registry.acme.com",
-                "support_URI": "https://acme.com/support",
-                "x5c": "MIID...AB"
-            }
-        </code></pre>
-
-        <p>
-            If the request is successful, you will receive the message:<br>
-            <b>"Relying Party successfully created."</b>
-        </p>
-    </div>
-    <div class="step">
-        <h2>Step 9 - Listing Legal Entities and Relying Parties</h2>
-        <p>
-            Now that you have created your Legal Entities and Relying Parties, the next step is to list them and prepare for establishing relationships.
-        </p>
-
-        <p>
-            The body of the request should be a JSON containing your hash_pid from Step 1:
-        </p>
-
-        <pre><code>
-            {
-                "hash_pid": "&lt;hash_pid from step 1&gt;"
-            }
-        </code></pre>
-
-        <h3>Legal Entities & Relying Parties</h3>
-        <p>
-            Use the endpoint <b>/legal_entity/list</b> to view all Legal Entities and all available Relying Parties.<br>
-            When reviewing the list, pay special attention to:
-        </p>
-        <ul>
-            <li><b>legal entity id</b>: the ID of the Legal Entity you want to use</li>
-            <li><b>relying party id</b>: the IDs of the Relying Parties you want to associate</li>
-            <li><b>associated</b> field: indicates whether a Relying Party is already linked to a Legal Entity</li>
-        </ul>
-
-        <p>
-            Note that a Relying Party may already be associated with another Legal Entity.<br>
-            If you associate a Relying Party that already has its <b>associated</b> field set to True, the previous association will be replaced with the new one.
-        </p>
-    </div>
-    <div class="step">
-        <h2>Step 10 - Associating Relying Parties with Legal Entities</h2>
-        <p>
-            After listing your Legal Entities and Relying Parties in the previous step, you can now establish associations between them.
-        </p>
-
-        <p>
-            To associate one or more Relying Parties with a Legal Entity, use the endpoint <b>/legal_entity/ui_update_RPs</b>.
-        </p>
-
-        <p>
-            Example JSON body:
-        </p>
-
-        <pre><code>
-            {
-                "hash_pid": "&lt;hash_pid from step 1&gt;",
-                "legal_entity": 1,
-                "relying_parties": [1]
-            }
-        </code></pre>
-
-        <p>
-            Note that:
-        </p>
-        <ul>
-            <li><b>legal_entity</b> must contain a single Legal Entity ID</li>
-            <li><b>relying_parties</b> must always be an array <code>[]</code>, even if you are associating only one Relying Party</li>
-        </ul>
-
-        <p>
-            To associate multiple Relying Parties with the same Legal Entity, include all their IDs inside the array, separated by commas:
-        </p>
-
-        <pre><code>"relying_parties": [1, 2, 3, 4]</code></pre>
-
-        <p>
-            If the association is successful, you will receive the message:<br>
-            <b>"Associations updated successfully"</b>.
-        </p>
-    </div>
-    <div class="step">
-        <h2>Step 11 - Creating an Intended Use</h2>
-        <p>
-            You can now create an Intended Use, which defines how data or services may be used within the system.
-        </p>
-
-        <p>
-            To create an Intended Use, use the endpoint <b>/intended_use/add_intended_use_db</b>.
-        </p>
-
-        <p>
-            The body of the request must be a JSON object with the following parameters:
-        </p>
-
-        <pre><code>
-            {
-                "hash_pid": "&lt;hash_pid from step 1&gt;",
-                "intendedUseIdentifier": "intended_use_001",
-                "purpose": "Data processing for analytics",
-                "purpose_lang": "EU",
-                "policy_uri": "https://acme.com/privacy-policy",
-                "type_policy": "http://data.europa.eu/eudi/policy/trust-service-practice-statement",
-                "createAt": "2026-02-09 12:00:00",
-                "revokeAt": "2026-12-31 23:59:59"
-            }
-        </code></pre>
-
-        <p>
-            If the request is successful, you will receive the message:<br>
-            <b>"Intended Use successfully created."</b>
-        </p>
-    </div>
-    <div class="step">
-        <h2>Step 12 - Listing Relying Parties and Intended Uses</h2>
-        <p>
-            Before creating associations between Relying Parties and Intended Uses, it is recommended to list the existing Relying Parties to understand their current status and relationships.
-        </p>
-
-        <p>
-            Use the endpoint <b>/RP/list</b> to retrieve all Relying Parties, including information about which Intended Uses are already associated.
-        </p>
-
-        <p>
-            The body of the request must be a JSON containing your hash_pid from Step 1:
-        </p>
-
-        <pre><code>
-            {
-                "hash_pid": "&lt;hash_pid from step 1&gt;"
-            }
-        </code></pre>
-
-        <p>
-            When reviewing the response, pay special attention to:
-        </p>
-
-        <ul>
-            <li><b>relying party id</b>: the ID of the Relying Party you want to manage</li>
-            <li><b>intended use id</b>: the IDs of the Intended Uses you want to associate</li>
-            <li><b>associations</b>: which Intended Uses are already linked to each Relying Party</li>
-        </ul>
-
-        <p>
-            Note that a Intended Uses may already be associated with another Relying Party.<br>
-            If you associate a Intended Uses that already has its <b>associated</b> field set to True, the previous association will be replaced with the new one.
-        </p>
-    </div>
-    <div class="step">
-        <h2>Step 13 - Associating Intended Uses with Relying Parties</h2>
-        <p>
-            After listing your Relying Parties and Intended Uses, you can now establish associations between them.
-        </p>
-
-        <p>
-            To associate Intended Uses with a Relying Party, use the endpoint <b>/RP/ui_update_intended_use</b>.
-        </p>
-
-        <p>
-            The body of the request must be a JSON containing:
-        </p>
-
-        <pre><code>
-            {
-                "hash_pid": "&lt;hash_pid from step 1&gt;",
-                "relying_party": 1,
-                "intended_uses": [1]
-            }
-        </code></pre>
-
-        <p>
-            Important rules:
-        </p>
-
-        <ul>
-            <li><b>relying_party</b> — only one Relying Party can be specified per request</li>
-            <li><b>intended_uses</b> — must always be an array <code>[]</code>, even if only one Intended Use is provided</li>
-        </ul>
-
-        <p>
-            To associate multiple Intended Uses with the same Relying Party, include all IDs inside the array, separated by commas:
-        </p>
-
-        <pre><code>"intended_uses": [1, 2, 3, 4]</code></pre>
-
-        <p>
-            If the association is successful, you will receive the message:<br>
-            <b>"Associations updated successfully"</b>.
-        </p>
-    </div>
-    <div class="step">
-        <h2>Step 14 - Creating Credentials</h2>
-        <p>
-            In this endpoint, you can create new credentials using <b>/credential/add_credential_db</b>.
-        </p>
-
-        <p>
-            The body of the request should be a JSON like this:
-        </p>
-
-        <pre><code>
-            {
-                "hash_pid": "&lt;hash_pid from step 1&gt;",
-                "name": "Credential name",
-                "path": "/credentials/cred.json",
-                "format": "JSON",
-                "credentialValues": "credentialValues",
-                "meta": "meta"
-            }
-        </code></pre>
-
-        <p>
-            If the creation is successful, the response will be:<br>
-            <b>"Credential successfully created."</b>
-        </p>
-    </div>
-    <div class="step">
-        <h2>Step 15 - Listing Intended Uses and Associated Credentials</h2>
-        <p>
-            After creating credentials, you can list all Intended Uses and see which credentials they are associated with using the endpoint <b>/intended_use/list</b>.
-        </p>
-
-        <p>
-            The body of the request should be a JSON containing your hash_pid from Step 1:
-        </p>
-
-        <pre><code>
-            {
-                "hash_pid": "&lt;hash_pid from step 1&gt;"
-            }
-        </code></pre>
-
-        <h3>Important Fields</h3>
-        <ul>
-            <li><b>credential id</b>: the ID of the credential you want to use</li>
-            <li><b>intended_use id</b>: the IDs of the Intended Uses you want to associate</li>
-            <li><b>associations</b>: which Credential are already linked to each Intended Uses</li>
-        </ul>
-
-        <p>
-            Note that an Intended Uses may already be associated with one or more credential.<br>
-            If you associate a Intended Use with a credential that already has its <b>associated</b> field set to True, the previous association will be replaced with the new one.
-        </p>
-    </div>
-    <div class="step">
-        <h2>Step 16 - Associating Intended Uses with  Credentials</h2>
-        <p>
-            After listing your Intended Uses and the available credentials in Step 13, you can associate an Intended Use with one or more credential using the endpoint <b>/intended_use/ui_update_intended_uses</b>.
-        </p>
-
-        <p>
-            Example JSON body:
-        </p>
-
-        <pre><code>
-            {
-                "hash_pid": "&lt;hash_pid from step 1&gt;",
-                "credentials": [1],
-                "intended_use": 1
-            }
-        </code></pre>
-
-        <p>
-            <b>Notes:</b><br>
-            - Only <b>one Intended Use</b> can be specified in the <b>intended_use</b> field.<br>
-            - The <b>credential</b> field must always be an array <code>[]</code>, even if you are associating only one credential.<br>
-            - To associate multiple credentials with an Intended Uses, include all IDs inside the array, separated by commas, like this:
-        </p>
-
-        <pre><code>
-            "credentials": [1, 2, 3, 4]
-        </code></pre>
-
-        <p>
-            If the association is successful, you will receive the message:<br>
-            <b>"Associations updated successfully"</b>.
-        </p>
-    </div>
-    <div class="step">
-        <h2>Step 17 - Retrieve Relying Party Certificate</h2>
-
-        <p>
-            After creating and configuring your Relying Parties, you can retrieve the certificate associated with a specific Relying Party using the endpoint <b>/RP/certificate</b>.
-        </p>
-
-        <p>
-            This endpoint returns the generated certificate file associated with the selected Relying Party.
-        </p>
-
-        <p>
-            Example JSON body:
-        </p>
-
-        <pre><code>
-            {
-                "hash_pid": "&lt;hash_pid from step 1&gt;",
-                "relying_party": 1,
-                "password": "example-password"
-            }
-        </code></pre>
-
-        <p>
-            <b>Notes:</b><br>
-            - Only <b>one Relying Party</b> can be specified in the <b>relying_party</b> field.<br>
-            - The provided Relying Party must belong to the authenticated user.<br>
-            - If the request is successful, the certificate file associated with the Relying Party will be returned.
-        </p>
-    </div>
-    <div class="step">
-        <h2>Step 18 - Retrieve Intended Use Certificate</h2>
-
-        <p>
-            You can also retrieve the certificate generated for a specific Intended Use using the endpoint <b>/intended_use/certificate</b>.
-        </p>
-
-        <p>
-            This endpoint returns the generated document and its corresponding COSE signature encoded in Base64.
-        </p>
-
-        <p>
-            Example JSON body:
-        </p>
-
-        <pre><code>
-            {
-                "hash_pid": "&lt;hash_pid from step 1&gt;",
-                "intended_use": 1
-            }
-        </code></pre>
-
-        <p>
-            If the request is successful, the response will contain:
-        </p>
-
-        <pre><code>
-            {
-                "status": "success",
-                "code": 200,
-                "data": {
-                    "filename": "document_with_signature.json",
-                    "file_base64": "...",
-                    "cose_base64": "..."
+              "createdAt": "2026-01-01T10:00:00Z",
+              "credential_ids": [
+                1
+              ],
+              "intendedUseIdentifier": "USE-001",
+              "privacyPolicy_id": [
+                2
+              ],
+              "purpose": [
+                {
+                  "content": "Identity verification",
+                  "lang": "en"
                 }
+              ],
+              "revokedAt": "2027-01-01T10:00:00Z"
             }
+          ]
+        }
+        </code></pre>
+      </div>
+      
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/provided_attestation/create</h3>
+
+        <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "providesAttestations": [
+            {
+              "format": "jwt",
+              "meta": "issuer metadata info"
+            }
+          ]
+        }
+        </code></pre>
+      </div>
+      
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/supervisory_authority/create</h3>
+
+        <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "supervisoryAuthority": [
+            {
+              "country": "PT",
+              "email": [
+                "geral@cnpd.pt"
+              ],
+              "formURI": [
+                "https://www.cnpd.pt/contactos"
+              ],
+              "name": "CNPD",
+              "phone": [
+                "+351213928400"
+              ]
+            }
+          ]
+        }
+        </code></pre>
+      </div>
+
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/wallet_rp/create</h3>
+
+        <pre><code>
+        {
+          "WalletRelyingParty": [
+            {
+              "entitlements": [
+                "AGE_VERIFICATION"
+              ],
+              "intendedUse_ids": [
+                1
+              ],
+              "isPSB": true,
+              "provider_id": 1,
+              "providesAttestations_id": [
+                1
+              ],
+              "registryURI": "https://registry.example.com",
+              "srvDescription": [
+                {
+                  "content": "Wallet authentication service",
+                  "lang": "en"
+                }
+              ],
+              "supervisoryAuthority": 1,
+              "supportURI": [
+                "https://support.example.com"
+              ],
+              "tradeName": "My Wallet Service"
+            }
+          ],
+          "hash_pid": "abc123hash"
+        }
+        </code></pre>
+      </div>
+    </section>
+
+    <section id="certificates">
+      <h2>Certificate Generation</h2>
+
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/intended_use/certificate</h3>
+        
+        <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "intended_use_id": 1
+        }
         </code></pre>
 
         <p>
-            <b>Notes:</b><br>
-            - Only <b>one Intended Use</b> can be specified in the <b>intended_use</b> field.<br>
-            - The provided Intended Use must belong to the authenticated user.<br>
-            - The <b>file_base64</b> field contains the generated document encoded in Base64.<br>
-            - The <b>cose_base64</b> field contains the COSE signature of the document.
+          Generates a signed Intended Use Registration Certificate using JAdES and COSE.
         </p>
-    </div>
+      </div>
 
-<script>
-    let currentStep = 0;
-    const steps = document.querySelectorAll(".step");
-    const prevBtn = document.getElementById("prevBtn");
-    const nextBtn = document.getElementById("nextBtn");
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/wallet_rp/certificate</h3>
 
-    function showStep(index) {
-        steps.forEach(step => step.classList.remove("active"));
-        steps[index].classList.add("active");
-
-        if (index === 0) {
-            prevBtn.style.display = "none";
-        } else {
-            prevBtn.style.display = "inline-block";
+        <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "password": "StrongPassword123!",
+          "wrp_id": 1
         }
+        </code></pre>
 
-        if (index === steps.length - 1) {
-            nextBtn.style.display = "none";
+        <p>
+          Generates a Wallet Relying Party certificate in PKCS#12 format.
+        </p>
+      </div>
+    </section>
 
-            if (!document.getElementById("finalButtons")) {
-                const finalDiv = document.createElement("div");
-                finalDiv.id = "finalButtons";
-                finalDiv.style.marginTop = "10px";
+    <section id="swagger">
+      <h2>Swagger Documentation</h2>
 
-                const homeBtn = document.createElement("button");
-                homeBtn.textContent = "Back to Home";
-                homeBtn.onclick = () => { window.location.href = "/"; };
-                homeBtn.style.marginRight = "10px";
+      <p>
+        Full API documentation is available through Swagger UI.
+      </p>
 
-                finalDiv.appendChild(homeBtn);
+      <pre><code>/apidocs/</code></pre>
+    </section>
 
-                steps[index].appendChild(finalDiv);
-            }
+  </main>
 
-        } else {
-            nextBtn.style.display = "inline-block";
+  <footer>
+    WRP Registry API Guide
+  </footer>
 
-            const finalDiv = document.getElementById("finalButtons");
-            if (finalDiv) finalDiv.remove();
-        }
-    }
-
-    function nextStep() {
-        if (currentStep < steps.length - 1) {
-            currentStep++;
-            showStep(currentStep);
-        }
-    }
-
-    function prevStep() {
-        if (currentStep > 0) {
-            currentStep--;
-            showStep(currentStep);
-        }
-    }
-    
-    function home() {
-        window.location.href = "/"; ;
-    }
-
-    showStep(currentStep);
-</script>
 </body>
 </html>

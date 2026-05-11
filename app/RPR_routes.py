@@ -2652,7 +2652,7 @@ def intended_use_registration_certificate():
             "certificate_policy":certificate_policy
         })
         
-    if db.get_wrp_intermediary(wrp[0]["wrp_id"]) != None:
+    if db.get_wrp_intermediary(wrp[0]["wrp_id"]) != []:
         
         rp_intermediary = db.get_wrp_id(db.get_wrp_intermediary(wrp[0]["wrp_id"]))
         legalentity_intermediary = db.get_legal_entity_id(rp_intermediary[0]["provider_id"])

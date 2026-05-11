@@ -44,7 +44,7 @@ def check_user(hash_pid):
             if row:
                 return row
             else:
-                return []
+                return None
             
             if result:
                 user_id = result[0]
