@@ -828,7 +828,6 @@ def create_legal_entity():
                 return error_invalid(f"The natural person ID {natural_person_id} does not belong to this user")
 
         if legal_person_id: 
-            return str(legal_person_id)
             if user_id != db.check_legal_person(legal_person_id):
                 return error_invalid(f"The legal person ID {legal_person_id} does not belong to this user")
         
