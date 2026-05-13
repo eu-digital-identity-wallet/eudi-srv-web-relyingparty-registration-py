@@ -846,27 +846,27 @@ def create_legal_entity():
         legal_person_id = aux.get("legal_person_id")
         natural_person_id = aux.get("natural_person_id")
 
-    legal_entity_id = db.insert_legal_entity(legal_person_id, natural_person_id, country, user_id)
-    result.append(legal_entity_id)
+        legal_entity_id = db.insert_legal_entity(legal_person_id, natural_person_id, country, user_id)
+        result.append(legal_entity_id)
 
-    for identifier_id in identifier_ids:
-        db.insert_legal_entity_identifier(legal_entity_id, identifier_id)
+        for identifier_id in identifier_ids:
+            db.insert_legal_entity_identifier(legal_entity_id, identifier_id)
 
-    if postalAddress:
-        for aux in postalAddress:
-            db.insert_legal_entity_postal_address(legal_entity_id, aux)
-    
-    if emails:
-        for email in emails:
-            db.insert_legal_entity_email(legal_entity_id, email)
-    
-    if phones:
-        for phone in phones:
-            db.insert_legal_entity_phone(legal_entity_id, phone)
+        if postalAddress:
+            for aux in postalAddress:
+                db.insert_legal_entity_postal_address(legal_entity_id, aux)
+        
+        if emails:
+            for email in emails:
+                db.insert_legal_entity_email(legal_entity_id, email)
+        
+        if phones:
+            for phone in phones:
+                db.insert_legal_entity_phone(legal_entity_id, phone)
 
-    if  infoURIs:
-        for infoURI in infoURIs:
-            db.insert_legal_entity_info_uri(legal_entity_id, infoURI)
+        if  infoURIs:
+            for infoURI in infoURIs:
+                db.insert_legal_entity_info_uri(legal_entity_id, infoURI)
 
     return create_response("Legal Entity created successfully.", "legal Entity id:", result)
 
