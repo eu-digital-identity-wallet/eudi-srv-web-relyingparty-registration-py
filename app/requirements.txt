@@ -6,7 +6,7 @@ segno
 Flask-Session==0.6.0
 cbor2==5.4.6
 pycose
-cryptography
+cryptography==46.0.7
 pymysql
 requests-pkcs12
 flasgger
