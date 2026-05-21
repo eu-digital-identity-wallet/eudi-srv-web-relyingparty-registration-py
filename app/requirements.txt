@@ -12,3 +12,4 @@ requests-pkcs12
 flasgger
 flask-swagger-ui
 cryptojwt
+Authlib

@@ -94,10 +94,22 @@ from app_config.Crypto_Info import Crypto_Info as crypto
 import models as db
 import user as get_hash_user_pid
 from app.data_management import oid4vp_requests,p12_temp, certificate_data_List
+from app.app_config.scytales_connector import scytales
 
 from app import logger
+from . import oauth
 
 rpr = Blueprint("RPR", __name__, url_prefix="/")
+
+# Register Scytales Wallet Connector
+oauth.register(
+    name=scytales.name,
+    client_id=scytales.client_id,
+    client_secret=scytales.client_secret,
+    server_metadata_url=scytales.server_metadata_url,
+    client_kwargs=scytales.client_kwargs
+)
+client = oauth.create_client(scytales.name)
 
 rpr.template_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'template/')
 
@@ -207,93 +219,135 @@ responses:
           example: 550e8400-e29b-41d4-a716-446655440000
 """
 
-    url = "https://" + cfgserv.url_verifier +"/ui/presentations"
     payload ={
-        "type": "vp_token",
-        "nonce": "hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc=",
-        "dcql_query": {
-            "credentials": [
-            {
-                "id": "query_0",
-                "format": "mso_mdoc",
-                "meta": {
-                "doctype_value": "eu.europa.ec.eudi.pid.1"
-                },
-                "claims": [
-                {
-                    "path": [
-                    "eu.europa.ec.eudi.pid.1",
-                    "family_name"
-                    ],
-                    "intent_to_retain": False
-                },
-                {
-                    "path": [
-                    "eu.europa.ec.eudi.pid.1",
-                    "given_name"
-                    ],
-                    "intent_to_retain": False
-                },
-                {
-                    "path": [
-                    "eu.europa.ec.eudi.pid.1",
-                    "birth_date"
-                    ],
-                    "intent_to_retain": False
-                },
-                {
-                    "path": [
-                    "eu.europa.ec.eudi.pid.1",
-                    "issuing_authority"
-                    ],
-                    "intent_to_retain": False
-                },
-                {
-                    "path": [
-                    "eu.europa.ec.eudi.pid.1",
-                    "issuing_country"
-                    ],
-                    "intent_to_retain": False
-                }
-                ]
-            }
-            ]
-        }
+      "type": "vp_token",
+      "nonce": "hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc=",
+      "dcql_query": {
+          "credentials": [
+          {
+              "id": "query_0",
+              "format": "mso_mdoc",
+              "meta": {
+              "doctype_value": "eu.europa.ec.eudi.pid.1"
+              },
+              "claims": [
+              {
+                  "path": [
+                  "eu.europa.ec.eudi.pid.1",
+                  "family_name"
+                  ],
+                  "intent_to_retain": False
+              },
+              {
+                  "path": [
+                  "eu.europa.ec.eudi.pid.1",
+                  "given_name"
+                  ],
+                  "intent_to_retain": False
+              },
+              {
+                  "path": [
+                  "eu.europa.ec.eudi.pid.1",
+                  "birth_date"
+                  ],
+                  "intent_to_retain": False
+              },
+              {
+                  "path": [
+                  "eu.europa.ec.eudi.pid.1",
+                  "issuing_authority"
+                  ],
+                  "intent_to_retain": False
+              },
+              {
+                  "path": [
+                  "eu.europa.ec.eudi.pid.1",
+                  "issuing_country"
+                  ],
+                  "intent_to_retain": False
+              }
+              ]
+          }
+          ]
+      }
     }
 
 
     headers = {
         "Content-Type": "application/json",
     }
+    if request.args.get("type") and request.args.get("type") == "scytales_connector":
 
-    response = requests.request("POST", url, headers=headers, data=json.dumps(payload)).json()
-    
+        redirect_uri = scytales.callback
 
-    QR_code_url = (
-        "eudi-openid4vp://" + cfgserv.url_verifier + "?client_id="
-        + response["client_id"]
-        + "&request_uri="
-        + response["request_uri"]
-    )
+        print("client.name", client.name)
+        return client.authorize_redirect(redirect_uri)
 
-    
-    session["session_id"]=str(uuid.uuid4())
-    session["certificate_List"]=False
 
-    qrcode = segno.make(QR_code_url)
-    out = io.BytesIO()
-    qrcode.save(out, kind='png', scale=3)
+    if request.args.get("type") and request.args.get("type") == "scytales":
+        
+        url = "https://" + cfgserv.url_scytales_verifier +"/ui/presentations"
 
-    """ qrcode.to_artistic(
-        background=cfgtest.qr_png,
-        target=out,
-        kind="png",
-        scale=4,
-    ) """
+        response = requests.request("POST", url, headers=headers, data=json.dumps(payload)).json()
+        
 
-    qr_img_base64 = "data:image/png;base64," + base64.b64encode(out.getvalue()).decode(
-        "utf-8"
-    )
+        QR_code_url = (
+            "mdoc-openid4vp://" + cfgserv.url_scytales_verifier + "?client_id="
+            + response["client_id"]
+            + "&request_uri="
+            + response["request_uri"]
+        )
+
+        
+        session["session_id"]=str(uuid.uuid4())
+        session["certificate_List"]=False
+
+        qrcode = segno.make(QR_code_url)
+        out = io.BytesIO()
+        qrcode.save(out, kind='png', scale=3)
+
+        """ qrcode.to_artistic(
+            background=cfgtest.qr_png,
+            target=out,
+            kind="png",
+            scale=4,
+        ) """
+
+        qr_img_base64 = "data:image/png;base64," + base64.b64encode(out.getvalue()).decode(
+            "utf-8"
+        )
+
+    else:
+        url = "https://" + cfgserv.url_verifier +"/ui/presentations"
+        
+        response = requests.request("POST", url, headers=headers, data=json.dumps(payload)).json()
+        
+
+        QR_code_url = (
+            "eudi-openid4vp://" + cfgserv.url_verifier + "?client_id="
+            + response["client_id"]
+            + "&request_uri="
+            + response["request_uri"]
+        )
+
+        
+        session["session_id"]=str(uuid.uuid4())
+        session["certificate_List"]=False
+
+        qrcode = segno.make(QR_code_url)
+        out = io.BytesIO()
+        qrcode.save(out, kind='png', scale=3)
+
+        """ qrcode.to_artistic(
+            background=cfgtest.qr_png,
+            target=out,
+            kind="png",
+            scale=4,
+        ) """
+
+        qr_img_base64 = "data:image/png;base64," + base64.b64encode(out.getvalue()).decode(
+            "utf-8"
+        )
 
     return_json = {
         "QR_code_url": QR_code_url,
@@ -301,6 +355,70 @@ responses:
     }
 
     return (return_json)
+
+@rpr.route("/callback", methods=["GET", "POST"])
+def callback():
+    """
+Get PID (OID4VP)
+---
+tags:
+  - Authentication
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: query
+    name: presentation_id
+    required: true
+    type: string
+    description: Transaction identifier received from the authentication step
+    example: 550e8400-e29b-41d4-a716-446655440000
+
+responses:
+  200:
+    description: PID retrieved successfully
+    schema:
+      type: string
+      example: abc123hashpid
+
+  400:
+    description: Missing presentation_id
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Missing presentation_id
+"""
+
+    token = client.authorize_access_token()
+    # Authlib extracts claims from the ID token into the token object
+    # For this IDP, claims are in the ID token (not requiring a separate userinfo call)
+    user = token.get('userinfo', token.get('id_token_claims', {}))
+
+    givenName=user.get("given_name")
+    surname=user.get("family_name")
+    birth_date=user.get("birth_date")
+    issuing_country=user.get("resident_country")
+    issuance_authority=""
+
+    new_user = get_hash_user_pid.User(surname, givenName, birth_date, issuing_country, issuance_authority)
+    hash_pid = new_user.hash
+
+    check_user = db.check_user(hash_pid)
+    
+    if(check_user == None):
+        db.insert_user(hash_pid)
+        return (hash_pid)
+    else:
+        return (hash_pid)
 
 @rpr.route("/pid_authorization")
 def pid_authorization_get():
@@ -346,7 +464,11 @@ responses:
 
     presentation_id= request.args.get("presentation_id")
 
-    url = "https://" + cfgserv.url_verifier+ "/ui/presentations/" + presentation_id + "?nonce=hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc="
+    if request.args.get("type") and request.args.get("type") == "scytales":
+        url = "https://" + cfgserv.url_scytales_verifier+ "/ui/presentations/" + presentation_id + "?nonce=hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc="
+    else:
+        url = "https://" + cfgserv.url_verifier+ "/ui/presentations/" + presentation_id + "?nonce=hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc="
+    
     headers = {
     'Content-Type': 'application/json',
     }
@@ -409,7 +531,11 @@ responses:
         }, 400
     else:
         presentation_id = request.args.get("presentation_id")
-        url = "https://" + cfgserv.url_verifier +"/ui/presentations/" + presentation_id + "?nonce=hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc="
+
+        if request.args.get("type") and request.args.get("type") == "scytales":
+            url = "https://" + cfgserv.url_scytales_verifier +"/ui/presentations/" + presentation_id + "?nonce=hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc="
+        else:           
+            url = "https://" + cfgserv.url_verifier +"/ui/presentations/" + presentation_id + "?nonce=hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc="
     
     headers = {
     'Content-Type': 'application/json',
@@ -420,11 +546,11 @@ responses:
         error_msg= str(response.status_code)
         return jsonify({"error": error_msg}),400
     
-    error, error_msg= validate_vp_token(response.json())
-
+    error, error_msg= validate_vp_token(response.json(), request.args.get("type"))
+    
     if error == True:
         return error_msg
-    
+
     mdoc_json = cbor2elems(response.json()["vp_token"]["query_0"][0] + "==")
 
     attributesForm={}
@@ -2506,7 +2632,8 @@ def intended_use_registration_certificate():
     name = wrp[0]["trade_name"]
     supportURI = wrp[0]["supportURI"][0]
     purpose = intended_use[0]["purpose"]
-    info_uri = legal_entity[0]["infoURI"][0]
+    if legal_entity[0].get("infoURI") and len(legal_entity[0]["infoURI"]) > 0:
+        info_uri = legal_entity[0]["infoURI"][0]
     country = legal_entity[0]["country"]
 
 # id=legal_entity_data["identifier"]
@@ -2585,7 +2712,6 @@ def intended_use_registration_certificate():
     json_payload = { 
                         "name": name,
                         "purpose": purpose, 
-                        "info_uri": info_uri,
                         "country": country,
                         "sub": sub_id,
                         "privacy_policy": privacy_policy, 
@@ -2602,6 +2728,9 @@ def intended_use_registration_certificate():
                             } 
                         }
         }
+
+    if info_uri:
+        json_payload["info_uri"] = info_uri
     
     if wrp[0].get("providesAttestations"):
         json_payload["provides_attestations"] = wrp[0]["providesAttestations"]
