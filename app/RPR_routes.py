@@ -280,7 +280,6 @@ responses:
 
         redirect_uri = scytales.callback
 
-        print("client.name", client.name)
         return client.authorize_redirect(redirect_uri)
 
 
