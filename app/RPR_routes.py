@@ -426,7 +426,9 @@ responses:
         else:
             return (hash_pid)
     else:
-        return (hash_pid)
+        front_end = session.pop("front_end", None)
+
+        if front_end:
             return redirect(f"{front_end}?hash_pid={hash_pid}")
         else:
             return (hash_pid)
