@@ -278,6 +278,10 @@ responses:
     }
     if request.args.get("type") and request.args.get("type") == "scytales_connector":
 
+        redirect_front_end = request.args.get("redirect_uri")
+        if redirect_front_end:
+            session["front_end"] = redirect_front_end
+
         redirect_uri = scytales.callback
 
         return client.authorize_redirect(redirect_uri)
@@ -415,9 +419,17 @@ responses:
     
     if(check_user == None):
         db.insert_user(hash_pid)
-        return (hash_pid)
+        front_end = session.pop("front_end", None)
+
+        if front_end:
+            return redirect(f"{front_end}?hash_pid={hash_pid}")
+        else:
+            return (hash_pid)
     else:
         return (hash_pid)
+            return redirect(f"{front_end}?hash_pid={hash_pid}")
+        else:
+            return (hash_pid)
 
 @rpr.route("/pid_authorization")
 def pid_authorization_get():
