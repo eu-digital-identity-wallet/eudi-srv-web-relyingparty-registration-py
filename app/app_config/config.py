@@ -46,7 +46,6 @@ class ConfService:
     #log_dir = os.getenv("LOG_PATH", "app/logs")
 
     url_verifier=os.getenv("VERIFIER","verifier-backend.eudiw.dev")
-    url_scytales_verifier=os.getenv("SCYTALES_VERIFIER","dev.verifier.backend.scytales.dev")
 
     eu_languages = [
         "bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr",

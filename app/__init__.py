@@ -55,10 +55,6 @@ import os
 from app_config.database import ConfDataBase
 from flasgger import Swagger
 
-from authlib.integrations.flask_client import OAuth
-from app.app_config.scytales_connector import scytales
-
-oauth = OAuth()
 
 def setup_logger():
     log_dir = cfgserv.log_dir
@@ -210,8 +206,6 @@ def create_app():
     app.config['SECRET_KEY'] = ConfService.secret_key
 
     app.register_error_handler(404, page_not_found)
-
-    oauth.init_app(app)
     
     from . import (RPR_routes)
     app.register_blueprint(RPR_routes.rpr)
