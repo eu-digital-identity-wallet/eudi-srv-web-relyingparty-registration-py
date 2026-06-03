@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WRP Registry Guide</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f5f7fa;
+      color: #1e293b;
+      line-height: 1.6;
+    }
+
+    header {
+      background: #0f172a;
+      color: white;
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 2.5rem;
+    }
+
+    header p {
+      margin-top: 10px;
+      opacity: 0.9;
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      background: white;
+      border-bottom: 1px solid #dbeafe;
+      padding: 10px 20px;
+      z-index: 100;
+    }
+
+    nav ul {
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      padding: 0;
+      margin: 0;
+    }
+
+    nav a {
+      text-decoration: none;
+      color: #2563eb;
+      font-weight: bold;
+    }
+
+    main {
+      max-width: 1200px;
+      margin: auto;
+      padding: 30px 20px;
+    }
+
+    section {
+      background: white;
+      padding: 25px;
+      margin-bottom: 25px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    h2 {
+      margin-top: 0;
+      color: #0f172a;
+    }
+
+    h3 {
+      color: #1e3a8a;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 15px;
+      overflow-x: auto;
+      border-radius: 8px;
+    }
+
+    code {
+      font-family: Consolas, monospace;
+    }
+
+    .endpoint {
+      border-left: 5px solid #2563eb;
+      padding-left: 15px;
+      margin-bottom: 25px;
+    }
+
+    .method {
+      display: inline-block;
+      background: #2563eb;
+      color: white;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      margin-bottom: 10px;
+    }
+
+    .note {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 15px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 30px;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>WRP Registry Guide</h1>
+    <p>Step-by-step guide for authentication, entity creation, management and certificate generation.</p>
+  </header>
+
+  <nav>
+    <ul>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#authentication">Authentication</a></li>
+      <li><a href="#workflow">Recommended Workflow</a></li>
+      <li><a href="#examples">Examples</a></li>
+      <li><a href="#certificates">Certificates</a></li>
+      <li><a href="#swagger">Swagger</a></li>
+    </ul>
+  </nav>
+
+  <main>
+
+    <section id="overview">
+      <h2>Overview</h2>
+
+      <p>
+        The WRP Registry API allows users to authenticate using PID/OID4VP,
+        manage legal entities and wallet relying parties, and generate certificates.
+      </p>
+
+      <div class="note">
+        The API follows a hierarchical structure:
+        <br><br>
+        <strong>Person → Legal Entity → Provider → Wallet Relying Party → Intended Use → Credential</strong>
+      </div>
+    </section>
+
+    <section id="authentication">
+      <h2>Authentication Flow</h2>
+
+      <div class="endpoint">
+        <span class="method">GET</span>
+        <h3>/authentication</h3>
+
+        <p>
+          Starts the authentication flow and returns a QR Code together with a presentation ID.
+        </p>
+
+        <pre><code>GET /authentication</code></pre>
+      </div>
+
+      <div class="endpoint">
+        <span class="method">GET</span>
+        <h3>/pid_authorization</h3>
+
+        <p>
+          Verifies whether the PID authentication flow has been completed.
+        </p>
+      </div>
+
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/getpidoid4vp</h3>
+
+        <p>
+          Retrieves PID information and returns the user <code>hash_pid</code>.
+        </p>
+      </div>
+    </section>
+
+    <section id="workflow">
+      <h2>Recommended Workflow</h2>
+
+      <ol>
+        <li>Authenticate using the PID/OID4VP flow.</li>
+        <li>Create Law.</li>
+        <li>Create Legal Person.</li>
+        <li>Create Identifiers.</li>
+        <li>Create Natural Person or Legal Person.</li>
+        <li>Create a Legal Entity.</li>
+        <li>Create Policies (wrp).</li>
+        <li>Create a Provider.</li>
+        <li>Create Credential</li>
+        <li>Create Policies (intended_use).</li>
+        <li>Create Intended Uses.</li>
+        <li>Create Provided Attestations.</li>
+        <li>Create Supervisory Authorities.</li>
+        <li>Create Wallet Relying Parties.</li>
+        <li>Generate certificates.</li>
+      </ol>
+    </section>
+
+    <section id="examples">
+      <h2>Example Requests</h2>
+
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/law/create</h3>
+
+        <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "law": [
+            {
+              "legalBasis": [
+                "consent",
+                "contract"
+              ],
+              "legislativeIdentifier": "GDPR-ART-6"
+            }
+          ]
+        }
+        </code></pre>
+      </div>
+      
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/legal_person/create</h3>
+
+        <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "legalPerson": [
+            {
+              "law": [1],
+              "legalName": [
+                "Company A",
+                "Company B"
+              ]
+            }
+          ]
+        }
+        </code></pre>
+      </div>
+      
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/identifier/create</h3>
+
+        <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "identifier": [
+            {
+              "identifier": "PT123456789",
+              "type": "http://data.europa.eu/eudi/id/EORI-No"
+            }
+          ]
+        }
+        </code></pre>
+      </div>
+      
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/legal_entity/create</h3>
+
+        <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "legal_entity": [
+            {
+              "country": "PT",
+              "email": [
+                "test@email.com"
+              ],
+              "identifiers": [
+                1
+              ],
+              "infoURI": [
+                "https://example.com"
+              ],
+              "legal_person_id": 1,
+              "phone": [
+                "+351912345678"
+              ],
+              "postalAddress": [
+                "Rua A, Porto"
+              ]
+            }
+          ]
+        }
+        </code></pre>
+      </div>
+
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/policy/create</h3>
+
+        <pre><code>
+        {
+          "hash_pid": "{{hash_pid}}",
+          "policy": [
+              {  
+                  "intention": "wrp",
+                  "policyURI": "policy",
+                  "type": "http://data.europa.eu/eudi/policy/trust-service-practice-statement"
+              }
+          ]
+        }
+        </code></pre>
+      </div>
+
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/provider/create</h3>
+
+        <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "provider": [
+            {
+              "legalEntityId": 1,
+              "policy_id": [
+                1
+              ],
+              "providerType": "WALLET_PROVIDER",
+              "x5c": [
+                "MIIC...base64cert1",
+                "MIIC...base64cert2"
+              ]
+            }
+          ]
+        }
+        </code></pre>
+      </div>
+      
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/credential/create</h3>
+
+        <pre><code>
+        {
+          "credentials": [
+            {
+              "claims": [
+                {
+                  "path": "credentialSubject.name"
+                }
+              ],
+              "format": "jwt_vc",
+              "meta": {
+                "name": "PID Credential",
+                "version": "1.0"
+              }
+            }
+          ],
+          "hash_pid": "abc123hash"
+        }
+        </code></pre>
+      </div>
+      
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/policy/create</h3>
+
+        <pre><code>
+        {
+          "hash_pid": "{{hash_pid}}",
+          "policy": [
+              {  
+                  "intention": "intended_use",
+                  "policyURI": "policy",
+                  "type": "http://data.europa.eu/eudi/policy/trust-service-practice-statement"
+              }
+          ]
+        }
+        </code></pre>
+      </div>
+      
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/intended_use/create</h3>
+
+        <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "intended_uses": [
+            {
+              "createdAt": "2026-01-01T10:00:00Z",
+              "credential_ids": [
+                1
+              ],
+              "intendedUseIdentifier": "USE-001",
+              "privacyPolicy_id": [
+                2
+              ],
+              "purpose": [
+                {
+                  "content": "Identity verification",
+                  "lang": "en"
+                }
+              ],
+              "revokedAt": "2027-01-01T10:00:00Z"
+            }
+          ]
+        }
+        </code></pre>
+      </div>
+      
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/provided_attestation/create</h3>
+
+        <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "providesAttestations": [
+            {
+              "format": "jwt",
+              "meta": "issuer metadata info"
+            }
+          ]
+        }
+        </code></pre>
+      </div>
+      
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/supervisory_authority/create</h3>
+
+        <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "supervisoryAuthority": [
+            {
+              "country": "PT",
+              "email": [
+                "geral@cnpd.pt"
+              ],
+              "formURI": [
+                "https://www.cnpd.pt/contactos"
+              ],
+              "name": "CNPD",
+              "phone": [
+                "+351213928400"
+              ]
+            }
+          ]
+        }
+        </code></pre>
+      </div>
+
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/wallet_rp/create</h3>
+
+        <pre><code>
+        {
+          "WalletRelyingParty": [
+            {
+              "entitlements": [
+                "AGE_VERIFICATION"
+              ],
+              "intendedUse_ids": [
+                1
+              ],
+              "isPSB": true,
+              "provider_id": 1,
+              "providesAttestations_id": [
+                1
+              ],
+              "registryURI": "https://registry.example.com",
+              "srvDescription": [
+                {
+                  "content": "Wallet authentication service",
+                  "lang": "en"
+                }
+              ],
+              "supervisoryAuthority": 1,
+              "supportURI": [
+                "https://support.example.com"
+              ],
+              "tradeName": "My Wallet Service"
+            }
+          ],
+          "hash_pid": "abc123hash"
+        }
+        </code></pre>
+      </div>
+    </section>
+
+    <section id="certificates">
+      <h2>Certificate Generation</h2>
+
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/intended_use/certificate</h3>
+        
+        <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "intended_use_id": 1
+        }
+        </code></pre>
+
+        <p>
+          Generates a signed Intended Use Registration Certificate using JAdES and COSE.
+        </p>
+      </div>
+
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <h3>/wallet_rp/certificate</h3>
+
+        <pre><code>
+        {
+          "hash_pid": "abc123hash",
+          "password": "StrongPassword123!",
+          "wrp_id": 1
+        }
+        </code></pre>
+
+        <p>
+          Generates a Wallet Relying Party certificate in PKCS#12 format.
+        </p>
+      </div>
+    </section>
+
+    <section id="swagger">
+      <h2>Swagger Documentation</h2>
+
+      <p>
+        Full API documentation is available through Swagger UI.
+      </p>
+
+      <pre><code>/apidocs/</code></pre>
+    </section>
+
+  </main>
+
+  <footer>
+    WRP Registry API Guide
+  </footer>
+
+</body>
+</html>
