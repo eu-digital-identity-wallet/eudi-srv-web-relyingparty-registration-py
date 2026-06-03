@@ -20,6 +20,7 @@ import json
 import os
 import sys
 
+import pymysql
 from requests import Session
 import requests
 
@@ -42,6 +43,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography import x509
 from app_config.config import ConfService as cfgserv
+from flasgger import Swagger
 
 import os
 import time
@@ -50,6 +52,9 @@ from flask import Flask
 import logging
 from logging.handlers import TimedRotatingFileHandler
 import os
+from app_config.database import ConfDataBase
+from flasgger import Swagger
+
 
 def setup_logger():
     log_dir = cfgserv.log_dir
@@ -170,26 +175,48 @@ def page_not_found(e):
         404,
     )
 
+def initialize_db():
+    with open('./relying_party_reg.sql', 'r') as f:
+        sql = f.read()
+
+    connection = pymysql.connect(
+        host=ConfDataBase.DATABASE['host'],
+        port=ConfDataBase.DATABASE['port'],
+        user=ConfDataBase.DATABASE['user'],
+        password=ConfDataBase.DATABASE['password'],
+    )
+
+    try:
+        with connection.cursor() as cursor:
+            for statement in sql.split(';'):
+                if statement.strip():
+                    cursor.execute(statement)
+        connection.commit()
+    finally:
+        connection.close()
+
+#initialize_db()
+
 def create_app():
 
     app = Flask(__name__, instance_relative_config=True)
+
+    Swagger(app, template_file="swagger/api.yaml")
+
     app.config['SECRET_KEY'] = ConfService.secret_key
 
-    #app.register_error_handler(Exception, handle_exception)
     app.register_error_handler(404, page_not_found)
-
+    
     from . import (RPR_routes)
-
     app.register_blueprint(RPR_routes.rpr)
 
-    # config session
+    # session
     app.config["SESSION_FILE_THRESHOLD"] = 50
     app.config["SESSION_PERMANENT"] = False
     app.config["SESSION_TYPE"] = "filesystem"
     app.config.update(SESSION_COOKIE_SAMESITE="None", SESSION_COOKIE_SECURE=True)
     Session(app)
 
-    # CORS is a mechanism implemented by browsers to block requests from domains other than the server's one.
     CORS(app, supports_credentials=True)
 
     return app

@@ -1,0 +1,2555 @@
+swagger: "2.0"
+info:
+  title: My API
+  version: 1.0.0
+
+paths:
+  /law/create:
+    post:
+      summary: Create Law
+      description: Create one or more laws for the authenticated user
+      tags:
+        - Law
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - law
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: User session identifier
+              law:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - legislativeIdentifier
+                  properties:
+                    legislativeIdentifier:
+                      type: string
+                      example: "GDPR-ART-6"
+                    legalBasis:
+                      type: array
+                      items:
+                        type: string
+                      example: ["consent", "contract"]
+
+      responses:
+        200:
+          description: Law created successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Law created successfully
+              data:
+                type: array
+                items:
+                  type: integer
+                example: [1, 2, 3]
+
+        400:
+          description: Invalid input or missing fields
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Missing required fields
+
+        401:
+          description: Invalid hash_pid
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Invalid hash_pid
+
+  /law/list:
+    post:
+      summary: List Laws
+      description: Retrieve all laws associated with the authenticated user
+      tags:
+        - Law
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: User session identifier
+
+      responses:
+        200:
+          description: Laws retrieved successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Law retrieved successfully
+              law:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    legislativeIdentifier:
+                      type: string
+                      example: "GDPR-ART-6"
+                    legalBasis:
+                      type: array
+                      items:
+                        type: string
+                      example: ["consent", "contract"]
+
+        400:
+          description: Invalid input or missing fields
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Missing required fields
+
+        401:
+          description: Invalid hash_pid
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Invalid hash_pid
+
+  /legal_person/create:
+    post:
+      summary: Create Legal Person
+      description: Create one or more legal persons and associate laws
+      tags:
+        - Legal Person
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - legalPerson
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              legalPerson:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - legalName
+                  properties:
+                    legalName:
+                      type: array
+                      items:
+                        type: string
+                      example: ["Company A", "Company B"]
+
+                    law:
+                      type: array
+                      items:
+                        type: integer
+                      example: [1, 2]
+
+      responses:
+        200:
+          description: Legal Person created successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Legal Person created successfully
+              data:
+                type: array
+                items:
+                  type: integer
+                example: [1, 2]
+
+        400:
+          description: Invalid input or missing fields
+
+        401:
+          description: Invalid hash_pid
+
+        403:
+          description: Law or Legal Person does not belong to user
+
+
+  /legal_person/list:
+    post:
+      summary: List Legal Persons
+      description: Retrieve all legal persons for the authenticated user
+      tags:
+        - Legal Person
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+      responses:
+        200:
+          description: Legal Persons retrieved successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Legal Persons retrieved successfully
+              legal_person:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    legalName:
+                      type: array
+                      items:
+                        type: string
+                      example: ["Company A"]
+                    law:
+                      type: array
+                      items:
+                        type: integer
+                      example: [1, 2]
+
+        400:
+          description: Invalid input or missing fields
+
+        401:
+          description: Invalid hash_pid
+
+
+  /legal_person/update_law:
+    post:
+      summary: Add Laws to Legal Person
+      description: Associate one or more laws to a legal person
+      tags:
+        - Legal Person
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - legal_person_id
+              - law_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              legal_person_id:
+                type: integer
+                example: 1
+
+              law_ids:
+                type: array
+                items:
+                  type: integer
+                example: [1, 2]
+
+      responses:
+        200:
+          description: Legal person law associations updated successfully
+
+        400:
+          description: Invalid input or missing fields
+
+        401:
+          description: Invalid hash_pid
+
+        403:
+          description: Resource does not belong to user
+
+
+  /legal_person/remove_law:
+    post:
+      summary: Remove Laws from Legal Person
+      description: Remove association between laws and a legal person
+      tags:
+        - Legal Person
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - legal_person_id
+              - law_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              legal_person_id:
+                type: integer
+                example: 1
+
+              law_ids:
+                type: array
+                items:
+                  type: integer
+                example: [1, 2]
+
+      responses:
+        200:
+          description: Legal person law associations removed successfully
+
+        400:
+          description: Invalid input or missing fields
+
+        401:
+          description: Invalid hash_pid
+
+        403:
+          description: Resource does not belong to user
+  
+  /natural_person/create:
+    post:
+      summary: Create Natural Person
+      description: Create one or more natural persons
+      tags:
+        - Natural Person
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - naturalPerson
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              naturalPerson:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - familyName
+                    - givenName
+                  properties:
+                    familyName:
+                      type: string
+                      example: "Silva"
+
+                    givenName:
+                      type: string
+                      example: "João"
+
+                    dateOfBirth:
+                      type: string
+                      format: date
+                      example: "1990-05-20"
+
+                    placeOfBirth:
+                      type: string
+                      example: "Porto"
+
+      responses:
+        200:
+          description: Natural Person created successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Natural Person created successfully
+              data:
+                type: array
+                items:
+                  type: integer
+                example: [1, 2]
+
+        400:
+          description: Invalid input or missing fields
+
+        401:
+          description: Invalid hash_pid
+
+  /natural_person/list:
+    post:
+      summary: List Natural Persons
+      description: Retrieve all natural persons for the authenticated user
+      tags:
+        - Natural Person
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+      responses:
+        200:
+          description: Natural Persons retrieved successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Natural Persons retrieved successfully
+              natural_person:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    familyName:
+                      type: string
+                      example: "Silva"
+                    givenName:
+                      type: string
+                      example: "João"
+                    dateOfBirth:
+                      type: string
+                      example: "1990-05-20"
+                    placeOfBirth:
+                      type: string
+                      example: "Porto"
+
+        400:
+          description: Invalid input or missing fields
+
+        401:
+          description: Invalid hash_pid
+  
+  /identifier/create:
+    post:
+      summary: Create Identifier
+      description: Create one or more identifiers for the authenticated user
+      tags:
+        - Identifier
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - identifier
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              identifier:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - identifier
+                    - type
+                  properties:
+                    identifier:
+                      type: string
+                      example: "PT123456789"
+
+                    type:
+                      type: string
+                      enum: ["http://data.europa.eu/eudi/id/EORI-No",
+                              "http://data.europa.eu/eudi/id/LEI" ,
+                              "http://data.europa.eu/eudi/id/EUID" ,
+                              "http://data.europa.eu/eudi/id/VATIN"  ,
+                              "http://data.europa.eu/eudi/id/TIN" ,
+                              "http://data.europa.eu/eudi/id/Excise"]
+                      description: Type of identifier (must match allowed values)
+
+      responses:
+        200:
+          description: Identifier created successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Identifier created successfully
+              data:
+                type: array
+                items:
+                  type: integer
+                example: [1, 2]
+
+        400:
+          description: Invalid input or missing fields
+
+        401:
+          description: Invalid hash_pid
+
+        403:
+          description: Invalid identifier type
+
+  /identifier/list:
+    post:
+      summary: List Identifiers
+      description: Retrieve all identifiers for the authenticated user
+      tags:
+        - Identifier
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+      responses:
+        200:
+          description: Identifiers retrieved successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Identifiers retrieved successfully
+              identifier:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    identifier:
+                      type: string
+                      example: "PT123456789"
+                    type:
+                      type: string
+                      example: "VAT"
+
+        400:
+          description: Invalid input or missing fields
+
+        401:
+          description: Invalid hash_pid
+  
+  /legal_entity/create:
+    post:
+      summary: Create Legal Entity
+      description: Create one or more legal entities associated with a legal or natural person
+      tags:
+        - Legal Entity
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - legal_entity
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              legal_entity:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - identifiers
+                    - country
+                  properties:
+                    legal_person_id:
+                      type: integer
+                      example: 1
+
+                    identifiers:
+                      type: array
+                      items:
+                        type: integer
+                      example: [1, 2]
+
+                    country:
+                      type: string
+                      example: "PT"
+                      description: Must be a valid EU country code
+
+                    postalAddress:
+                      type: array
+                      items:
+                        type: string
+                      example: ["Rua A, Porto"]
+
+                    email:
+                      type: array
+                      items:
+                        type: string
+                      example: ["test@email.com"]
+
+                    phone:
+                      type: array
+                      items:
+                        type: string
+                      example: ["+351912345678"]
+
+                    infoURI:
+                      type: array
+                      items:
+                        type: string
+                      example: ["https://example.com"]
+
+      responses:
+        200:
+          description: Legal Entity created successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Legal Entity created successfully
+              data:
+                type: array
+                items:
+                  type: integer
+                example: [1]
+
+        400:
+          description: Invalid input or missing fields
+
+        401:
+          description: Invalid hash_pid
+
+        403:
+          description: Resource does not belong to user
+
+  /legal_entity/list:
+    post:
+      summary: List Legal Entities
+      description: Retrieve all legal entities for the authenticated user
+      tags:
+        - Legal Entity
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+      responses:
+        200:
+          description: Legal Entities retrieved successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Legal Entity retrieved successfully
+              legal_entity:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    country:
+                      type: string
+                      example: "PT"
+                    identifiers:
+                      type: array
+                      items:
+                        type: integer
+                      example: [1, 2]
+
+        400:
+          description: Invalid input or missing fields
+
+        401:
+          description: Invalid hash_pid
+    
+  /legal_entity/update_identifier:
+    post:
+      summary: Add Identifiers to Legal Entity
+      description: Associate identifiers to a legal entity
+      tags:
+        - Legal Entity
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - legal_entity_id
+              - identifier_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              legal_entity_id:
+                type: integer
+                example: 1
+
+              identifier_ids:
+                type: array
+                items:
+                  type: integer
+                example: [1, 2]
+
+      responses:
+        200:
+          description: Identifiers associated successfully
+
+        400:
+          description: Invalid input
+
+        401:
+          description: Invalid hash_pid
+
+        403:
+          description: Resource does not belong to user
+
+  /legal_entity/remove_identifier:
+    post:
+      summary: Remove Identifiers from Legal Entity
+      description: Remove identifier associations. A legal entity must always have at least one identifier.
+      tags:
+        - Legal Entity
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - legal_entity_id
+              - identifier_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              legal_entity_id:
+                type: integer
+                example: 1
+
+              identifier_ids:
+                type: array
+                items:
+                  type: integer
+                example: [1]
+
+      responses:
+        200:
+          description: Identifiers removed successfully
+
+        400:
+          description: Invalid request (e.g. trying to remove all identifiers)
+
+        401:
+          description: Invalid hash_pid
+
+        403:
+          description: Resource does not belong to user
+
+  /policy/create:
+    post:
+      summary: Create Policy
+      description: Create one or more policies with a specific intention and type
+      tags:
+        - Policy
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - policy
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              policy:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - policyURI
+                    - type
+                    - intention
+                  properties:
+                    policyURI:
+                      type: string
+                      example: "https://example.com/privacy-policy"
+
+                    intention:
+                      type: string
+                      enum: ["wrp", "intended_use"]
+                      example: "wrp"
+                      description: Defines the purpose of the policy
+
+                    type:
+                      type: string
+                      enum: ["http://data.europa.eu/eudi/policy/trust-service-practice-statement",
+                        "http://data.europa.eu/eudi/policy/terms-and-conditions",
+                        "http://data.europa.eu/eudi/policy/privacy-statement",
+                        "http://data.europa.eu/eudi/policy/privacy-policy",
+                        "http://data.europa.eu/eudi/policy/registration-policy"]
+                      description: Type depends on intention (wrp or intended_use)
+
+      responses:
+        200:
+          description: Policy created successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Policy created successfully
+              data:
+                type: array
+                items:
+                  type: integer
+                example: [1, 2]
+
+        400:
+          description: Invalid input or missing fields
+
+        401:
+          description: Invalid hash_pid
+
+        403:
+          description: Invalid policy type or intention
+  
+  /policy/list:
+    post:
+      summary: List Policies
+      description: Retrieve all policies for the authenticated user
+      tags:
+        - Policy
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+      responses:
+        200:
+          description: Policies retrieved successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Policies retrieved successfully
+              policy:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    policyURI:
+                      type: string
+                      example: "https://example.com/privacy-policy"
+                    type:
+                      type: string
+                      example: "PRIVACY_POLICY"
+                    intention:
+                      type: string
+                      example: "wrp"
+
+        400:
+          description: Invalid input or missing fields
+
+        401:
+          description: Invalid hash_pid
+
+  /provider/create:
+    post:
+      summary: Create Provider
+      description: Create one or more providers associated with a legal entity and policies
+      tags:
+        - Provider
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - provider
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              provider:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - legalEntityId
+                    - providerType
+                    - policy_id
+                  properties:
+                    legalEntityId:
+                      type: integer
+                      example: 1
+
+                    providerType:
+                      type: string
+                      example: "WALLET_PROVIDER"
+
+                    policy_id:
+                      type: array
+                      items:
+                        type: integer
+                      example: [1, 2]
+                      description: Must be policies with intention 'wrp'
+
+                    x5c:
+                      type: array
+                      items:
+                        type: string
+                      example:
+                        - "MIIC...base64cert1"
+                        - "MIIC...base64cert2"
+                      description: Certificate chain (optional)
+
+      responses:
+        200:
+          description: Provider created successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Provider created successfully
+              data:
+                type: array
+                items:
+                  type: integer
+                example: [1]
+
+        400:
+          description: Invalid input or missing fields
+
+        401:
+          description: Invalid hash_pid
+
+        403:
+          description: Resource does not belong to user or invalid policy type
+  
+  /provider/list:
+    post:
+      summary: List Providers
+      description: Retrieve all providers for the authenticated user
+      tags:
+        - Provider
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+      responses:
+        200:
+          description: Providers retrieved successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Providers retrieved successfully
+              provider:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    legalEntityId:
+                      type: integer
+                      example: 1
+                    providerType:
+                      type: string
+                      example: "WALLET_PROVIDER"
+                    policies:
+                      type: array
+                      items:
+                        type: integer
+                      example: [1, 2]
+
+        400:
+          description: Invalid input or missing fields
+
+        401:
+          description: Invalid hash_pid
+  
+  /provider/update_policy:
+    post:
+      summary: Add Policies to Provider
+      description: Associate policies to a provider (must be WRP policies)
+      tags:
+        - Provider
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - provider_id
+              - policy_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              provider_id:
+                type: integer
+                example: 1
+
+              policy_ids:
+                type: array
+                items:
+                  type: integer
+                example: [1, 2]
+
+      responses:
+        200:
+          description: Policies associated successfully
+
+        400:
+          description: Invalid input
+
+        401:
+          description: Invalid hash_pid
+
+        403:
+          description: Policy does not belong to user or invalid type
+
+  /provider/remove_policy:
+    post:
+      summary: Remove Policies from Provider
+      description: Remove policy associations. A provider must always have at least one policy.
+      tags:
+        - Provider
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - provider_id
+              - policy_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              provider_id:
+                type: integer
+                example: 1
+
+              policy_ids:
+                type: array
+                items:
+                  type: integer
+                example: [1]
+
+      responses:
+        200:
+          description: Policies removed successfully
+
+        400:
+          description: Invalid request (e.g. removing all policies)
+
+        401:
+          description: Invalid hash_pid
+
+        403:
+          description: Resource does not belong to user
+
+  /credential/create:
+    post:
+      summary: Create Credential
+      description: Create one or more credentials with associated claims
+      tags:
+        - Credential
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - credentials
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              credentials:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - format
+                    - meta
+                    - claims
+                  properties:
+                    format:
+                      type: string
+                      example: "jwt_vc"
+                      description: Credential format
+
+                    meta:
+                      type: object
+                      example:
+                        name: "PID Credential"
+                        version: "1.0"
+
+                    claims:
+                      type: array
+                      items:
+                        type: object
+                        required:
+                          - path
+                        properties:
+                          path:
+                            type: string
+                            example: "$.credentialSubject.name"
+                            description: JSON path of the claim
+
+      responses:
+        200:
+          description: Credential created successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Credential created successfully
+              data:
+                type: array
+                items:
+                  type: integer
+                example: [1, 2]
+
+        400:
+          description: Invalid input or missing fields
+
+        401:
+          description: Invalid hash_pid
+
+  /credential/list:
+    post:
+      summary: List Credentials
+      description: Retrieve all credentials for the authenticated user
+      tags:
+        - Credential
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+      responses:
+        200:
+          description: Credentials retrieved successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Credentials retrieved successfully
+              credential:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    format:
+                      type: string
+                      example: "jwt_vc"
+                    meta:
+                      type: object
+                      example:
+                        name: "PID Credential"
+                        version: "1.0"
+                    claims:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          path:
+                            type: string
+                            example: "$.credentialSubject.name"
+
+        400:
+          description: Invalid input or missing fields
+
+        401:
+          description: Invalid hash_pid
+    
+  /intended_use/create:
+    post:
+      summary: Create Intended Use
+      description: Create one or more intended uses with purposes, policies and credentials
+      tags:
+        - Intended Use
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - intended_uses
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              intended_uses:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - intendedUseIdentifier
+                    - createdAt
+                    - revokedAt
+                    - purpose
+                    - privacyPolicy_id
+                    - credential_ids
+                  properties:
+                    intendedUseIdentifier:
+                      type: string
+                      example: "USE-001"
+
+                    createdAt:
+                      type: string
+                      format: date-time
+                      example: "2026-01-01T10:00:00Z"
+
+                    revokedAt:
+                      type: string
+                      format: date-time
+                      example: "2027-01-01T10:00:00Z"
+
+                    purpose:
+                      type: array
+                      items:
+                        type: object
+                        required:
+                          - lang
+                          - content
+                        properties:
+                          lang:
+                            type: string
+                            example: "en"
+                            description: Must be a valid EU language code
+                          content:
+                            type: string
+                            example: "Identity verification"
+
+                    privacyPolicy_id:
+                      type: array
+                      items:
+                        type: integer
+                      example: [1, 2]
+                      description: Must be valid intended_use policy types
+
+                    credential_ids:
+                      type: array
+                      items:
+                        type: integer
+                      example: [1, 2]
+
+      responses:
+        200:
+          description: Intended Use created successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Intended Use created successfully
+              data:
+                type: array
+                items:
+                  type: integer
+                example: [1]
+
+        400:
+          description: Invalid input or missing fields
+
+        401:
+          description: Invalid hash_pid
+
+        403:
+          description: Resource does not belong to user or invalid type
+  
+  /intended_use/list:
+    post:
+      summary: List Intended Uses
+      description: Retrieve all intended uses for the authenticated user
+      tags:
+        - Intended Use
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+      responses:
+        200:
+          description: Intended Uses retrieved successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Intended Use retrieved successfully
+              intended_use:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    intendedUseIdentifier:
+                      type: string
+                      example: "USE-001"
+                    purposes:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          lang:
+                            type: string
+                            example: "en"
+                          content:
+                            type: string
+                            example: "Identity verification"
+                    policies:
+                      type: array
+                      items:
+                        type: integer
+                      example: [1, 2]
+                    credentials:
+                      type: array
+                      items:
+                        type: integer
+                      example: [1, 2]
+
+        400:
+          description: Invalid input
+
+        401:
+          description: Invalid hash_pid
+  
+  /intended_use/update_credential:
+    post:
+      summary: Add Credentials to Intended Use
+      tags:
+        - Intended Use
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - intended_use_id
+              - credential_ids
+            properties:
+              hash_pid:
+                type: string
+              intended_use_id:
+                type: integer
+                example: 1
+              credential_ids:
+                type: array
+                items:
+                  type: integer
+                example: [1, 2]
+
+      responses:
+        200:
+          description: Credentials associated successfully
+  
+  /intended_use/update_policy:
+    post:
+      summary: Add Policies to Intended Use
+      tags:
+        - Intended Use
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - intended_use_id
+              - policy_ids
+            properties:
+              hash_pid:
+                type: string
+              intended_use_id:
+                type: integer
+              policy_ids:
+                type: array
+                items:
+                  type: integer
+
+      responses:
+        200:
+          description: Policies associated successfully
+  
+  /intended_use/remove_credential:
+    post:
+      summary: Remove Credentials from Intended Use
+      description: Must keep at least one credential
+      tags:
+        - Intended Use
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - intended_use_id
+              - credential_ids
+            properties:
+              hash_pid:
+                type: string
+              intended_use_id:
+                type: integer
+              credential_ids:
+                type: array
+                items:
+                  type: integer
+
+      responses:
+        200:
+          description: Credentials removed successfully
+  
+  /intended_use/remove_policy:
+    post:
+      summary: Remove Policies from Intended Use
+      description: Must keep at least one policy
+      tags:
+        - Intended Use
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - intended_use_id
+              - policy_ids
+            properties:
+              hash_pid:
+                type: string
+              intended_use_id:
+                type: integer
+              policy_ids:
+                type: array
+                items:
+                  type: integer
+
+      responses:
+        200:
+          description: Policies removed successfully
+  
+  /provided_attestation/create:
+    post:
+      summary: Create Provided Attestation
+      description: Create one or more provided attestations for the authenticated user
+      tags:
+        - Provided Attestation
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - providesAttestations
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: User session identifier
+
+              providesAttestations:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - format
+                    - meta
+                  properties:
+                    format:
+                      type: string
+                      example: "jwt"
+                      description: Credential format (e.g., jwt, sd-jwt, mdoc)
+
+                    meta:
+                      type: string
+                      example: "issuer metadata info"
+                      description: Additional metadata associated with the attestation
+
+      responses:
+        200:
+          description: Provided Attestation created successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Provided Attestation created successfully
+              data:
+                type: array
+                items:
+                  type: integer
+                example: [1, 2]
+
+        400:
+          description: Invalid input or missing fields
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Missing required fields
+
+        401:
+          description: Invalid hash_pid
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Invalid hash_pid
+  
+  /provided_attestation/list:
+    post:
+      summary: List Provided Attestations
+      description: Retrieve all provided attestations for the authenticated user
+      tags:
+        - Provided Attestation
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+      responses:
+        200:
+          description: Provided attestations retrieved successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Provided attestation retrieved successfully
+              provided_attestation:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    format:
+                      type: string
+                      example: "jwt"
+                    meta:
+                      type: string
+                      example: "issuer metadata info"
+
+        400:
+          description: Invalid input or missing fields
+
+        401:
+          description: Invalid hash_pid
+
+  /supervisory_authority/create:
+    post:
+      summary: Create Supervisory Authority
+      description: Create one or more supervisory authorities. At least one contact method (email, formURI, or phone) is required.
+      tags:
+        - Supervisory Authority
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - supervisoryAuthority
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: User session identifier
+
+              supervisoryAuthority:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - name
+                    - country
+                  properties:
+                    name:
+                      type: string
+                      example: "CNPD"
+                      description: Name of the supervisory authority
+
+                    country:
+                      type: string
+                      example: "PT"
+                      description: Must be a valid EU country code
+
+                    email:
+                      type: array
+                      items:
+                        type: string
+                        format: email
+                      example: ["geral@cnpd.pt"]
+
+                    formURI:
+                      type: array
+                      items:
+                        type: string
+                        format: uri
+                      example: ["https://www.cnpd.pt/contactos"]
+
+                    phone:
+                      type: array
+                      items:
+                        type: string
+                      example: ["+351213928400"]
+
+      responses:
+        200:
+          description: Supervisory Authority created successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Supervisory Authority created successfully
+              data:
+                type: array
+                items:
+                  type: integer
+                example: [1]
+
+        400:
+          description: Invalid input or missing fields
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Missing required fields
+
+        401:
+          description: Invalid hash_pid
+
+        403:
+          description: Validation error (e.g., missing contact methods)
+  
+  /supervisory_authority/list:
+    post:
+      summary: List Supervisory Authorities
+      description: Retrieve all supervisory authorities for the authenticated user
+      tags:
+        - Supervisory Authority
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+      responses:
+        200:
+          description: Supervisory Authorities retrieved successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Supervisory Authority retrieved successfully
+              supervisory_authority:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    name:
+                      type: string
+                      example: "CNPD"
+                    country:
+                      type: string
+                      example: "PT"
+                    email:
+                      type: array
+                      items:
+                        type: string
+                      example: ["geral@cnpd.pt"]
+                    formURI:
+                      type: array
+                      items:
+                        type: string
+                      example: ["https://www.cnpd.pt/contactos"]
+                    phone:
+                      type: array
+                      items:
+                        type: string
+                      example: ["+351213928400"]
+
+        400:
+          description: Invalid input
+
+        401:
+          description: Invalid hash_pid
+  
+  /wallet_rp/create:
+    post:
+      summary: Create Wallet Relying Party
+      description: Create one or more Wallet Relying Parties with full configuration (provider, intended uses, attestations, etc.)
+      tags:
+        - WalletRelyingParty
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - WalletRelyingParty
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              WalletRelyingParty:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - supportURI
+                    - provider_id
+                    - srvDescription
+                    - intendedUse_ids
+                    - isPSB
+                    - entitlements
+                    - supervisoryAuthority
+                    - registryURI
+                  properties:
+
+                    tradeName:
+                      type: string
+                      example: "My Wallet Service"
+
+                    provider_id:
+                      type: integer
+                      example: 1
+
+                    supervisoryAuthority:
+                      type: integer
+                      example: 1
+
+                    registryURI:
+                      type: string
+                      format: uri
+                      example: "https://registry.example.com"
+
+                    supportURI:
+                      type: array
+                      items:
+                        type: string
+                        format: uri
+                      example: ["https://support.example.com"]
+
+                    srvDescription:
+                      type: array
+                      items:
+                        type: object
+                        required:
+                          - lang
+                        properties:
+                          lang:
+                            type: string
+                            example: "en"
+                          content:
+                            type: string
+                            example: "Wallet authentication service"
+
+                    intendedUse_ids:
+                      type: array
+                      items:
+                        type: integer
+                      example: [1, 2]
+
+                    providesAttestations_id:
+                      type: array
+                      items:
+                        type: integer
+                      example: [1]
+
+                    usesIntermediary:
+                      type: array
+                      items:
+                        type: integer
+                      example: [1]
+
+                    entitlements:
+                      type: array
+                      items:
+                        type: string
+                      example: ["AGE_VERIFICATION"]
+
+                    isPSB:
+                      type: boolean
+                      example: true
+
+      responses:
+        200:
+          description: Wallet Relying Party created successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Wallet Relying Party created successfully
+              data:
+                type: array
+                items:
+                  type: integer
+                example: [1]
+
+        400:
+          description: Invalid input
+
+        401:
+          description: Invalid hash_pid
+
+        403:
+          description: Validation error (ownership, duplicates, invalid types)
+  
+  /wallet_rp/list:
+    post:
+      summary: List Wallet Relying Parties
+      tags:
+        - WalletRelyingParty
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+      responses:
+        200:
+          description: Wallet Relying Parties retrieved successfully
+  
+  /wallet_rp/update_intended_use:
+    post:
+      summary: Add Intended Uses to WRP
+      tags:
+        - WalletRelyingParty
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - wrp_id
+              - intended_use_ids
+            properties:
+              hash_pid:
+                type: string
+              wrp_id:
+                type: integer
+                example: 1
+              intended_use_ids:
+                type: array
+                items:
+                  type: integer
+                example: [1, 2]
+
+      responses:
+        200:
+          description: Intended Uses added successfully
+  
+  /wallet_rp/update_provided_attestation:
+    post:
+      summary: Update Provided Attestations for Wallet Relying Party
+      tags:
+        - WalletRelyingParty
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - wrp_id
+              - provided_attestation_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+              wrp_id:
+                type: integer
+                example: 1
+              provided_attestation_ids:
+                type: array
+                items:
+                  type: integer
+                example: [1, 2]
+      responses:
+        200:
+          description: Updated successfully
+  
+  /wallet_rp/update_uses_intermediary:
+    post:
+      summary: Update Uses Intermediary for Wallet Relying Party
+      tags:
+        - WalletRelyingParty
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - wrp_id
+              - uses_intermediary_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+              wrp_id:
+                type: integer
+                example: 1
+              uses_intermediary_ids:
+                type: array
+                items:
+                  type: integer
+                example: [10, 11]
+      responses:
+        200:
+          description: Updated successfully
+  
+  /wallet_rp/remove_intended_use:
+    post:
+      summary: Remove Intended Uses from WRP
+      description: A Wallet Relying Party must always have at least one Intended Use
+      tags:
+        - WalletRelyingParty
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - wrp_id
+              - intended_use_ids
+            properties:
+              hash_pid:
+                type: string
+              wrp_id:
+                type: integer
+              intended_use_ids:
+                type: array
+                items:
+                  type: integer
+
+      responses:
+        200:
+          description: Intended Uses removed successfully
+
+  /wallet_rp/remove_provided_attestation:
+    post:
+      summary: Remove Provided Attestations from Wallet Relying Party
+      tags:
+        - WalletRelyingParty
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - wrp_id
+              - provided_attestation_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+              wrp_id:
+                type: integer
+                example: 1
+              provided_attestation_ids:
+                type: array
+                items:
+                  type: integer
+                example: [5, 6]
+      responses:
+        200:
+          description: Removed successfully
+  
+  /wallet_rp/remove_uses_intermediary:
+    post:
+      summary: Remove Uses Intermediary from Wallet Relying Party
+      tags:
+        - WalletRelyingParty
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - wrp_id
+              - uses_intermediary_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+              wrp_id:
+                type: integer
+                example: 1
+              uses_intermediary_ids:
+                type: array
+                items:
+                  type: integer
+                example: [7, 8]
+      responses:
+        200:
+          description: Removed successfully
+
+  /list_claim:
+    post:
+      summary: List Claims
+      tags:
+        - Claim
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+      responses:
+        200:
+          description: Claims retrieved successfully
+
+  /list_full_info:
+    post:
+      summary: Get full hierarchical user information
+      description: Returns legal entities with providers, wallet relying parties and intended uses
+      tags:
+        - FullInfo
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+      responses:
+        200:
+          description: Full structured data returned
+
+  /wrp:
+    get:
+      summary: Public search for Wallet Relying Parties (signed response)
+      description: >
+        Returns filtered Wallet Relying Parties. Response is signed using JWS (ES256).
+        The response is NOT JSON but a signed token.
+      tags:
+        - Public
+      parameters:
+        - name: identifier
+          in: query
+          type: string
+        - name: legalname
+          in: query
+          type: string
+        - name: tradename
+          in: query
+          type: string
+        - name: policy
+          in: query
+          type: string
+        - name: entitlement
+          in: query
+          type: string
+        - name: providesattestation
+          in: query
+          type: string
+        - name: intendeduseidentifier
+          in: query
+          type: string
+        - name: isintermediary
+          in: query
+          type: string
+          enum: ["true", "false"]
+        - name: usesintermediary
+          in: query
+          type: string
+
+      responses:
+        200:
+          description: Signed JWS response (ES256)
+          schema:
+            type: string
+            example: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
+  
+  /wrp/{identifier}:
+    get:
+      summary: Get WRP by Identifier (signed response)
+      description: >
+        Returns a Wallet Relying Party by identifier.
+        The response is signed using ES256 JWS and must be verified using the public key.
+      tags:
+        - Public
+
+      parameters:
+        - name: identifier
+          in: path
+          required: true
+          type: string
+          example: "EU01-WRP-123"
+
+      responses:
+        200:
+          description: Signed WRP object (JWS ES256)
+          schema:
+            type: string
+            example: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+        404:
+          description: WRP not found
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                example: error
+              code:
+                type: integer
+                example: 404
+              message:
+                type: string
+                example: WRP not found
+
+  /wrp/check-intended-use:
+    get:
+      tags:
+        - Public
+      summary: Check Intended Use
+      description: |
+        Verifies if a given combination of identifier, claim, credential and intended use exists.
+        Returns a signed JWS response.
+
+      parameters:
+        - in: query
+          name: identifier
+          required: true
+          schema:
+            type: string
+          description: Identifier of the WRP
+
+        - in: query
+          name: claim_path
+          required: false
+          schema:
+            type: string
+          description: Path of the claim
+
+        - in: query
+          name: credential_format
+          required: false
+          schema:
+            type: string
+          description: Format of the credential
+
+        - in: query
+          name: credential_meta
+          required: false
+          schema:
+            type: string
+          description: Metadata of the credential
+
+        - in: query
+          name: intended_use_identifier
+          required: false
+          schema:
+            type: string
+          description: Intended use identifier
+
+      responses:
+        "200":
+          description: Signed verification result (JWS)
+          content:
+            application/json:
+              schema:
+                type: object
+                description: JWS signed payload (string)
+                example:
+                  payload: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+        "400":
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  status: error
+                  message: Missing required fields.
+                  details: identifier
+
+        "500":
+          description: Internal server error
+          
+  /intended_use/certificate:
+    post:
+      tags:
+        - Certificates
+      summary: Generate Intended Use Registration Certificate
+      description: |
+        Generates a signed certificate (JAdES + COSE) for a given Intended Use.
+        Returns both the signed document and COSE payload encoded in base64.
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - intended_use_id
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              intended_use_id:
+                type: integer
+                example: 10
+
+      responses:
+        200:
+          description: Certificate generated successfully
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                example: success
+
+              code:
+                type: integer
+                example: 200
+
+              data:
+                type: object
+                properties:
+                  filename:
+                    type: string
+                    example: document_with_signature.json
+
+                  file_base64:
+                    type: string
+                    example: BASE64_ENCODED_SIGNED_DOCUMENT
+
+                  cose_base64:
+                    type: string
+                    example: BASE64_ENCODED_COSE
+                    
+  /wallet_rp/certificate:
+    post:
+      tags:
+        - Certificates
+
+      summary: Generate Wallet Relying Party Certificate (PKCS#12)
+
+      description: |
+        Generates a certificate for a Wallet Relying Party using EJBCA.
+        Returns a PKCS#12 (.p12) file encoded in base64.
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - wrp_id
+              - password
+
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: User session identifier
+
+              wrp_id:
+                type: integer
+                example: 5
+                description: Wallet Relying Party identifier
+
+              password:
+                type: string
+                example: "StrongPassword123!"
+                description: Password used to encrypt the PKCS#12 file
+
+      responses:
+        200:
+          description: Certificate generated successfully
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                example: success
+
+              code:
+                type: integer
+                example: 200
+
+              data:
+                type: object
+                properties:
+                  filename:
+                    type: string
+                    example: document_with_signature.json
+
+                  file_base64:
+                    type: string
+                    example: BASE64_ENCODED_P12_FILE
+
+        400:
+          description: Missing required fields
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                example: error
+
+              message:
+                type: string
+                example: Missing required fields.
+
+              details:
+                type: string
+                example: wrp_id
+
+        401:
+          description: Invalid hash_pid
+
+        403:
+          description: Resource does not belong to the authenticated user
+
+        500:
+          description: Internal server error

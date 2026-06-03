@@ -23,6 +23,8 @@ NOTE: You should only change it if you understand what you're doing.
 
 import logging
 from logging.handlers import TimedRotatingFileHandler
+import os
+import random
 from flask import  session
 import logging
 from logging.handlers import TimedRotatingFileHandler
@@ -30,19 +32,76 @@ from logging.handlers import TimedRotatingFileHandler
 
 class ConfService:
 
-    secret_key = "secret_key"
+    secret_key = os.urandom(32).hex()
 
     #service_url = "http://127.0.0.1:5000/"
-    service_url = "https://registry.serviceproviders.eudiw.dev/"
+    service_url = os.getenv("SERVICE_URL","https://registry.serviceproviders.eudiw.dev/")
 
     #trusted_CAs_path = "app\certs"
-    trusted_CAs_path = "/etc/eudiw/pid-issuer/cert/"
+    trusted_CAs_path = os.getenv("TRUSTED_CAS_PATH","/etc/eudiw/pid-issuer/cert/")
 
     deffered_expiry = 100
 
-    #log_dir = "app\logs"
-    log_dir = "app/logs"
+    log_dir = "app\logs"
+    #log_dir = os.getenv("LOG_PATH", "app/logs")
 
+    url_verifier=os.getenv("VERIFIER","verifier-backend.eudiw.dev")
+
+    eu_languages = [
+        "bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr",
+        "ga", "hr", "hu", "it", "lt", "lv", "mt", "nl", "pl", "pt",
+        "ro", "sk", "sl", "sv"]
+
+    eu_countries = [
+        "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR",
+        "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL",
+        "PL", "PT", "RO", "SK", "SI", "ES", "SE","UT", "EU"]
+    
+    legal_entity_type_identifier={
+        "Country":list(eu_countries),
+        "Type of Identifier":["http://data.europa.eu/eudi/id/EORI-No",
+                            "http://data.europa.eu/eudi/id/LEI" ,
+                            "http://data.europa.eu/eudi/id/EUID" ,
+                            "http://data.europa.eu/eudi/id/VATIN"  ,
+                            "http://data.europa.eu/eudi/id/TIN" ,
+                            "http://data.europa.eu/eudi/id/Excise"]
+    }
+
+    relying_party={
+        "Entitlement":["http://data.europa.eu/eudi/entitlement/Service_Provider",
+                    "http://data.europa.eu/eudi/entitlement/QEAA_Provider",
+                    "http://data.europa.eu/eudi/entitlement/Non_Q_EAA_Provider",
+                    "http://data.europa.eu/eudi/entitlement/PUB_EAA_Provider",
+                    "http://data.europa.eu/eudi/entitlement/PID_Provider",
+                    "http://data.europa.eu/eudi/entitlement/QCert_for_ESeal_Provider",
+                    "http://data.europa.eu/eudi/entitlement/QCert_for_ESig_Provider",
+                    "http://data.europa.eu/eudi/entitlement/rQSealCDs_Provider",
+                    "http://data.europa.eu/eudi/entitlement/rQSigCDs_Provider",
+                    "http://data.europa.eu/eudi/entitlement/ESig_ESeal_Creation_Provider"],
+
+        "Type of Policy":["http://data.europa.eu/eudi/policy/trust-service-practice-statement",
+                        "http://data.europa.eu/eudi/policy/terms-and-conditions",
+                        "http://data.europa.eu/eudi/policy/privacy-statement",
+                        "http://data.europa.eu/eudi/policy/privacy-policy",
+                        "http://data.europa.eu/eudi/policy/registration-policy"]
+    }
+
+    intended_use={
+        "Type of Privacy Policy":["http://data.europa.eu/eudi/policy/trust-service-practice-statement",
+                        "http://data.europa.eu/eudi/policy/terms-and-conditions",
+                        "http://data.europa.eu/eudi/policy/privacy-statement",
+                        "http://data.europa.eu/eudi/policy/privacy-policy",
+                        "http://data.europa.eu/eudi/policy/registration-policy"]
+    }
+
+    sca_signer_url="http://localhost:8086"
+
+    url_statuslist="https://dev.issuer.eudiw.dev/token_status_list/take"
+
+    wrprc_privateKey = "app/EJBCA/ecdsa_key.pem"
+
+    wrprc_certificate = "app/EJBCA/ecdsa_cert.pem"
+    
 
     # log_dir = "/tmp/log"
     # #log_dir = "../../log"
