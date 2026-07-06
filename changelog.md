@@ -1,15 +1,50 @@
 # Changelog
 
-## [0.x.0]
+## [0.2.1]
 
-_00 Jun 0000_
+06 Jul 2026
 
-### Added:
--  
+### Fixed
+- Fixed Certificate Authority fallback selection in the EJBCA integration when the country code is not configured.
+- Fixed the `credential/create` section in the Guide documentation.
 
 ### Changed
+- Updated Docker configuration and environment variables.
+- Improved API error handling and validation messages.
+- Minor improvements to the authentication flow documentation.
 
-- 
-    
-### Fixed	
--  
+---
+
+## [0.2.0]
+
+03 Jun 2026
+
+### Added
+- Full implementation aligned with **EU Technical Specification 5** (Common formats and API for Relying Party Registration Information).
+- Full implementation aligned with **EU Technical Specification 6** (Common Set of Relying Party Information to be Registered).
+- Support for Wallet Relying Party registration.
+- Registration certificate generation.
+- Wallet access certificate generation.
+- Public WRP search endpoints.
+- Swagger API documentation.
+- HTML User Guide.
+- Complete REST API for:
+  - Authentication
+  - Legal Persons
+  - Natural Persons
+  - Legal Entities
+  - Providers
+  - Wallet Relying Parties
+  - Intended Uses
+  - Credentials
+  - Policies
+  - Laws
+  - Identifiers
+  - Supervisory Authorities
+  - Provided Attestations
+
+### Changed
+- Refactored the registration workflow to comply with ETSI TS 119 475.
+- Updated API responses to provide a consistent structure across endpoints.
+- Improved certificate generation workflow.
+- Improved validation and ownership checks for protected resources.
