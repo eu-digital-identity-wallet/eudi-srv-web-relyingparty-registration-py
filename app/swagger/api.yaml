@@ -1209,10 +1209,8 @@ paths:
                       description: Credential format
 
                     meta:
-                      type: object
-                      example:
-                        name: "PID Credential"
-                        version: "1.0"
+                      type: string
+                      example: "PID Credential"
 
                     claims:
                       type: array
