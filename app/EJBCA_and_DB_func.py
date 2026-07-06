@@ -86,11 +86,7 @@ from app import logger
 def getCertificateAuthorityName( countryCode):
 
     countries=ejbca.countries
-
-    if countryCode in countries:
-        CertificateAuthorityName=countries.get(countryCode)
-
-    return CertificateAuthorityName
+    return countries.get(countryCode, "PID Issuer CA - EU 02")
 
 def getJsonBody(certificateRequest, certificateAuthorityName, countryName):
 

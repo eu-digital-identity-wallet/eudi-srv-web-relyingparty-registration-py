@@ -134,18 +134,11 @@ The configuration file for defining access credentials and the location of the a
 
 ### 3. Initial Page
 
-The initial Page of the Relying Party Registration Service (<http://127.0.0.1:5000/> or <http://localhost:5000/>) presents two options:
+The initial Page of the Relying Party Registration Service (<http://127.0.0.1:5000/> or <http://localhost:5000/>) presents one options:
 
-+ Register Relying Party : <http://localhost:5000/authentication>
-+ User's Certificate List:  <http://localhost:5000/authentication_List>
-
-#### 3.1. Register Relying Party
-
-+ First step is authentication with the PID
-+ After authentication, the user must enter the Relying Party details.
-+ Once the Relying Party is registered, the user downloads a pkcs#12 (.p12) file containing the private key and the certificate for the Relying Party, encrypted with the password set when entering the Relying Party details.
++ Guide: <http://localhost:5000/guide>
     
-#### 3.1.1. (optional) Integrate with EUDI Verifier Endpoint
+#### 3.1. (optional) Integrate with EUDI Verifier Endpoint
   
 To integrate with the [EUDI Verifier Endpoint to mount an external keystore to be used with Authorization Request signing in](https://github.com/eu-digital-identity-wallet/eudi-srv-web-verifier-endpoint-23220-4-kt?tab=readme-ov-file#mount-external-keystore-to-be-used-with-authorization-request-signing), please use the following command line to convert the downloaded pkcs#12 file to a JKS file:
 
@@ -156,11 +149,6 @@ keytool -importkeystore -srckeystore [FileIn.p12] -srcstoretype pkcs12 -destkeys
 + FileIn.p12 - .p12 file generated in Relying Party Registration
 + FileOUT.jks - Path to the keystore
 + passwordJKS - password for .jks file (minimum 6 characters)
-
-#### 3.2. Certificate List
-
-+ First step is authentication with the PID 
-+ After authentication, the user has access to all their certificates and has the option to revoke any certificate they hold by clicking the "Revoke" button.
 
 ## Run docker
 
