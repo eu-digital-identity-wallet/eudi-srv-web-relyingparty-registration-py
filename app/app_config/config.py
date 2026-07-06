@@ -96,7 +96,7 @@ class ConfService:
 
     sca_signer_url= os.getenv("SCA_SIGNER_URL", "http://localhost:8086")
 
-    url_statuslist= os.getenv("URL_STATUSLIST", "tthps://dev.issuer.eudiw.dev/token_status_list/take")
+    url_statuslist= os.getenv("URL_STATUSLIST", "https://dev.issuer.eudiw.dev/token_status_list/take")
 
     wrprc_privateKey = os.getenv("WRPRC_PRIVATEkEY", "app/EJBCA/ecdsa_key.pem")
 
