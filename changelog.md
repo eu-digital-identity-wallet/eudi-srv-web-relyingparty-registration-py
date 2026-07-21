@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.2]
+
+21 Jul 2026
+
+### Fixed
+- Fix for the error when entering dates in the “Intended Uses” field.
+
+### Changed
+- Changes to the database to support changes to the meta format in the provided attestations and credentials.
+- The “meta” field is now an object instead of a string in the “provided attestation”.
+- The “meta” field is now an object instead of a string in the “Credential.
+
+---
+
 ## [0.2.1]
 
 06 Jul 2026

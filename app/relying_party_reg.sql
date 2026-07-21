@@ -156,7 +156,6 @@ CREATE TABLE IF NOT EXISTS `legal_entity_email` (
   CONSTRAINT `legal_entity_email_ibfk_1` FOREIGN KEY (`legal_entity_id`) REFERENCES `legal_entity` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-
 -- Exportação de dados não seleccionada.
 
 -- A despejar estrutura para tabela wrp.legal_entity_info_uri
@@ -253,7 +252,7 @@ CREATE TABLE IF NOT EXISTS `provider_policy` (
 CREATE TABLE IF NOT EXISTS `credential` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `format` varchar(100) NOT NULL,
-  `meta` text NOT NULL,
+  `meta` longtext NOT NULL,
   `user_id` int(11) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `user_id` (`user_id`),
@@ -308,7 +307,7 @@ CREATE TABLE IF NOT EXISTS `intended_use_policy` (
   KEY `policy_id` (`policy_id`),
   CONSTRAINT `intended_use_policy_ibfk_1` FOREIGN KEY (`intended_use_id`) REFERENCES `intended_use` (`id`),
   CONSTRAINT `intended_use_policy_ibfk_2` FOREIGN KEY (`policy_id`) REFERENCES `policy` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=31 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Exportação de dados não seleccionada.
 
@@ -343,7 +342,7 @@ CREATE TABLE IF NOT EXISTS `intended_use_purpose` (
 CREATE TABLE IF NOT EXISTS `provided_attestation` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `format` varchar(100) NOT NULL,
-  `meta` text NOT NULL,
+  `meta` longtext NOT NULL,
   `user_id` int(11) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `user_id` (`user_id`),
@@ -492,6 +491,45 @@ CREATE TABLE IF NOT EXISTS `wrp_support_uri` (
   KEY `wrp_id` (`wrp_id`),
   CONSTRAINT `wrp_support_uri_ibfk_1` FOREIGN KEY (`wrp_id`) REFERENCES `wallet_relying_party` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Exportação de dados não seleccionada.
+
+-- A despejar estrutura para tabela wrp.access_certificate
+CREATE TABLE IF NOT EXISTS `access_certificate` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `pkcs12_certificate` longtext NOT NULL,
+  `serial_number` varchar(255) NOT NULL,
+  `subject` text NOT NULL,
+  `state` varchar(20) NOT NULL DEFAULT 'ACTIVE',
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `expires_at` datetime NOT NULL,
+  `wrp_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `fk_access_certificate_wrp` (`wrp_id`),
+  KEY `fk_access_certificate_user` (`user_id`),
+  CONSTRAINT `fk_access_certificate_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_access_certificate_wrp` FOREIGN KEY (`wrp_id`) REFERENCES `wallet_relying_party` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Exportação de dados não seleccionada.
+
+-- A despejar estrutura para tabela wrp.registration_certificate
+CREATE TABLE IF NOT EXISTS `registration_certificate` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `jwt_certificate` longtext NOT NULL,
+  `cbor_certificate` longtext NOT NULL,
+  `state` varchar(20) NOT NULL DEFAULT 'ACTIVE',
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `expires_at` datetime NOT NULL,
+  `intended_use_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `fk_registration_certificate_intended_use` (`intended_use_id`),
+  KEY `fk_registration_certificate_user` (`user_id`),
+  CONSTRAINT `fk_registration_certificate_intended_use` FOREIGN KEY (`intended_use_id`) REFERENCES `intended_use` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_registration_certificate_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Exportação de dados não seleccionada.
 

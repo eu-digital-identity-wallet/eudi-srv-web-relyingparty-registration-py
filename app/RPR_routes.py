@@ -172,6 +172,20 @@ def list_response(message, result, name, code=200):
         }
     }, code
 
+def serialize_json(value):
+    return json.dumps(value) if value is not None else None
+
+def deserialize_json(value):
+    return json.loads(value) if value else None
+
+def validate_date_field(value, field_name):
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return error_response(
+            f"Invalid '{field_name}'. Expected format: YYYY-MM-DD."
+        )
+    return None
 
 @rpr.route('/', methods=['GET','POST'])
 def initial_page():
@@ -1272,23 +1286,38 @@ def create_credential():
         if missing:
             return error_response("Missing required fields.", missing)
         
+        if not isinstance(credential["meta"], dict):
+            return error_response(
+                "Field 'meta' must be an object."
+            )
+        
         claims = credential.get("claims", [])
         for claim in claims:
             missing = validate_required_fields(claim, ["path"])
             if missing:
                 return error_response("Missing required fields.", missing)
 
+            if not isinstance(claim["path"], list):
+                return error_response(
+                    "Field 'path' must be an array."
+                )
+
+            if len(claim["path"]) == 0:
+                return error_response(
+                    "Field 'path' cannot be empty."
+                )
+
     #insert data base
     for credential in credentials:
         format = credential.get("format")
-        meta = credential.get("meta")
+        meta = serialize_json(credential["meta"])
         claims = credential.get("claims", [])
         
         credential_id = db.insert_credential(format, meta, user_id)
         result.append(credential_id)
 
         for claim in claims:
-            path = claim.get("path")
+            path = serialize_json(claim["path"])
 
             db.insert_claim(credential_id, path)
     
@@ -1372,11 +1401,20 @@ def create_intended_use():
     #insert data base
     for intended_use in intended_uses:
         intendedUseIdentifier = intended_use.get("intendedUseIdentifier")
-        createdAt = intended_use.get("createdAt")
-        revokedAt = intended_use.get("revokedAt")
         purposes = intended_use.get("purpose", [])
         privacyPolicy_ids = intended_use.get("privacyPolicy_id", [])
         credential_ids = intended_use.get("credential_ids", [])
+
+        createdAt = intended_use.get("createdAt")
+        revokedAt = intended_use.get("revokedAt")
+
+        error = validate_date_field(createdAt, "createdAt")
+        if error:
+            return error
+
+        error = validate_date_field(revokedAt, "revokedAt")
+        if error:
+            return error
 
         intended_use_id = db.insert_intended_use(intendedUseIdentifier, createdAt, revokedAt, user_id)
         result.append(intended_use_id)
@@ -1620,11 +1658,16 @@ def create_provided_attestation():
         missing = validate_required_fields(providesAttestation, ["format", "meta"])
         if missing:
             return error_response("Missing required fields.", missing)
+        
+        if not isinstance(providesAttestation["meta"], dict):
+            return error_response(
+                "Field 'meta' must be an object."
+            )
     
     #insert data base
     for providesAttestation in providesAttestations:
         format = providesAttestation.get("format")
-        meta = providesAttestation.get("meta")
+        meta = serialize_json(providesAttestation["meta"])
         
         provided_attestation_id = db.insert_provided_attestation(format, meta, user_id)
         result.append(provided_attestation_id)
@@ -1763,7 +1806,7 @@ def create_wrp():
     #validation
     for wrp in wrps:
         missing = validate_required_fields(wrp, ["supportURI", "provider_id", "srvDescription", 
-                                                 "intendedUse_ids", "isPSB", "entitlements", 
+                                                 "isPSB", "entitlements", 
                                                  "supervisoryAuthority", "registryURI"])
         if missing:
             return error_response("Missing required fields.", missing)
@@ -1795,9 +1838,10 @@ def create_wrp():
         if user_id != db.check_provider(provider_id):
                 return error_invalid(f"The Provider ID {provider_id} does not belong to this user")
         
-        for intendedUse_id in intendedUse_ids:
-            if user_id != db.check_intendedUse(intendedUse_id):
-                return error_invalid(f"The intendedUse ID {intendedUse_id} does not belong to this user")
+        if intendedUse_ids:
+            for intendedUse_id in intendedUse_ids:
+                if user_id != db.check_intendedUse(intendedUse_id):
+                    return error_invalid(f"The intendedUse ID {intendedUse_id} does not belong to this user")
 
             if db.check_wrp_intendedUse(intendedUse_id) != []:
                 return error_invalid(f"Intended Use id {intendedUse_id} already belongs to other wallet relying party")
@@ -2576,7 +2620,7 @@ def intended_use_registration_certificate():
     response = requests.post(cfgserv.url_statuslist, headers=headers, data=data)
 
     status=response.json()
-
+    
     status_idx=status["status_list"]["idx"]
     status_uri=status["status_list"]["uri"]
 
@@ -2672,7 +2716,7 @@ def intended_use_registration_certificate():
         })
     
     with open(cfgserv.wrprc_certificate, "rb") as f:
-        cert = x509.load_der_x509_certificate(f.read(), default_backend())
+        cert = x509.load_pem_x509_certificate(f.read(), default_backend())
 
     base64_cert = base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode("utf-8")
     

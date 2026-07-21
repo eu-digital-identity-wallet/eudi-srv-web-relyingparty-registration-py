@@ -27,6 +27,12 @@ from db import get_db_connection as conn
 
 from app import logger
 
+def serialize_json(value):
+    return json.dumps(value) if value is not None else None
+
+def deserialize_json(value):
+    return json.loads(value) if value else None
+
 def check_user(hash_pid):
     try:
         connection = conn()
@@ -2691,7 +2697,7 @@ def get_provided_attestation(user_id):
             cursor = connection.cursor()
 
             query = """
-                SELECT 
+                SELECT
                     pa.id,
                     pa.format,
                     pa.meta
@@ -2708,7 +2714,7 @@ def get_provided_attestation(user_id):
                 result.append({
                     "provided_attestation_id": pa_id,
                     "format": format_,
-                    "meta": meta
+                    "meta": deserialize_json(meta)
                 })
 
             return result
@@ -3521,14 +3527,14 @@ def get_credentials(user_id):
                     result[cred_id] = {
                         "credential_id": cred_id,
                         "format": format,
-                        "meta": meta,
+                        "meta": deserialize_json(meta),
                         "claims": []
                     }
 
                 if claim_id:
                     result[cred_id]["claims"].append({
                         "claim_id": claim_id,
-                        "path": path
+                        "path": deserialize_json(path)
                     })
 
             return list(result.values())
