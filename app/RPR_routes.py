@@ -2823,13 +2823,14 @@ def intended_use_registration_certificate():
     
     document_with_signature=obtain_signed_document.json()["documentWithSignature"][0]
 
-    # data=json.loads(base64.b64decode(document_with_signature).decode("utf-8"))
+    data=json.loads(base64.b64decode(document_with_signature).decode("utf-8"))
 
-    # jwt_payload=data["payload"]
-    # jwt_header=data["signatures"][0]["protected"]
-    # jwt_signature=data["signatures"][0]["signature"]
+    jwt_payload=data["payload"]
+    jwt_header=data["signatures"][0]["protected"]
+    jwt_signature=data["signatures"][0]["signature"]
 
-    # jwt = jwt_header + "." + jwt_payload + "." + jwt_signature
+    jwt = jwt_header + "." + jwt_payload + "." + jwt_signature
+
     #cbor
 
     cbor_data= cbor2.dumps(json_payload)
@@ -2843,9 +2844,9 @@ def intended_use_registration_certificate():
     msg.key = cose_key
     cose_bytes = msg.encode()
 
-    file_data = base64.b64decode(document_with_signature)
+    #file_data = base64.b64decode(document_with_signature)
 
-    file_base64 = base64.b64encode(file_data).decode()
+    file_base64 = base64.urlsafe_b64encode(jwt.encode()).decode()
     cose_base64 = base64.urlsafe_b64encode(cose_bytes).decode()
 
     return jsonify({
