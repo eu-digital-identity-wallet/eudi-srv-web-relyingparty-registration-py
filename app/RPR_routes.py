@@ -2526,6 +2526,8 @@ def intended_use_registration_certificate():
     intended_use = db.get_intended_use_id(intended_use_id)
 
     wrp = db.get_wrp_intended_id(intended_use_id)
+    if wrp == []:
+        return error_invalid(f"Intended Use id {intended_use_id} doesn't have a Wallet Relying Party associated.")
 
     legal_entity = db.get_legal_entity_id(wrp[0]["provider_id"])
 
@@ -2636,7 +2638,7 @@ def intended_use_registration_certificate():
                         "country": country,
                         "sub": sub_id,
                         "privacy_policy": privacy_policy, 
-                        "policy_id": [ "{ itu-t(0) identified-organization(4) etsi(0) eudiwrpa(19475) policy-identifiers(3) wrprc (1)}" ],
+                        "policy_id": "0.4.0.19475.3.1",
                         "iat": iat, 
                         "credentials": credentials,
                         "entitlements": entitlement,
@@ -2696,7 +2698,7 @@ def intended_use_registration_certificate():
         
         legalName = legal_entity[0]["LegalPerson"]["legalName"][0]
         #legalName=legal_person[0]["legalName"]
-        certificate_policy = "itu-t(0) identified-organization(4) etsi(0) eudiwrp(194118) policy-identifiers(1) ncp-legal (2)"
+        certificate_policy = cfgserv.service_url + "certificate_policy"
         json_payload.update({
             "sub_ln": legalName,
             "certificate_policy":certificate_policy

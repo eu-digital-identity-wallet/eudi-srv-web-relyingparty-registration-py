@@ -3415,7 +3415,7 @@ def get_intended_use_id(intended_use_id):
                     if cred_id not in iu["credentials"]:
                         iu["credentials"][cred_id] = {
                             "format": cred_format,
-                            "meta": cred_meta,
+                            "meta": deserialize_json(cred_meta),
                             "claims": [],
                             "_claims_seen": set()
                         }
@@ -3425,7 +3425,7 @@ def get_intended_use_id(intended_use_id):
                     # CLAIMS
                     if claim_path and claim_path not in cred["_claims_seen"]:
                         cred["claims"].append({
-                            "path": claim_path
+                            "path": deserialize_json(claim_path)
                         })
                         cred["_claims_seen"].add(claim_path)
 
