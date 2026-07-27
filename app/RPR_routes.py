@@ -2580,7 +2580,7 @@ def intended_use_registration_certificate():
     # if wrp[0]["providesAttestations"]:
     #     providesAttestations = wrp[0]["providesAttestations"]
     public_body = wrp[0]["isPSB"]
-    service = wrp[0]["srvDescription"]
+    srv_description = wrp[0]["srvDescription"]
 
 # #A URI to a status list presenting information about validity of the WRPRC. 
 # #status=
@@ -2637,14 +2637,17 @@ def intended_use_registration_certificate():
                         "purpose": purpose, 
                         "country": country,
                         "sub": sub_id,
+                        "registry_uri": cfgserv.service_url,
                         "privacy_policy": privacy_policy, 
-                        "policy_id": "0.4.0.19475.3.1",
+                        "policy_id": [
+                            "0.4.0.19475.3.1"
+                        ],
                         "iat": iat, 
                         "credentials": credentials,
                         "entitlements": entitlement,
                         "public_body": False,
-                        "service": service,
-                        "supportURI":supportURI,
+                        "srv_description": srv_description,
+                        "support_uri":supportURI,
                         "status": { 
                             "status_list": { 
                                             "idx": status_idx, "uri": status_uri
@@ -2672,7 +2675,7 @@ def intended_use_registration_certificate():
             supervisory_authority["uri"] = sa["formURI"][0]
 
         if supervisory_authority:
-            json_payload["supervisory_Authority"] = supervisory_authority
+            json_payload["supervisory_authority"] = supervisory_authority
     
     if legal_entity[0]["LegalPerson"] is None:
         #se user for natural person
@@ -2683,7 +2686,7 @@ def intended_use_registration_certificate():
         # givenName=legal_entity[0]["givenName"]
         # #surname
         # surname=natural_person[0]["familyName"]
-        certificate_policy = "itu-t(0) identified-organization(4) etsi(0) eudiwrp(194118) policy-identifiers(1) ncp-natural (1)"
+        certificate_policy = cfgserv.service_url + "certificate_policy"
         json_payload.update({
             "sub_gn": givenName,
             "sub_fn":surname,

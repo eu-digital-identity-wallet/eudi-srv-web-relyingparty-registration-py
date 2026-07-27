@@ -2624,7 +2624,7 @@ def get_wrp_intended_id(intended_use_id):
 
                 # srvDescription
                 if lang and content:
-                    obj = {"lang": lang, "content": content}
+                    obj = {"lang": lang, "value": content}
                     if obj not in wrp["srvDescription"]:
                         wrp["srvDescription"].append(obj)
 
@@ -3395,7 +3395,7 @@ def get_intended_use_id(intended_use_id):
                     if key not in iu["_purpose_seen"]:
                         iu["purpose"].append({
                             "lang": lang,
-                            "content": content
+                            "value": content
                         })
                         iu["_purpose_seen"].add(key)
 
