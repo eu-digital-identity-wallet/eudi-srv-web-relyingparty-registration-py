@@ -2410,7 +2410,13 @@ def wrp_access_certificate():
         surname=legal_entity[0]["NaturalPerson"]["familyName"]
 
         first = legal_entity[0]["identifier"][0]
-        serial_number = (TypeIdentifier[first["type"]] + first["identifier"])
+        country_code = "XG" if TypeIdentifier[first['type']] == "LEI" else country
+
+        serial_number = (
+            f"{TypeIdentifier[first['type']]}"
+            f"{country_code}-"
+            f"{first['identifier']}"
+        )
 
         certificateRequest= generateCertificateRequest(priv_key=priv_key, commonName=tradeName, countryName=country, uniformResourceIdentifier=supportURI, 
                                                        givenName=givenName, surname=surname, serialNumber=serial_number, email=email)
@@ -2422,7 +2428,13 @@ def wrp_access_certificate():
         legalName = legal_entity[0]["LegalPerson"]["legalName"][0]
 
         first = legal_entity[0]["identifier"][0]
-        organizationIdentifier = (TypeIdentifier[first["type"]] + first["identifier"])
+        country_code = "XG" if TypeIdentifier[first['type']] == "LEI" else country
+
+        organizationIdentifier = (
+            f"{TypeIdentifier[first['type']]}"
+            f"{country_code}-"
+            f"{first['identifier']}"
+        )
         
         certificateRequest = generateCertificateRequest(priv_key=priv_key, commonName=tradeName, countryName=country, uniformResourceIdentifier=supportURI, 
                                                        organizationName=legalName, organizationIdentifier=organizationIdentifier, email=None)
@@ -2598,7 +2610,14 @@ def intended_use_registration_certificate():
     }
     
     identifier = legal_entity[0]["identifier"][0]
-    sub_id = TypeIdentifier[identifier["type"]] + '-' + id
+
+    country_code = "XG" if TypeIdentifier[identifier['type']] == "LEI" else country
+
+    sub_id = (
+        f"{TypeIdentifier[identifier['type']]}"
+        f"{country_code}-"
+        f"{identifier['identifier']}"
+    )
 
     #sub_id = TypeIdentifier[legal_entity[0]["identifierType"]] + '-' + id
 
@@ -2711,12 +2730,22 @@ def intended_use_registration_certificate():
         
         rp_intermediary = db.get_wrp_id(db.get_wrp_intermediary(wrp[0]["wrp_id"]))
         legalentity_intermediary = db.get_legal_entity_id(rp_intermediary[0]["provider_id"])
-        aux = TypeIdentifier[legalentity_intermediary[0]["identifier"][0]["type"]] + '-' + legalentity_intermediary[0]["identifier"][0]['identifier']
+
+        identifier = legalentity_intermediary[0]["identifier"][0]
+        country = legalentity_intermediary[0]["country"]
+
+        country_code = "XG" if TypeIdentifier[identifier['type']] == "LEI" else country
+
+        aux = (
+            f"{TypeIdentifier[identifier['type']]}"
+            f"{country_code}-"
+            f"{identifier['identifier']}"
+        )
 
         json_payload.update({
-            "intermediary":{
-                "sub":aux,
-                "sname":rp_intermediary[0]["trade_name"]
+            "intermediary": {
+                "sub": aux,
+                "sname": rp_intermediary[0]["trade_name"]
             }
         })
     
