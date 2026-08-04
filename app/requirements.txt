@@ -10,6 +10,6 @@ cryptography==46.0.7
 pymysql
 requests-pkcs12
 flasgger
-flask-swagger-ui
+flask-swagger-ui==5.32.12
 cryptojwt
 Authlib

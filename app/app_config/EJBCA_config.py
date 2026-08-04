@@ -30,23 +30,20 @@ from .config import ConfService as cfgserv
 
 class EJBCA_Config:
 
-    cahost=os.getenv("cahost")
-    clientP12ArchiveFilepath=os.getenv("clientP12ArchiveFilepath")
-    clientP12ArchivePassword=os.getenv("clientP12ArchivePassword")
+    cahost=os.getenv("CA_HOST")
+    clientP12ArchiveFilepath=os.getenv("CLIENTP12_ARCHIVE_FILEPATH")
+    clientP12ArchivePassword=os.getenv("CLIENTP12_ARCHIVE_PASSWORD")
     managementCA=os.getenv("managementCA")
 
     # Endpoint:
-    endpoint= "/certificate/pkcs10enroll"
+    endpoint= "/certificate/pkcs10enroll/certificate/pkcs10enroll"
     # Values required by the endpoint "/pkcs10enroll":
-    certificateProfileName= os.getenv("certificateProfileName")
-    endEntityProfileName= os.getenv("endEntityProfileName")
-
-    avCertificateProfile="mDL_Reader_Auth_AgeV_ISO_18013-7"
-    avEndEntityProfile="IACA_AgeV-mdocReader_ISO-18013-7"
+    certificateProfileName= os.getenv("CERTIFICATE_PROFILE_NAME")
+    endEntityProfileName= os.getenv("END_ENTITY_PROFILE_NAME")
 
 
-    username=os.getenv("EJBCA_username")
-    password=os.getenv("EJBCA_password")
+    username=os.getenv("EJBCA_USERNAME")
+    password=os.getenv("EJBCA_PASSWORD")
     includeChain= True
 
     countries={

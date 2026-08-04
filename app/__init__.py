@@ -53,8 +53,18 @@ import logging
 from logging.handlers import TimedRotatingFileHandler
 import os
 from app_config.database import ConfDataBase
-from flasgger import Swagger
+from flask_swagger_ui import get_swaggerui_blueprint
 
+SWAGGER_URL = "/swagger"
+API_URL = "/swagger/api.yaml"
+
+swaggerui_blueprint = get_swaggerui_blueprint(
+    SWAGGER_URL,
+    API_URL,
+    config={
+        "app_name": "Wallet RP API"
+    }
+)
 
 def setup_logger():
     log_dir = cfgserv.log_dir
@@ -201,7 +211,7 @@ def create_app():
 
     app = Flask(__name__, instance_relative_config=True)
 
-    Swagger(app, template_file="swagger/api.yaml")
+    app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
 
     app.config['SECRET_KEY'] = ConfService.secret_key
 

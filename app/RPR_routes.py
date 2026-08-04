@@ -96,6 +96,7 @@ import user as get_hash_user_pid
 from app.data_management import oid4vp_requests,p12_temp, certificate_data_List
 
 from app import logger
+from flask import send_from_directory
 
 rpr = Blueprint("RPR", __name__, url_prefix="/")
 
@@ -171,6 +172,10 @@ def list_response(message, result, name, code=200):
             name: result
         }
     }, code
+
+@rpr.route("/swagger/api.yaml")
+def swagger_yaml():
+    return send_from_directory("swagger", "api.yaml")
 
 def serialize_json(value):
     return json.dumps(value) if value is not None else None

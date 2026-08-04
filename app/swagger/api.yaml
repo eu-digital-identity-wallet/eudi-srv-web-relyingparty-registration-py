@@ -1,9 +1,162 @@
-swagger: "2.0"
+openapi: 3.0.3
+
 info:
   title: My API
   version: 1.0.0
 
+servers:
+  - url: https://registry.serviceproviders.eudiw.dev
+  - url: http://localhost:5000
+
 paths:
+  /authentication:
+    get:
+      tags:
+        - Authentication
+      summary: Start Authentication Flow
+      description: Starts a new authentication flow and returns the QR Code URL together with the presentation identifier.
+
+      responses:
+        "200":
+          description: Authentication initiated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  QR_code_url:
+                    type: string
+                    description: URL to generate/display the QR code for authentication.
+                    example: "https://example.com/qr/123456"
+
+                  presentation_id:
+                    type: string
+                    description: Transaction identifier for the authentication session.
+                    example: "550e8400-e29b-41d4-a716-446655440000"
+  /pid_authorization:
+    get:
+      tags:
+        - Authentication
+      summary: PID Authorization
+      description: Completes the PID authorization process using the presentation identifier.
+
+      parameters:
+        - in: query
+          name: presentation_id
+          required: true
+          description: Transaction identifier received from the authentication step.
+          schema:
+            type: string
+          example: "550e8400-e29b-41d4-a716-446655440000"
+
+      responses:
+        "200":
+          description: Authorization successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Success
+
+        "500":
+          description: Error during authorization request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "500"
+  /getpidoid4vp:
+    get:
+      tags:
+        - Authentication
+      summary: Get PID (OID4VP)
+      description: Retrieves the authenticated PID using the presentation identifier.
+
+      parameters:
+        - in: query
+          name: presentation_id
+          required: true
+          description: Transaction identifier received from the authentication step.
+          schema:
+            type: string
+          example: "550e8400-e29b-41d4-a716-446655440000"
+
+      responses:
+        "200":
+          description: PID retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "abc123hashpid"
+
+        "400":
+          description: Missing presentation_id
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  code:
+                    type: integer
+                    example: 400
+                  message:
+                    type: string
+                    example: Missing presentation_id
+
+    post:
+      tags:
+        - Authentication
+      summary: Get PID (OID4VP)
+      description: Retrieves the authenticated PID using the presentation identifier.
+
+      parameters:
+        - in: query
+          name: presentation_id
+          required: true
+          description: Transaction identifier received from the authentication step.
+          schema:
+            type: string
+          example: "550e8400-e29b-41d4-a716-446655440000"
+
+      responses:
+        "200":
+          description: PID retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "abc123hashpid"
+
+        "400":
+          description: Missing presentation_id
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  code:
+                    type: integer
+                    example: 400
+                  message:
+                    type: string
+                    example: Missing presentation_id
+
   /law/create:
     post:
       summary: Create Law
@@ -11,69 +164,82 @@ paths:
       tags:
         - Law
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - law
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
-                description: User session identifier
-              law:
-                type: array
-                items:
-                  type: object
-                  required:
-                    - legislativeIdentifier
-                  properties:
-                    legislativeIdentifier:
-                      type: string
-                      example: "GDPR-ART-6"
-                    legalBasis:
-                      type: array
-                      items:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - law
+              properties:
+                hash_pid:
+                  type: string
+                  description: User session identifier
+                  example: "abc123hash"
+
+                law:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - legislativeIdentifier
+                    properties:
+                      legislativeIdentifier:
                         type: string
-                      example: ["consent", "contract"]
+                        example: "GDPR-ART-6"
+
+                      legalBasis:
+                        type: array
+                        items:
+                          type: string
+                        example:
+                          - consent
+                          - contract
 
       responses:
-        200:
+        "200":
           description: Law created successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Law created successfully
-              data:
-                type: array
-                items:
-                  type: integer
-                example: [1, 2, 3]
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Law created successfully
+                  data:
+                    type: array
+                    items:
+                      type: integer
+                    example:
+                      - 1
+                      - 2
+                      - 3
 
-        400:
+        "400":
           description: Invalid input or missing fields
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Missing required fields
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Missing required fields
 
-        401:
+        "401":
           description: Invalid hash_pid
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Invalid hash_pid
-
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Invalid hash_pid
+                    
   /law/list:
     post:
       summary: List Laws
@@ -81,63 +247,71 @@ paths:
       tags:
         - Law
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
-                description: User session identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+              properties:
+                hash_pid:
+                  type: string
+                  description: User session identifier
+                  example: "abc123hash"
 
       responses:
-        200:
+        "200":
           description: Laws retrieved successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Law retrieved successfully
-              law:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 1
-                    legislativeIdentifier:
-                      type: string
-                      example: "GDPR-ART-6"
-                    legalBasis:
-                      type: array
-                      items:
-                        type: string
-                      example: ["consent", "contract"]
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Law retrieved successfully
+                  law:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        legislativeIdentifier:
+                          type: string
+                          example: "GDPR-ART-6"
+                        legalBasis:
+                          type: array
+                          items:
+                            type: string
+                          example:
+                            - consent
+                            - contract
 
-        400:
+        "400":
           description: Invalid input or missing fields
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Missing required fields
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Missing required fields
 
-        401:
+        "401":
           description: Invalid hash_pid
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Invalid hash_pid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Invalid hash_pid
 
   /legal_person/create:
     post:
@@ -146,61 +320,63 @@ paths:
       tags:
         - Legal Person
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - legalPerson
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - legalPerson
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
-              legalPerson:
-                type: array
-                items:
-                  type: object
-                  required:
-                    - legalName
-                  properties:
-                    legalName:
-                      type: array
-                      items:
-                        type: string
-                      example: ["Company A", "Company B"]
+                legalPerson:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - legalName
+                    properties:
+                      legalName:
+                        type: array
+                        items:
+                          type: string
+                        example: ["Company A", "Company B"]
 
-                    law:
-                      type: array
-                      items:
-                        type: integer
-                      example: [1, 2]
+                      law:
+                        type: array
+                        items:
+                          type: integer
+                        example: [1, 2]
 
       responses:
-        200:
+        "200":
           description: Legal Person created successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Legal Person created successfully
-              data:
-                type: array
-                items:
-                  type: integer
-                example: [1, 2]
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Legal Person created successfully
+                  data:
+                    type: array
+                    items:
+                      type: integer
+                    example: [1, 2]
 
-        400:
+        "400":
           description: Invalid input or missing fields
 
-        401:
+        "401":
           description: Invalid hash_pid
 
-        403:
+        "403":
           description: Law or Legal Person does not belong to user
 
 
@@ -211,53 +387,54 @@ paths:
       tags:
         - Legal Person
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
       responses:
-        200:
+        "200":
           description: Legal Persons retrieved successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Legal Persons retrieved successfully
-              legal_person:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 1
-                    legalName:
-                      type: array
-                      items:
-                        type: string
-                      example: ["Company A"]
-                    law:
-                      type: array
-                      items:
-                        type: integer
-                      example: [1, 2]
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Legal Persons retrieved successfully
+                  legal_person:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        legalName:
+                          type: array
+                          items:
+                            type: string
+                          example: ["Company A"]
+                        law:
+                          type: array
+                          items:
+                            type: integer
+                          example: [1, 2]
 
-        400:
+        "400":
           description: Invalid input or missing fields
 
-        401:
+        "401":
           description: Invalid hash_pid
-
 
   /legal_person/update_law:
     post:
@@ -266,44 +443,43 @@ paths:
       tags:
         - Legal Person
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - legal_person_id
-              - law_ids
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - legal_person_id
+                - law_ids
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
-              legal_person_id:
-                type: integer
-                example: 1
-
-              law_ids:
-                type: array
-                items:
+                legal_person_id:
                   type: integer
-                example: [1, 2]
+                  example: 1
+
+                law_ids:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 2]
 
       responses:
-        200:
+        "200":
           description: Legal person law associations updated successfully
 
-        400:
+        "400":
           description: Invalid input or missing fields
 
-        401:
+        "401":
           description: Invalid hash_pid
 
-        403:
+        "403":
           description: Resource does not belong to user
-
 
   /legal_person/remove_law:
     post:
@@ -312,44 +488,44 @@ paths:
       tags:
         - Legal Person
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - legal_person_id
-              - law_ids
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - legal_person_id
+                - law_ids
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
-              legal_person_id:
-                type: integer
-                example: 1
-
-              law_ids:
-                type: array
-                items:
+                legal_person_id:
                   type: integer
-                example: [1, 2]
+                  example: 1
+
+                law_ids:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 2]
 
       responses:
-        200:
+        "200":
           description: Legal person law associations removed successfully
 
-        400:
+        "400":
           description: Invalid input or missing fields
 
-        401:
+        "401":
           description: Invalid hash_pid
 
-        403:
+        "403":
           description: Resource does not belong to user
-  
+
   /natural_person/create:
     post:
       summary: Create Natural Person
@@ -357,64 +533,66 @@ paths:
       tags:
         - Natural Person
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - naturalPerson
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - naturalPerson
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
-              naturalPerson:
-                type: array
-                items:
-                  type: object
-                  required:
-                    - familyName
-                    - givenName
-                  properties:
-                    familyName:
-                      type: string
-                      example: "Silva"
+                naturalPerson:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - familyName
+                      - givenName
+                    properties:
+                      familyName:
+                        type: string
+                        example: "Silva"
 
-                    givenName:
-                      type: string
-                      example: "João"
+                      givenName:
+                        type: string
+                        example: "João"
 
-                    dateOfBirth:
-                      type: string
-                      format: date
-                      example: "1990-05-20"
+                      dateOfBirth:
+                        type: string
+                        format: date
+                        example: "1990-05-20"
 
-                    placeOfBirth:
-                      type: string
-                      example: "Porto"
+                      placeOfBirth:
+                        type: string
+                        example: "Porto"
 
       responses:
-        200:
+        "200":
           description: Natural Person created successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Natural Person created successfully
-              data:
-                type: array
-                items:
-                  type: integer
-                example: [1, 2]
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Natural Person created successfully
+                  data:
+                    type: array
+                    items:
+                      type: integer
+                    example: [1, 2]
 
-        400:
+        "400":
           description: Invalid input or missing fields
 
-        401:
+        "401":
           description: Invalid hash_pid
 
   /natural_person/list:
@@ -424,55 +602,57 @@ paths:
       tags:
         - Natural Person
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
       responses:
-        200:
+        "200":
           description: Natural Persons retrieved successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Natural Persons retrieved successfully
-              natural_person:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 1
-                    familyName:
-                      type: string
-                      example: "Silva"
-                    givenName:
-                      type: string
-                      example: "João"
-                    dateOfBirth:
-                      type: string
-                      example: "1990-05-20"
-                    placeOfBirth:
-                      type: string
-                      example: "Porto"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Natural Persons retrieved successfully
+                  natural_person:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        familyName:
+                          type: string
+                          example: "Silva"
+                        givenName:
+                          type: string
+                          example: "João"
+                        dateOfBirth:
+                          type: string
+                          example: "1990-05-20"
+                        placeOfBirth:
+                          type: string
+                          example: "Porto"
 
-        400:
+        "400":
           description: Invalid input or missing fields
 
-        401:
+        "401":
           description: Invalid hash_pid
-  
+
   /identifier/create:
     post:
       summary: Create Identifier
@@ -480,65 +660,69 @@ paths:
       tags:
         - Identifier
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - identifier
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - identifier
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
-              identifier:
-                type: array
-                items:
-                  type: object
-                  required:
-                    - identifier
-                    - type
-                  properties:
-                    identifier:
-                      type: string
-                      example: "PT123456789"
+                identifier:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - identifier
+                      - type
+                    properties:
+                      identifier:
+                        type: string
+                        example: "PT123456789"
 
-                    type:
-                      type: string
-                      enum: ["http://data.europa.eu/eudi/id/EORI-No",
-                              "http://data.europa.eu/eudi/id/LEI" ,
-                              "http://data.europa.eu/eudi/id/EUID" ,
-                              "http://data.europa.eu/eudi/id/VATIN"  ,
-                              "http://data.europa.eu/eudi/id/TIN" ,
-                              "http://data.europa.eu/eudi/id/Excise"]
-                      description: Type of identifier (must match allowed values)
+                      type:
+                        type: string
+                        enum:
+                          - "http://data.europa.eu/eudi/id/EORI-No"
+                          - "http://data.europa.eu/eudi/id/LEI"
+                          - "http://data.europa.eu/eudi/id/EUID"
+                          - "http://data.europa.eu/eudi/id/VATIN"
+                          - "http://data.europa.eu/eudi/id/TIN"
+                          - "http://data.europa.eu/eudi/id/Excise"
+                        description: Type of identifier (must match allowed values)
 
       responses:
-        200:
+        "200":
           description: Identifier created successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Identifier created successfully
-              data:
-                type: array
-                items:
-                  type: integer
-                example: [1, 2]
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Identifier created successfully
+                  data:
+                    type: array
+                    items:
+                      type: integer
+                    example: [1, 2]
 
-        400:
+        "400":
           description: Invalid input or missing fields
 
-        401:
+        "401":
           description: Invalid hash_pid
 
-        403:
+        "403":
           description: Invalid identifier type
+
 
   /identifier/list:
     post:
@@ -547,49 +731,52 @@ paths:
       tags:
         - Identifier
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
       responses:
-        200:
+        "200":
           description: Identifiers retrieved successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Identifiers retrieved successfully
-              identifier:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 1
-                    identifier:
-                      type: string
-                      example: "PT123456789"
-                    type:
-                      type: string
-                      example: "VAT"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Identifiers retrieved successfully
+                  identifier:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        identifier:
+                          type: string
+                          example: "PT123456789"
+                        type:
+                          type: string
+                          example: "VAT"
 
-        400:
+        "400":
           description: Invalid input or missing fields
 
-        401:
+        "401":
           description: Invalid hash_pid
-  
+
+
   /legal_entity/create:
     post:
       summary: Create Legal Entity
@@ -597,90 +784,93 @@ paths:
       tags:
         - Legal Entity
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - legal_entity
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - legal_entity
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
-              legal_entity:
-                type: array
-                items:
-                  type: object
-                  required:
-                    - identifiers
-                    - country
-                  properties:
-                    legal_person_id:
-                      type: integer
-                      example: 1
-
-                    identifiers:
-                      type: array
-                      items:
+                legal_entity:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - identifiers
+                      - country
+                    properties:
+                      legal_person_id:
                         type: integer
-                      example: [1, 2]
+                        example: 1
 
-                    country:
-                      type: string
-                      example: "PT"
-                      description: Must be a valid EU country code
+                      identifiers:
+                        type: array
+                        items:
+                          type: integer
+                        example: [1, 2]
 
-                    postalAddress:
-                      type: array
-                      items:
+                      country:
                         type: string
-                      example: ["Rua A, Porto"]
+                        description: Must be a valid EU country code
+                        example: "PT"
 
-                    email:
-                      type: array
-                      items:
-                        type: string
-                      example: ["test@email.com"]
+                      postalAddress:
+                        type: array
+                        items:
+                          type: string
+                        example: ["Rua A, Porto"]
 
-                    phone:
-                      type: array
-                      items:
-                        type: string
-                      example: ["+351912345678"]
+                      email:
+                        type: array
+                        items:
+                          type: string
+                        example: ["test@email.com"]
 
-                    infoURI:
-                      type: array
-                      items:
-                        type: string
-                      example: ["https://example.com"]
+                      phone:
+                        type: array
+                        items:
+                          type: string
+                        example: ["+351912345678"]
+
+                      infoURI:
+                        type: array
+                        items:
+                          type: string
+                        example: ["https://example.com"]
 
       responses:
-        200:
+        "200":
           description: Legal Entity created successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Legal Entity created successfully
-              data:
-                type: array
-                items:
-                  type: integer
-                example: [1]
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Legal Entity created successfully
+                  data:
+                    type: array
+                    items:
+                      type: integer
+                    example: [1]
 
-        400:
+        "400":
           description: Invalid input or missing fields
 
-        401:
+        "401":
           description: Invalid hash_pid
 
-        403:
+        "403":
           description: Resource does not belong to user
+
 
   /legal_entity/list:
     post:
@@ -689,51 +879,54 @@ paths:
       tags:
         - Legal Entity
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
       responses:
-        200:
+        "200":
           description: Legal Entities retrieved successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Legal Entity retrieved successfully
-              legal_entity:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 1
-                    country:
-                      type: string
-                      example: "PT"
-                    identifiers:
-                      type: array
-                      items:
-                        type: integer
-                      example: [1, 2]
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Legal Entity retrieved successfully
+                  legal_entity:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        country:
+                          type: string
+                          example: "PT"
+                        identifiers:
+                          type: array
+                          items:
+                            type: integer
+                          example: [1, 2]
 
-        400:
+        "400":
           description: Invalid input or missing fields
 
-        401:
+        "401":
           description: Invalid hash_pid
-    
+
+
   /legal_entity/update_identifier:
     post:
       summary: Add Identifiers to Legal Entity
@@ -741,43 +934,44 @@ paths:
       tags:
         - Legal Entity
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - legal_entity_id
-              - identifier_ids
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - legal_entity_id
+                - identifier_ids
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
-              legal_entity_id:
-                type: integer
-                example: 1
-
-              identifier_ids:
-                type: array
-                items:
+                legal_entity_id:
                   type: integer
-                example: [1, 2]
+                  example: 1
+
+                identifier_ids:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 2]
 
       responses:
-        200:
+        "200":
           description: Identifiers associated successfully
 
-        400:
+        "400":
           description: Invalid input
 
-        401:
+        "401":
           description: Invalid hash_pid
 
-        403:
+        "403":
           description: Resource does not belong to user
+
 
   /legal_entity/remove_identifier:
     post:
@@ -786,43 +980,44 @@ paths:
       tags:
         - Legal Entity
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - legal_entity_id
-              - identifier_ids
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - legal_entity_id
+                - identifier_ids
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
-              legal_entity_id:
-                type: integer
-                example: 1
-
-              identifier_ids:
-                type: array
-                items:
+                legal_entity_id:
                   type: integer
-                example: [1]
+                  example: 1
+
+                identifier_ids:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1]
 
       responses:
-        200:
+        "200":
           description: Identifiers removed successfully
 
-        400:
+        "400":
           description: Invalid request (e.g. trying to remove all identifiers)
 
-        401:
+        "401":
           description: Invalid hash_pid
 
-        403:
+        "403":
           description: Resource does not belong to user
+
 
   /policy/create:
     post:
@@ -831,72 +1026,77 @@ paths:
       tags:
         - Policy
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - policy
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - policy
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
-              policy:
-                type: array
-                items:
-                  type: object
-                  required:
-                    - policyURI
-                    - type
-                    - intention
-                  properties:
-                    policyURI:
-                      type: string
-                      example: "https://example.com/privacy-policy"
+                policy:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - policyURI
+                      - type
+                      - intention
+                    properties:
+                      policyURI:
+                        type: string
+                        example: "https://example.com/privacy-policy"
 
-                    intention:
-                      type: string
-                      enum: ["wrp", "intended_use"]
-                      example: "wrp"
-                      description: Defines the purpose of the policy
+                      intention:
+                        type: string
+                        enum:
+                          - wrp
+                          - intended_use
+                        example: "wrp"
+                        description: Defines the purpose of the policy
 
-                    type:
-                      type: string
-                      enum: ["http://data.europa.eu/eudi/policy/trust-service-practice-statement",
-                        "http://data.europa.eu/eudi/policy/terms-and-conditions",
-                        "http://data.europa.eu/eudi/policy/privacy-statement",
-                        "http://data.europa.eu/eudi/policy/privacy-policy",
-                        "http://data.europa.eu/eudi/policy/registration-policy"]
-                      description: Type depends on intention (wrp or intended_use)
+                      type:
+                        type: string
+                        enum:
+                          - "http://data.europa.eu/eudi/policy/trust-service-practice-statement"
+                          - "http://data.europa.eu/eudi/policy/terms-and-conditions"
+                          - "http://data.europa.eu/eudi/policy/privacy-statement"
+                          - "http://data.europa.eu/eudi/policy/privacy-policy"
+                          - "http://data.europa.eu/eudi/policy/registration-policy"
+                        description: Type depends on intention (wrp or intended_use)
 
       responses:
-        200:
+        "200":
           description: Policy created successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Policy created successfully
-              data:
-                type: array
-                items:
-                  type: integer
-                example: [1, 2]
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Policy created successfully
+                  data:
+                    type: array
+                    items:
+                      type: integer
+                    example: [1, 2]
 
-        400:
+        "400":
           description: Invalid input or missing fields
 
-        401:
+        "401":
           description: Invalid hash_pid
 
-        403:
+        "403":
           description: Invalid policy type or intention
-  
+
   /policy/list:
     post:
       summary: List Policies
@@ -904,51 +1104,54 @@ paths:
       tags:
         - Policy
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
       responses:
-        200:
+        "200":
           description: Policies retrieved successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Policies retrieved successfully
-              policy:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 1
-                    policyURI:
-                      type: string
-                      example: "https://example.com/privacy-policy"
-                    type:
-                      type: string
-                      example: "PRIVACY_POLICY"
-                    intention:
-                      type: string
-                      example: "wrp"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Policies retrieved successfully
+                  policy:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        policyURI:
+                          type: string
+                          example: "https://example.com/privacy-policy"
+                        type:
+                          type: string
+                          example: "PRIVACY_POLICY"
+                        intention:
+                          type: string
+                          example: "wrp"
 
-        400:
+        "400":
           description: Invalid input or missing fields
 
-        401:
+        "401":
           description: Invalid hash_pid
+
 
   /provider/create:
     post:
@@ -957,77 +1160,80 @@ paths:
       tags:
         - Provider
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - provider
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - provider
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
-              provider:
-                type: array
-                items:
-                  type: object
-                  required:
-                    - legalEntityId
-                    - providerType
-                    - policy_id
-                  properties:
-                    legalEntityId:
-                      type: integer
-                      example: 1
-
-                    providerType:
-                      type: string
-                      example: "WALLET_PROVIDER"
-
-                    policy_id:
-                      type: array
-                      items:
+                provider:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - legalEntityId
+                      - providerType
+                      - policy_id
+                    properties:
+                      legalEntityId:
                         type: integer
-                      example: [1, 2]
-                      description: Must be policies with intention 'wrp'
+                        example: 1
 
-                    x5c:
-                      type: array
-                      items:
+                      providerType:
                         type: string
-                      example:
-                        - "MIIC...base64cert1"
-                        - "MIIC...base64cert2"
-                      description: Certificate chain (optional)
+                        example: "WALLET_PROVIDER"
+
+                      policy_id:
+                        type: array
+                        description: Must be policies with intention 'wrp'
+                        items:
+                          type: integer
+                        example: [1, 2]
+
+                      x5c:
+                        type: array
+                        description: Certificate chain (optional)
+                        items:
+                          type: string
+                        example:
+                          - "MIIC...base64cert1"
+                          - "MIIC...base64cert2"
 
       responses:
-        200:
+        "200":
           description: Provider created successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Provider created successfully
-              data:
-                type: array
-                items:
-                  type: integer
-                example: [1]
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Provider created successfully
+                  data:
+                    type: array
+                    items:
+                      type: integer
+                    example: [1]
 
-        400:
+        "400":
           description: Invalid input or missing fields
 
-        401:
+        "401":
           description: Invalid hash_pid
 
-        403:
+        "403":
           description: Resource does not belong to user or invalid policy type
-  
+
+
   /provider/list:
     post:
       summary: List Providers
@@ -1035,54 +1241,57 @@ paths:
       tags:
         - Provider
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
       responses:
-        200:
+        "200":
           description: Providers retrieved successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Providers retrieved successfully
-              provider:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 1
-                    legalEntityId:
-                      type: integer
-                      example: 1
-                    providerType:
-                      type: string
-                      example: "WALLET_PROVIDER"
-                    policies:
-                      type: array
-                      items:
-                        type: integer
-                      example: [1, 2]
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Providers retrieved successfully
+                  provider:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        legalEntityId:
+                          type: integer
+                          example: 1
+                        providerType:
+                          type: string
+                          example: "WALLET_PROVIDER"
+                        policies:
+                          type: array
+                          items:
+                            type: integer
+                          example: [1, 2]
 
-        400:
+        "400":
           description: Invalid input or missing fields
 
-        401:
+        "401":
           description: Invalid hash_pid
-  
+
+
   /provider/update_policy:
     post:
       summary: Add Policies to Provider
@@ -1090,43 +1299,44 @@ paths:
       tags:
         - Provider
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - provider_id
-              - policy_ids
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - provider_id
+                - policy_ids
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
-              provider_id:
-                type: integer
-                example: 1
-
-              policy_ids:
-                type: array
-                items:
+                provider_id:
                   type: integer
-                example: [1, 2]
+                  example: 1
+
+                policy_ids:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 2]
 
       responses:
-        200:
+        "200":
           description: Policies associated successfully
 
-        400:
+        "400":
           description: Invalid input
 
-        401:
+        "401":
           description: Invalid hash_pid
 
-        403:
+        "403":
           description: Policy does not belong to user or invalid type
+
 
   /provider/remove_policy:
     post:
@@ -1135,43 +1345,44 @@ paths:
       tags:
         - Provider
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - provider_id
-              - policy_ids
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - provider_id
+                - policy_ids
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
-              provider_id:
-                type: integer
-                example: 1
-
-              policy_ids:
-                type: array
-                items:
+                provider_id:
                   type: integer
-                example: [1]
+                  example: 1
+
+                policy_ids:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1]
 
       responses:
-        200:
+        "200":
           description: Policies removed successfully
 
-        400:
+        "400":
           description: Invalid request (e.g. removing all policies)
 
-        401:
+        "401":
           description: Invalid hash_pid
 
-        403:
+        "403":
           description: Resource does not belong to user
+
 
   /credential/create:
     post:
@@ -1180,70 +1391,77 @@ paths:
       tags:
         - Credential
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - credentials
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - credentials
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
-              credentials:
-                type: array
-                items:
-                  type: object
-                  required:
-                    - format
-                    - meta
-                    - claims
-                  properties:
-                    format:
-                      type: string
-                      example: "jwt_vc"
-                      description: Credential format
+                credentials:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - format
+                      - meta
+                      - claims
+                    properties:
+                      format:
+                        type: string
+                        example: "jwt_vc"
 
-                    meta:
-                      type: string
-                      example: "PID Credential"
-
-                    claims:
-                      type: array
-                      items:
+                      meta:
                         type: object
-                        required:
-                          - path
-                        properties:
-                          path:
-                            type: string
-                            example: "$.credentialSubject.name"
-                            description: JSON path of the claim
+                        example:
+                          vct_values:
+                            - "urn:eudi:pid:1"
+
+                      claims:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - path
+                          properties:
+                            path:
+                              type: array
+                              description: Non-empty array of strings, nulls and non-negative integers.
+                              items: {}
+                              example:
+                                - "credentialSubject"
+                                - "family_name"
 
       responses:
-        200:
+        "200":
           description: Credential created successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Credential created successfully
-              data:
-                type: array
-                items:
-                  type: integer
-                example: [1, 2]
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Credential created successfully
+                  data:
+                    type: array
+                    items:
+                      type: integer
+                    example: [1, 2]
 
-        400:
+        "400":
           description: Invalid input or missing fields
 
-        401:
+        "401":
           description: Invalid hash_pid
+
 
   /credential/list:
     post:
@@ -1252,59 +1470,65 @@ paths:
       tags:
         - Credential
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
       responses:
-        200:
+        "200":
           description: Credentials retrieved successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Credentials retrieved successfully
-              credential:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 1
-                    format:
-                      type: string
-                      example: "jwt_vc"
-                    meta:
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Credentials retrieved successfully
+                  credential:
+                    type: array
+                    items:
                       type: object
-                      example:
-                        name: "PID Credential"
-                        version: "1.0"
-                    claims:
-                      type: array
-                      items:
-                        type: object
-                        properties:
-                          path:
-                            type: string
-                            example: "$.credentialSubject.name"
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        format:
+                          type: string
+                          example: "jwt_vc"
+                        meta:
+                          type: object
+                          example:
+                            vct_values:
+                              - "urn:eudi:pid:1"
+                        claims:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              path:
+                                type: array
+                                items: {}
+                                example:
+                                  - "credentialSubject"
+                                  - "family_name"
 
-        400:
+        "400":
           description: Invalid input or missing fields
 
-        401:
+        "401":
           description: Invalid hash_pid
-    
+
+
   /intended_use/create:
     post:
       summary: Create Intended Use
@@ -1312,99 +1536,101 @@ paths:
       tags:
         - Intended Use
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - intended_uses
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - intended_uses
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
-              intended_uses:
-                type: array
-                items:
-                  type: object
-                  required:
-                    - intendedUseIdentifier
-                    - createdAt
-                    - revokedAt
-                    - purpose
-                    - privacyPolicy_id
-                    - credential_ids
-                  properties:
-                    intendedUseIdentifier:
-                      type: string
-                      example: "USE-001"
+                intended_uses:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - intendedUseIdentifier
+                      - createdAt
+                      - revokedAt
+                      - purpose
+                      - privacyPolicy_id
+                      - credential_ids
+                    properties:
+                      intendedUseIdentifier:
+                        type: string
+                        example: "USE-001"
 
-                    createdAt:
-                      type: string
-                      format: date-time
-                      example: "2026-01-01T10:00:00Z"
+                      createdAt:
+                        type: string
+                        format: date
+                        example: "2026-01-01"
 
-                    revokedAt:
-                      type: string
-                      format: date-time
-                      example: "2027-01-01T10:00:00Z"
+                      revokedAt:
+                        type: string
+                        format: date
+                        example: "2027-01-01"
 
-                    purpose:
-                      type: array
-                      items:
-                        type: object
-                        required:
-                          - lang
-                          - content
-                        properties:
-                          lang:
-                            type: string
-                            example: "en"
-                            description: Must be a valid EU language code
-                          content:
-                            type: string
-                            example: "Identity verification"
+                      purpose:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - lang
+                            - content
+                          properties:
+                            lang:
+                              type: string
+                              description: Must be a valid EU language code
+                              example: "en"
+                            content:
+                              type: string
+                              example: "Identity verification"
 
-                    privacyPolicy_id:
-                      type: array
-                      items:
-                        type: integer
-                      example: [1, 2]
-                      description: Must be valid intended_use policy types
+                      privacyPolicy_id:
+                        type: array
+                        description: Must be valid intended_use policy types
+                        items:
+                          type: integer
+                        example: [1, 2]
 
-                    credential_ids:
-                      type: array
-                      items:
-                        type: integer
-                      example: [1, 2]
+                      credential_ids:
+                        type: array
+                        items:
+                          type: integer
+                        example: [1, 2]
 
       responses:
-        200:
+        "200":
           description: Intended Use created successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Intended Use created successfully
-              data:
-                type: array
-                items:
-                  type: integer
-                example: [1]
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Intended Use created successfully
+                  data:
+                    type: array
+                    items:
+                      type: integer
+                    example: [1]
 
-        400:
+        "400":
           description: Invalid input or missing fields
 
-        401:
+        "401":
           description: Invalid hash_pid
 
-        403:
+        "403":
           description: Resource does not belong to user or invalid type
-  
+
   /intended_use/list:
     post:
       summary: List Intended Uses
@@ -1412,129 +1638,134 @@ paths:
       tags:
         - Intended Use
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
       responses:
-        200:
+        "200":
           description: Intended Uses retrieved successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Intended Use retrieved successfully
-              intended_use:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 1
-                    intendedUseIdentifier:
-                      type: string
-                      example: "USE-001"
-                    purposes:
-                      type: array
-                      items:
-                        type: object
-                        properties:
-                          lang:
-                            type: string
-                            example: "en"
-                          content:
-                            type: string
-                            example: "Identity verification"
-                    policies:
-                      type: array
-                      items:
-                        type: integer
-                      example: [1, 2]
-                    credentials:
-                      type: array
-                      items:
-                        type: integer
-                      example: [1, 2]
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Intended Use retrieved successfully
+                  intended_use:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        intendedUseIdentifier:
+                          type: string
+                          example: "USE-001"
+                        purposes:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              lang:
+                                type: string
+                                example: "en"
+                              content:
+                                type: string
+                                example: "Identity verification"
+                        policies:
+                          type: array
+                          items:
+                            type: integer
+                          example: [1, 2]
+                        credentials:
+                          type: array
+                          items:
+                            type: integer
+                          example: [1, 2]
 
-        400:
+        "400":
           description: Invalid input
 
-        401:
+        "401":
           description: Invalid hash_pid
-  
+
+
   /intended_use/update_credential:
     post:
       summary: Add Credentials to Intended Use
       tags:
         - Intended Use
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - intended_use_id
-              - credential_ids
-            properties:
-              hash_pid:
-                type: string
-              intended_use_id:
-                type: integer
-                example: 1
-              credential_ids:
-                type: array
-                items:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - intended_use_id
+                - credential_ids
+              properties:
+                hash_pid:
+                  type: string
+                intended_use_id:
                   type: integer
-                example: [1, 2]
+                  example: 1
+                credential_ids:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 2]
 
       responses:
-        200:
+        "200":
           description: Credentials associated successfully
-  
+
+
   /intended_use/update_policy:
     post:
       summary: Add Policies to Intended Use
       tags:
         - Intended Use
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - intended_use_id
-              - policy_ids
-            properties:
-              hash_pid:
-                type: string
-              intended_use_id:
-                type: integer
-              policy_ids:
-                type: array
-                items:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - intended_use_id
+                - policy_ids
+              properties:
+                hash_pid:
+                  type: string
+                intended_use_id:
                   type: integer
+                policy_ids:
+                  type: array
+                  items:
+                    type: integer
 
       responses:
-        200:
+        "200":
           description: Policies associated successfully
-  
+
+
   /intended_use/remove_credential:
     post:
       summary: Remove Credentials from Intended Use
@@ -1542,30 +1773,31 @@ paths:
       tags:
         - Intended Use
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - intended_use_id
-              - credential_ids
-            properties:
-              hash_pid:
-                type: string
-              intended_use_id:
-                type: integer
-              credential_ids:
-                type: array
-                items:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - intended_use_id
+                - credential_ids
+              properties:
+                hash_pid:
+                  type: string
+                intended_use_id:
                   type: integer
+                credential_ids:
+                  type: array
+                  items:
+                    type: integer
 
       responses:
-        200:
+        "200":
           description: Credentials removed successfully
-  
+
+
   /intended_use/remove_policy:
     post:
       summary: Remove Policies from Intended Use
@@ -1573,30 +1805,31 @@ paths:
       tags:
         - Intended Use
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - intended_use_id
-              - policy_ids
-            properties:
-              hash_pid:
-                type: string
-              intended_use_id:
-                type: integer
-              policy_ids:
-                type: array
-                items:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - intended_use_id
+                - policy_ids
+              properties:
+                hash_pid:
+                  type: string
+                intended_use_id:
                   type: integer
+                policy_ids:
+                  type: array
+                  items:
+                    type: integer
 
       responses:
-        200:
+        "200":
           description: Policies removed successfully
-  
+
+
   /provided_attestation/create:
     post:
       summary: Create Provided Attestation
@@ -1604,72 +1837,64 @@ paths:
       tags:
         - Provided Attestation
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - providesAttestations
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
-                description: User session identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - providesAttestations
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
+                  description: User session identifier
 
-              providesAttestations:
-                type: array
-                items:
-                  type: object
-                  required:
-                    - format
-                    - meta
-                  properties:
-                    format:
-                      type: string
-                      example: "jwt"
-                      description: Credential format (e.g., jwt, sd-jwt, mdoc)
+                providesAttestations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - format
+                      - meta
+                    properties:
+                      format:
+                        type: string
+                        example: "jwt"
+                        description: Credential format (e.g., jwt, sd-jwt, mdoc)
 
-                    meta:
-                      type: string
-                      example: "issuer metadata info"
-                      description: Additional metadata associated with the attestation
+                      meta:
+                        type: object
+                        example:
+                          vct_values:
+                            - "urn:eudi:pid:1"
 
       responses:
-        200:
+        "200":
           description: Provided Attestation created successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Provided Attestation created successfully
-              data:
-                type: array
-                items:
-                  type: integer
-                example: [1, 2]
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Provided Attestation created successfully
+                  data:
+                    type: array
+                    items:
+                      type: integer
+                    example: [1, 2]
 
-        400:
+        "400":
           description: Invalid input or missing fields
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Missing required fields
 
-        401:
+        "401":
           description: Invalid hash_pid
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Invalid hash_pid
-  
+
+
   /provided_attestation/list:
     post:
       summary: List Provided Attestations
@@ -1677,48 +1902,53 @@ paths:
       tags:
         - Provided Attestation
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
       responses:
-        200:
+        "200":
           description: Provided attestations retrieved successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Provided attestation retrieved successfully
-              provided_attestation:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 1
-                    format:
-                      type: string
-                      example: "jwt"
-                    meta:
-                      type: string
-                      example: "issuer metadata info"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Provided attestation retrieved successfully
+                  provided_attestation:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        format:
+                          type: string
+                          example: "jwt"
+                        meta:
+                          type: object
+                          example:
+                            vct_values:
+                              - "urn:eudi:pid:1"
 
-        400:
+        "400":
           description: Invalid input or missing fields
 
-        401:
+        "401":
           description: Invalid hash_pid
+
 
   /supervisory_authority/create:
     post:
@@ -1727,89 +1957,88 @@ paths:
       tags:
         - Supervisory Authority
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - supervisoryAuthority
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
-                description: User session identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - supervisoryAuthority
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
+                  description: User session identifier
 
-              supervisoryAuthority:
-                type: array
-                items:
-                  type: object
-                  required:
-                    - name
-                    - country
-                  properties:
-                    name:
-                      type: string
-                      example: "CNPD"
-                      description: Name of the supervisory authority
-
-                    country:
-                      type: string
-                      example: "PT"
-                      description: Must be a valid EU country code
-
-                    email:
-                      type: array
-                      items:
+                supervisoryAuthority:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - country
+                    properties:
+                      name:
                         type: string
-                        format: email
-                      example: ["geral@cnpd.pt"]
+                        example: "CNPD"
 
-                    formURI:
-                      type: array
-                      items:
+                      country:
                         type: string
-                        format: uri
-                      example: ["https://www.cnpd.pt/contactos"]
+                        description: Must be a valid EU country code
+                        example: "PT"
 
-                    phone:
-                      type: array
-                      items:
-                        type: string
-                      example: ["+351213928400"]
+                      email:
+                        type: array
+                        items:
+                          type: string
+                          format: email
+                        example:
+                          - "geral@cnpd.pt"
+
+                      formURI:
+                        type: array
+                        items:
+                          type: string
+                          format: uri
+                        example:
+                          - "https://www.cnpd.pt/contactos"
+
+                      phone:
+                        type: array
+                        items:
+                          type: string
+                        example:
+                          - "+351213928400"
 
       responses:
-        200:
+        "200":
           description: Supervisory Authority created successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Supervisory Authority created successfully
-              data:
-                type: array
-                items:
-                  type: integer
-                example: [1]
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Supervisory Authority created successfully
+                  data:
+                    type: array
+                    items:
+                      type: integer
+                    example: [1]
 
-        400:
+        "400":
           description: Invalid input or missing fields
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Missing required fields
 
-        401:
+        "401":
           description: Invalid hash_pid
 
-        403:
+        "403":
           description: Validation error (e.g., missing contact methods)
-  
+
+
   /supervisory_authority/list:
     post:
       summary: List Supervisory Authorities
@@ -1817,64 +2046,70 @@ paths:
       tags:
         - Supervisory Authority
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
       responses:
-        200:
+        "200":
           description: Supervisory Authorities retrieved successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Supervisory Authority retrieved successfully
-              supervisory_authority:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 1
-                    name:
-                      type: string
-                      example: "CNPD"
-                    country:
-                      type: string
-                      example: "PT"
-                    email:
-                      type: array
-                      items:
-                        type: string
-                      example: ["geral@cnpd.pt"]
-                    formURI:
-                      type: array
-                      items:
-                        type: string
-                      example: ["https://www.cnpd.pt/contactos"]
-                    phone:
-                      type: array
-                      items:
-                        type: string
-                      example: ["+351213928400"]
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Supervisory Authority retrieved successfully
+                  supervisory_authority:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        name:
+                          type: string
+                          example: "CNPD"
+                        country:
+                          type: string
+                          example: "PT"
+                        email:
+                          type: array
+                          items:
+                            type: string
+                          example:
+                            - "geral@cnpd.pt"
+                        formURI:
+                          type: array
+                          items:
+                            type: string
+                          example:
+                            - "https://www.cnpd.pt/contactos"
+                        phone:
+                          type: array
+                          items:
+                            type: string
+                          example:
+                            - "+351213928400"
 
-        400:
+        "400":
           description: Invalid input
 
-        401:
+        "401":
           description: Invalid hash_pid
-  
+
+
   /wallet_rp/create:
     post:
       summary: Create Wallet Relying Party
@@ -1882,242 +2117,256 @@ paths:
       tags:
         - WalletRelyingParty
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - WalletRelyingParty
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - WalletRelyingParty
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
-              WalletRelyingParty:
-                type: array
-                items:
-                  type: object
-                  required:
-                    - supportURI
-                    - provider_id
-                    - srvDescription
-                    - intendedUse_ids
-                    - isPSB
-                    - entitlements
-                    - supervisoryAuthority
-                    - registryURI
-                  properties:
+                WalletRelyingParty:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - supportURI
+                      - provider_id
+                      - srvDescription
+                      - intendedUse_ids
+                      - isPSB
+                      - entitlements
+                      - supervisoryAuthority
+                      - registryURI
+                    properties:
+                      tradeName:
+                        type: string
+                        example: "My Wallet Service"
 
-                    tradeName:
-                      type: string
-                      example: "My Wallet Service"
+                      provider_id:
+                        type: integer
+                        example: 1
 
-                    provider_id:
-                      type: integer
-                      example: 1
+                      supervisoryAuthority:
+                        type: integer
+                        example: 1
 
-                    supervisoryAuthority:
-                      type: integer
-                      example: 1
-
-                    registryURI:
-                      type: string
-                      format: uri
-                      example: "https://registry.example.com"
-
-                    supportURI:
-                      type: array
-                      items:
+                      registryURI:
                         type: string
                         format: uri
-                      example: ["https://support.example.com"]
+                        example: "https://registry.example.com"
 
-                    srvDescription:
-                      type: array
-                      items:
-                        type: object
-                        required:
-                          - lang
-                        properties:
-                          lang:
-                            type: string
-                            example: "en"
-                          content:
-                            type: string
-                            example: "Wallet authentication service"
+                      supportURI:
+                        type: array
+                        items:
+                          type: string
+                          format: uri
+                        example:
+                          - "https://support.example.com"
 
-                    intendedUse_ids:
-                      type: array
-                      items:
-                        type: integer
-                      example: [1, 2]
+                      srvDescription:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - lang
+                          properties:
+                            lang:
+                              type: string
+                              example: "en"
+                            content:
+                              type: string
+                              example: "Wallet authentication service"
 
-                    providesAttestations_id:
-                      type: array
-                      items:
-                        type: integer
-                      example: [1]
+                      intendedUse_ids:
+                        type: array
+                        items:
+                          type: integer
+                        example: [1, 2]
 
-                    usesIntermediary:
-                      type: array
-                      items:
-                        type: integer
-                      example: [1]
+                      providesAttestations_id:
+                        type: array
+                        items:
+                          type: integer
+                        example: [1]
 
-                    entitlements:
-                      type: array
-                      items:
-                        type: string
-                      example: ["AGE_VERIFICATION"]
+                      usesIntermediary:
+                        type: array
+                        items:
+                          type: integer
+                        example: [1]
 
-                    isPSB:
-                      type: boolean
-                      example: true
+                      entitlements:
+                        type: array
+                        items:
+                          type: string
+                        example:
+                          - "AGE_VERIFICATION"
+
+                      isPSB:
+                        type: boolean
+                        example: true
 
       responses:
-        200:
+        "200":
           description: Wallet Relying Party created successfully
-          schema:
-            type: object
-            properties:
-              message:
-                type: string
-                example: Wallet Relying Party created successfully
-              data:
-                type: array
-                items:
-                  type: integer
-                example: [1]
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Wallet Relying Party created successfully
+                  data:
+                    type: array
+                    items:
+                      type: integer
+                    example: [1]
 
-        400:
+        "400":
           description: Invalid input
 
-        401:
+        "401":
           description: Invalid hash_pid
 
-        403:
+        "403":
           description: Validation error (ownership, duplicates, invalid types)
-  
+
   /wallet_rp/list:
     post:
       summary: List Wallet Relying Parties
       tags:
         - WalletRelyingParty
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
 
       responses:
-        200:
+        "200":
           description: Wallet Relying Parties retrieved successfully
-  
+
   /wallet_rp/update_intended_use:
     post:
       summary: Add Intended Uses to WRP
       tags:
         - WalletRelyingParty
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - wrp_id
-              - intended_use_ids
-            properties:
-              hash_pid:
-                type: string
-              wrp_id:
-                type: integer
-                example: 1
-              intended_use_ids:
-                type: array
-                items:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - wrp_id
+                - intended_use_ids
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
+
+                wrp_id:
                   type: integer
-                example: [1, 2]
+                  example: 1
+
+                intended_use_ids:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 2]
 
       responses:
-        200:
+        "200":
           description: Intended Uses added successfully
-  
+
   /wallet_rp/update_provided_attestation:
     post:
       summary: Update Provided Attestations for Wallet Relying Party
       tags:
         - WalletRelyingParty
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - wrp_id
-              - provided_attestation_ids
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
-              wrp_id:
-                type: integer
-                example: 1
-              provided_attestation_ids:
-                type: array
-                items:
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - wrp_id
+                - provided_attestation_ids
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
+
+                wrp_id:
                   type: integer
-                example: [1, 2]
+                  example: 1
+
+                provided_attestation_ids:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 2]
+
       responses:
-        200:
+        "200":
           description: Updated successfully
-  
+
   /wallet_rp/update_uses_intermediary:
     post:
       summary: Update Uses Intermediary for Wallet Relying Party
       tags:
         - WalletRelyingParty
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - wrp_id
-              - uses_intermediary_ids
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
-              wrp_id:
-                type: integer
-                example: 1
-              uses_intermediary_ids:
-                type: array
-                items:
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - wrp_id
+                - uses_intermediary_ids
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
+
+                wrp_id:
                   type: integer
-                example: [10, 11]
+                  example: 1
+
+                uses_intermediary_ids:
+                  type: array
+                  items:
+                    type: integer
+                  example: [10, 11]
+
       responses:
-        200:
+        "200":
           description: Updated successfully
-  
+
   /wallet_rp/remove_intended_use:
     post:
       summary: Remove Intended Uses from WRP
@@ -2125,28 +2374,33 @@ paths:
       tags:
         - WalletRelyingParty
 
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - wrp_id
-              - intended_use_ids
-            properties:
-              hash_pid:
-                type: string
-              wrp_id:
-                type: integer
-              intended_use_ids:
-                type: array
-                items:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - wrp_id
+                - intended_use_ids
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
+
+                wrp_id:
                   type: integer
+                  example: 1
+
+                intended_use_ids:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 2]
 
       responses:
-        200:
+        "200":
           description: Intended Uses removed successfully
 
   /wallet_rp/remove_provided_attestation:
@@ -2154,61 +2408,69 @@ paths:
       summary: Remove Provided Attestations from Wallet Relying Party
       tags:
         - WalletRelyingParty
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - wrp_id
-              - provided_attestation_ids
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
-              wrp_id:
-                type: integer
-                example: 1
-              provided_attestation_ids:
-                type: array
-                items:
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - wrp_id
+                - provided_attestation_ids
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
+
+                wrp_id:
                   type: integer
-                example: [5, 6]
+                  example: 1
+
+                provided_attestation_ids:
+                  type: array
+                  items:
+                    type: integer
+                  example: [5, 6]
+
       responses:
-        200:
+        "200":
           description: Removed successfully
-  
+
   /wallet_rp/remove_uses_intermediary:
     post:
       summary: Remove Uses Intermediary from Wallet Relying Party
       tags:
         - WalletRelyingParty
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - wrp_id
-              - uses_intermediary_ids
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
-              wrp_id:
-                type: integer
-                example: 1
-              uses_intermediary_ids:
-                type: array
-                items:
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - wrp_id
+                - uses_intermediary_ids
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
+
+                wrp_id:
                   type: integer
-                example: [7, 8]
+                  example: 1
+
+                uses_intermediary_ids:
+                  type: array
+                  items:
+                    type: integer
+                  example: [7, 8]
+
       responses:
-        200:
+        "200":
           description: Removed successfully
 
   /list_claim:
@@ -2216,20 +2478,22 @@ paths:
       summary: List Claims
       tags:
         - Claim
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
+
       responses:
-        200:
+        "200":
           description: Claims retrieved successfully
 
   /list_full_info:
@@ -2238,21 +2502,175 @@ paths:
       description: Returns legal entities with providers, wallet relying parties and intended uses
       tags:
         - FullInfo
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
+
       responses:
-        200:
+        "200":
           description: Full structured data returned
+
+  /intended_use/certificate:
+    post:
+      tags:
+        - Certificates
+
+      summary: Generate Intended Use Registration Certificate
+
+      description: |
+        Generates a signed certificate (JAdES + COSE) for a given Intended Use.
+        Returns both the signed document and COSE payload encoded in base64.
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - intended_use_id
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
+
+                intended_use_id:
+                  type: integer
+                  example: 10
+
+      responses:
+        "200":
+          description: Certificate generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+
+                  code:
+                    type: integer
+                    example: 200
+
+                  data:
+                    type: object
+                    properties:
+                      filename:
+                        type: string
+                        example: document_with_signature.json
+
+                      file_base64:
+                        type: string
+                        example: BASE64_ENCODED_SIGNED_DOCUMENT
+
+                      cose_base64:
+                        type: string
+                        example: BASE64_ENCODED_COSE
+
+  /wallet_rp/certificate:
+    post:
+      tags:
+        - Certificates
+
+      summary: Generate Wallet Relying Party Certificate (PKCS#12)
+
+      description: |
+        Generates a certificate for a Wallet Relying Party using EJBCA.
+        Returns a PKCS#12 (.p12) file encoded in base64.
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - wrp_id
+                - password
+              properties:
+                hash_pid:
+                  type: string
+                  example: "abc123hash"
+                  description: User session identifier
+
+                wrp_id:
+                  type: integer
+                  example: 5
+                  description: Wallet Relying Party identifier
+
+                password:
+                  type: string
+                  example: "StrongPassword123!"
+                  description: Password used to encrypt the PKCS#12 file
+
+      responses:
+        "200":
+          description: Certificate generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+
+                  code:
+                    type: integer
+                    example: 200
+
+                  data:
+                    type: object
+                    properties:
+                      filename:
+                        type: string
+                        example: document_with_signature.json
+
+                      file_base64:
+                        type: string
+                        example: BASE64_ENCODED_P12_FILE
+
+        "400":
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+
+                  message:
+                    type: string
+                    example: Missing required fields.
+
+                  details:
+                    type: string
+                    example: wrp_id
+
+        "401":
+          description: Invalid hash_pid
+
+        "403":
+          description: Resource does not belong to the authenticated user
+
+        "500":
+          description: Internal server error
 
   /wrp:
     get:
@@ -2262,43 +2680,63 @@ paths:
         The response is NOT JSON but a signed token.
       tags:
         - Public
+
       parameters:
         - name: identifier
           in: query
-          type: string
-        - name: legalname
-          in: query
-          type: string
-        - name: tradename
-          in: query
-          type: string
-        - name: policy
-          in: query
-          type: string
-        - name: entitlement
-          in: query
-          type: string
-        - name: providesattestation
-          in: query
-          type: string
-        - name: intendeduseidentifier
-          in: query
-          type: string
-        - name: isintermediary
-          in: query
-          type: string
-          enum: ["true", "false"]
-        - name: usesintermediary
-          in: query
-          type: string
-
-      responses:
-        200:
-          description: Signed JWS response (ES256)
           schema:
             type: string
-            example: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
-  
+
+        - name: legalname
+          in: query
+          schema:
+            type: string
+
+        - name: tradename
+          in: query
+          schema:
+            type: string
+
+        - name: policy
+          in: query
+          schema:
+            type: string
+
+        - name: entitlement
+          in: query
+          schema:
+            type: string
+
+        - name: providesattestation
+          in: query
+          schema:
+            type: string
+
+        - name: intendeduseidentifier
+          in: query
+          schema:
+            type: string
+
+        - name: isintermediary
+          in: query
+          schema:
+            type: string
+            enum: ["true", "false"]
+
+        - name: usesintermediary
+          in: query
+          schema:
+            type: string
+
+      responses:
+        "200":
+          description: Signed JWS response (ES256)
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
+
   /wrp/{identifier}:
     get:
       summary: Get WRP by Identifier (signed response)
@@ -2312,30 +2750,35 @@ paths:
         - name: identifier
           in: path
           required: true
-          type: string
+          schema:
+            type: string
           example: "EU01-WRP-123"
 
       responses:
-        200:
+        "200":
           description: Signed WRP object (JWS ES256)
-          schema:
-            type: string
-            example: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
 
-        404:
+        "404":
           description: WRP not found
-          schema:
-            type: object
-            properties:
-              status:
-                type: string
-                example: error
-              code:
-                type: integer
-                example: 404
-              message:
-                type: string
-                example: WRP not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  code:
+                    type: integer
+                    example: 404
+                  message:
+                    type: string
+                    example: WRP not found
 
   /wrp/check-intended-use:
     get:
@@ -2350,37 +2793,33 @@ paths:
         - in: query
           name: identifier
           required: true
+          description: Identifier of the WRP
           schema:
             type: string
-          description: Identifier of the WRP
 
         - in: query
           name: claim_path
-          required: false
+          description: Path of the claim
           schema:
             type: string
-          description: Path of the claim
 
         - in: query
           name: credential_format
-          required: false
+          description: Format of the credential
           schema:
             type: string
-          description: Format of the credential
 
         - in: query
           name: credential_meta
-          required: false
+          description: Metadata of the credential
           schema:
             type: string
-          description: Metadata of the credential
 
         - in: query
           name: intended_use_identifier
-          required: false
+          description: Intended use identifier
           schema:
             type: string
-          description: Intended use identifier
 
       responses:
         "200":
@@ -2389,9 +2828,10 @@ paths:
             application/json:
               schema:
                 type: object
-                description: JWS signed payload (string)
-                example:
-                  payload: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
+                properties:
+                  payload:
+                    type: string
+                    example: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
 
         "400":
           description: Missing required fields
@@ -2399,155 +2839,16 @@ paths:
             application/json:
               schema:
                 type: object
-                example:
-                  status: error
-                  message: Missing required fields.
-                  details: identifier
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  message:
+                    type: string
+                    example: Missing required fields.
+                  details:
+                    type: string
+                    example: identifier
 
         "500":
-          description: Internal server error
-          
-  /intended_use/certificate:
-    post:
-      tags:
-        - Certificates
-      summary: Generate Intended Use Registration Certificate
-      description: |
-        Generates a signed certificate (JAdES + COSE) for a given Intended Use.
-        Returns both the signed document and COSE payload encoded in base64.
-
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - intended_use_id
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
-
-              intended_use_id:
-                type: integer
-                example: 10
-
-      responses:
-        200:
-          description: Certificate generated successfully
-          schema:
-            type: object
-            properties:
-              status:
-                type: string
-                example: success
-
-              code:
-                type: integer
-                example: 200
-
-              data:
-                type: object
-                properties:
-                  filename:
-                    type: string
-                    example: document_with_signature.json
-
-                  file_base64:
-                    type: string
-                    example: BASE64_ENCODED_SIGNED_DOCUMENT
-
-                  cose_base64:
-                    type: string
-                    example: BASE64_ENCODED_COSE
-                    
-  /wallet_rp/certificate:
-    post:
-      tags:
-        - Certificates
-
-      summary: Generate Wallet Relying Party Certificate (PKCS#12)
-
-      description: |
-        Generates a certificate for a Wallet Relying Party using EJBCA.
-        Returns a PKCS#12 (.p12) file encoded in base64.
-
-      parameters:
-        - in: body
-          name: body
-          required: true
-          schema:
-            type: object
-            required:
-              - hash_pid
-              - wrp_id
-              - password
-
-            properties:
-              hash_pid:
-                type: string
-                example: "abc123hash"
-                description: User session identifier
-
-              wrp_id:
-                type: integer
-                example: 5
-                description: Wallet Relying Party identifier
-
-              password:
-                type: string
-                example: "StrongPassword123!"
-                description: Password used to encrypt the PKCS#12 file
-
-      responses:
-        200:
-          description: Certificate generated successfully
-          schema:
-            type: object
-            properties:
-              status:
-                type: string
-                example: success
-
-              code:
-                type: integer
-                example: 200
-
-              data:
-                type: object
-                properties:
-                  filename:
-                    type: string
-                    example: document_with_signature.json
-
-                  file_base64:
-                    type: string
-                    example: BASE64_ENCODED_P12_FILE
-
-        400:
-          description: Missing required fields
-          schema:
-            type: object
-            properties:
-              status:
-                type: string
-                example: error
-
-              message:
-                type: string
-                example: Missing required fields.
-
-              details:
-                type: string
-                example: wrp_id
-
-        401:
-          description: Invalid hash_pid
-
-        403:
-          description: Resource does not belong to the authenticated user
-
-        500:
           description: Internal server error
