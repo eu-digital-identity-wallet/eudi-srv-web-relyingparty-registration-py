@@ -5,7 +5,8 @@ info:
   version: 1.0.0
 
 servers:
-  - url: https://registry.serviceproviders.eudiw.dev
+  # - url: https://registry.serviceproviders.eudiw.dev
+  # - url: https://dev.registry.serviceproviders.eudiw.dev
   - url: http://localhost:5000
 
 paths:
@@ -13,8 +14,34 @@ paths:
     get:
       tags:
         - Authentication
+
       summary: Start Authentication Flow
-      description: Starts a new authentication flow and returns the QR Code URL together with the presentation identifier.
+
+      description: |
+        Starts a new OpenID4VP authentication flow.
+
+        The endpoint returns:
+
+        - A **QR_code_url** that must be converted into a QR Code and presented to
+          the end user.
+        - A **presentation_id** that uniquely identifies the authentication session.
+
+        The client application shall:
+
+        1. Call this endpoint.
+        2. Generate and display a QR Code using the returned **QR_code_url**.
+        3. Ask the user to scan the QR Code using an EUDI Wallet.
+        4. Complete the authentication by presenting their PID from the Wallet.
+        5. Store the returned **presentation_id**, as it is required by the
+          subsequent authentication endpoints (**/pid_authorization** and
+          **/getpidoid4vp**) to retrieve the authentication result.
+
+        ### Response
+
+        | Field | Description |
+        |-------|-------------|
+        | `QR_code_url` | OpenID4VP URI used to generate the QR Code that the Wallet scans. |
+        | `presentation_id` | Identifier of the authentication session. It must be stored by the client and used in subsequent requests. |
 
       responses:
         "200":
@@ -34,11 +61,32 @@ paths:
                     description: Transaction identifier for the authentication session.
                     example: "550e8400-e29b-41d4-a716-446655440000"
   /pid_authorization:
-    get:
+    post:
       tags:
         - Authentication
+
       summary: PID Authorization
-      description: Completes the PID authorization process using the presentation identifier.
+
+      description: |
+        Checks whether the user has successfully completed the authentication
+        process in their EUDI Wallet.
+
+        The client shall call this endpoint after the user has scanned the QR Code
+        and successfully authenticated using their PID in the Wallet.
+
+        The request requires the `presentation_id` obtained from the
+        `/authentication` endpoint.
+
+        When the response indicates `Success`, the authentication flow has been
+        completed successfully and the client may proceed to the
+        `/getpidoid4vp` endpoint to retrieve the authenticated user's
+        `hash_pid`.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `presentation_id` | Authentication session identifier returned by the `/authentication` endpoint. |
 
       parameters:
         - in: query
@@ -74,53 +122,39 @@ paths:
                   error:
                     type: string
                     example: "500"
+
   /getpidoid4vp:
-    get:
-      tags:
-        - Authentication
-      summary: Get PID (OID4VP)
-      description: Retrieves the authenticated PID using the presentation identifier.
-
-      parameters:
-        - in: query
-          name: presentation_id
-          required: true
-          description: Transaction identifier received from the authentication step.
-          schema:
-            type: string
-          example: "550e8400-e29b-41d4-a716-446655440000"
-
-      responses:
-        "200":
-          description: PID retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: string
-                example: "abc123hashpid"
-
-        "400":
-          description: Missing presentation_id
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: error
-                  code:
-                    type: integer
-                    example: 400
-                  message:
-                    type: string
-                    example: Missing presentation_id
-
     post:
       tags:
         - Authentication
+
       summary: Get PID (OID4VP)
-      description: Retrieves the authenticated PID using the presentation identifier.
+
+      description: |
+        Retrieves the authenticated user's `hash_pid` after a successful
+        OpenID4VP authentication.
+
+        This endpoint shall be called only after the
+        `/pid_authorization` endpoint has returned a successful response.
+
+        The request requires the `presentation_id` obtained from the
+        `/authentication` endpoint.
+
+        The returned `hash_pid` identifies the authenticated user and shall be
+        used as the authentication token for all protected endpoints exposed by
+        this API.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `presentation_id` | Authentication session identifier returned by the `/authentication` endpoint. |
+
+        ### Response
+
+        | Field | Description |
+        |-------|-------------|
+        | `hash_pid` | Authenticated user session identifier to be used in subsequent API requests. |
 
       parameters:
         - in: query
@@ -160,7 +194,25 @@ paths:
   /law/create:
     post:
       summary: Create Law
-      description: Create one or more laws for the authenticated user
+      description: |
+        Creates one or more Law objects.
+
+        The `Law` object follows the Law definition described in the TS5
+        specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `law` | Collection of Law objects. |
+
+        ### Law attributes (TS5)
+
+        | Attribute | Type | Description |
+        |-----------|------|-------------|
+        | `legislativeIdentifier` | string | Unique legislative identifier of the Law. |
+        | `legalBasis` | array<string> | Legal basis associated with the Law. |
       tags:
         - Law
 
@@ -176,7 +228,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
-                  description: User session identifier
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 law:
@@ -239,11 +291,21 @@ paths:
                   message:
                     type: string
                     example: Invalid hash_pid
-                    
   /law/list:
     post:
       summary: List Laws
-      description: Retrieve all laws associated with the authenticated user
+      description: |
+        Retrieves all Law objects associated with the authenticated user.
+
+        The returned Law objects follow the Law definition described in the
+        TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+
       tags:
         - Law
 
@@ -258,7 +320,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
-                  description: User session identifier
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
       responses:
@@ -316,7 +378,25 @@ paths:
   /legal_person/create:
     post:
       summary: Create Legal Person
-      description: Create one or more legal persons and associate laws
+      description: |
+        Creates one or more Legal Person objects.
+
+        The `legalPerson` object follows the **Legal Person** definition specified in
+        the EUDI Wallet Relying Party Registration Technical Specification (TS5).
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier returned by the authentication flow. |
+        | `legalPerson` | Collection of Legal Person objects. |
+
+        ### Legal Person attributes (TS5)
+
+        | Attribute | Type | Description |
+        |-----------|------|-------------|
+        | `legalName` | array<string> | Legal name(s) of the Legal Person. |
+        | `law` | array<integer> | References to Law objects previously registered by the authenticated user. |
       tags:
         - Legal Person
 
@@ -332,6 +412,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 legalPerson:
@@ -383,7 +464,18 @@ paths:
   /legal_person/list:
     post:
       summary: List Legal Persons
-      description: Retrieve all legal persons for the authenticated user
+      description: |
+        Retrieves all Legal Person objects associated with the authenticated user.
+
+        The returned Legal Person objects follow the Legal Person definition
+        described in the TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+
       tags:
         - Legal Person
 
@@ -398,6 +490,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
       responses:
@@ -439,9 +532,56 @@ paths:
   /legal_person/update_law:
     post:
       summary: Add Laws to Legal Person
-      description: Associate one or more laws to a legal person
+
+      description: |
+        Associates one or more existing Law objects with a Legal Person.
+
+        Both the Legal Person and the referenced Law objects must belong to the
+        authenticated user.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `legal_person_id` | Identifier of the Legal Person to update. |
+        | `law_ids` | List of Law identifiers to associate with the Legal Person. |
+
+        ### Parameter details
+
+        | Attribute | Type | Description |
+        |-----------|------|-------------|
+        | `legal_person_id` | integer | Identifier of the Legal Person. The Legal Person must belong to the authenticated user. |
+        | `law_ids` | array<integer> | List of Law identifiers to associate. Every Law must belong to the authenticated user and must already exist. |
       tags:
         - Legal Person
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - legal_person_id
+              - law_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
+
+              legal_person_id:
+                type: integer
+                example: 1
+                description: Identifier of the Legal Person to update.
+
+              law_ids:
+                type: array
+                description: List of Law identifiers to associate with the Legal Person.
+                items:
+                  type: integer
+                example: [1, 2]
 
       requestBody:
         required: true
@@ -456,6 +596,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 legal_person_id:
@@ -484,9 +625,59 @@ paths:
   /legal_person/remove_law:
     post:
       summary: Remove Laws from Legal Person
-      description: Remove association between laws and a legal person
+
+      description: |
+        Removes one or more Law associations from a Legal Person.
+
+        A Legal Person must always remain associated with at least one Law.
+
+        Both the Legal Person and the referenced Law objects must belong to the
+        authenticated user.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `legal_person_id` | Identifier of the Legal Person to update. |
+        | `law_ids` | List of Law identifiers to remove from the Legal Person. |
+
+        ### Parameter details
+
+        | Attribute | Type | Description |
+        |-----------|------|-------------|
+        | `legal_person_id` | integer | Identifier of the Legal Person. |
+        | `law_ids` | array<integer> | List of Law identifiers to remove. The operation fails if it would leave the Legal Person without any associated Law. |
       tags:
         - Legal Person
+      
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - legal_person_id
+              - law_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
+
+              legal_person_id:
+                type: integer
+                example: 1
+                description: Identifier of the Legal Person to update.
+
+              law_ids:
+                type: array
+                description: List of Law identifiers to remove from the Legal Person.
+                items:
+                  type: integer
+                example: [1]
 
       requestBody:
         required: true
@@ -501,6 +692,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 legal_person_id:
@@ -529,10 +721,60 @@ paths:
   /natural_person/create:
     post:
       summary: Create Natural Person
-      description: Create one or more natural persons
+      description: |
+        Creates one or more Natural Persons.
+
+        The `naturalPerson` object follows the Natural Person definition described in
+        the TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `naturalPerson` | Collection of Natural Person objects. |
+
+        ### NaturalPerson attributes (TS5)
+
+        | Attribute | Type | Description |
+        |-----------|------|-------------|
+        | `familyName` | string | Family name (surname) of the Natural Person. |
+        | `givenName` | string | Given name(s) of the Natural Person. |
       tags:
         - Natural Person
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - naturalPerson
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
 
+              naturalPerson:
+                type: array
+                description: Collection of Natural Person objects as defined in the TS5 specification.
+                items:
+                  type: object
+                  required:
+                    - familyName
+                    - givenName
+                  properties:
+                    familyName:
+                      type: string
+                      description: Family name of the Natural Person as defined in the TS5 specification.
+                      example: "Doe"
+
+                    givenName:
+                      type: string
+                      description: Given name(s) of the Natural Person as defined in the TS5 specification.
+                      example: "John"
       requestBody:
         required: true
         content:
@@ -545,6 +787,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 naturalPerson:
@@ -598,10 +841,32 @@ paths:
   /natural_person/list:
     post:
       summary: List Natural Persons
-      description: Retrieve all natural persons for the authenticated user
+      description: |
+        Retrieves all Natural Persons belonging to the authenticated user.
+
+        The returned objects follow the Natural Person definition described in
+        the TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
       tags:
         - Natural Person
-
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
       requestBody:
         required: true
         content:
@@ -613,6 +878,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
       responses:
@@ -652,11 +918,29 @@ paths:
 
         "401":
           description: Invalid hash_pid
-
   /identifier/create:
     post:
       summary: Create Identifier
-      description: Create one or more identifiers for the authenticated user
+      description: |
+        Creates one or more Identifier objects.
+
+        The `Identifier` object follows the Identifier definition described in
+        the TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `identifier` | Collection of Identifier objects. |
+
+        ### Identifier attributes (TS5)
+
+        | Attribute | Type | Description |
+        |-----------|------|-------------|
+        | `type` | string | Identifier type as defined in the TS5 specification. |
+        | `identifier` | string | Identifier value. |
+
       tags:
         - Identifier
 
@@ -672,10 +956,17 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 identifier:
                   type: array
+                  description: |
+                    Creates one or more identifiers associated with the authenticated user.
+
+                    The identifier object follows the TS5 specification:
+                    - identifier: identifier value.
+                    - type: identifier type URI defined by TS5.
                   items:
                     type: object
                     required:
@@ -684,10 +975,12 @@ paths:
                     properties:
                       identifier:
                         type: string
+                        description: Identifier value as defined in TS5.
                         example: "PT123456789"
 
                       type:
                         type: string
+                        description: Identifier type URI defined in TS5.
                         enum:
                           - "http://data.europa.eu/eudi/id/EORI-No"
                           - "http://data.europa.eu/eudi/id/LEI"
@@ -695,7 +988,6 @@ paths:
                           - "http://data.europa.eu/eudi/id/VATIN"
                           - "http://data.europa.eu/eudi/id/TIN"
                           - "http://data.europa.eu/eudi/id/Excise"
-                        description: Type of identifier (must match allowed values)
 
       responses:
         "200":
@@ -723,11 +1015,21 @@ paths:
         "403":
           description: Invalid identifier type
 
-
   /identifier/list:
     post:
       summary: List Identifiers
-      description: Retrieve all identifiers for the authenticated user
+      description: |
+        Retrieves all Identifier objects associated with the authenticated user.
+
+        The returned Identifier objects follow the Identifier definition
+        described in the TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+
       tags:
         - Identifier
 
@@ -742,6 +1044,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
       responses:
@@ -776,11 +1079,46 @@ paths:
         "401":
           description: Invalid hash_pid
 
-
   /legal_entity/create:
     post:
       summary: Create Legal Entity
-      description: Create one or more legal entities associated with a legal or natural person
+
+      description: |
+        Creates one or more Legal Entity objects.
+
+        The `LegalEntity` object follows the Legal Entity definition described in
+        the TS5 specification.
+
+        A Legal Entity represents the organization that owns or operates Wallet
+        Relying Parties and Providers.
+
+        The request must reference previously created Identifier objects and
+        either a Natural Person or a Legal Person, depending on the ownership
+        model.
+
+        Country values shall use ISO 3166-1 alpha-2 codes and must correspond to
+        an EU Member State.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `legal_entity` | Collection of Legal Entity objects. |
+
+        ### LegalEntity attributes (TS5)
+
+        | Attribute | Type | Description |
+        |-----------|------|-------------|
+        | `legal_person_id` | integer | Identifier of the associated Legal Person. |
+        | `natural_person_id` | integer | Identifier of the associated Natural Person. |
+        | `identifiers` | array<integer> | References to previously created Identifier objects. |
+        | `country` | string | ISO 3166-1 alpha-2 country code of an EU Member State. |
+        | `postalAddress` | array<object> | Postal address information. |
+        | `email` | array<string> | Contact email address(es). |
+        | `phone` | array<string> | Contact phone number(s). |
+        | `infoURI` | array<string> | URI(s) containing additional information about the Legal Entity. |
+
       tags:
         - Legal Entity
 
@@ -796,6 +1134,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 legal_entity:
@@ -814,35 +1153,41 @@ paths:
                         type: array
                         items:
                           type: integer
+                        
+                        description: List of Identifier IDs previously created.
                         example: [1, 2]
 
                       country:
                         type: string
-                        description: Must be a valid EU country code
+                        description: ISO 3166-1 alpha-2 country code of the Legal Entity.
                         example: "PT"
 
                       postalAddress:
                         type: array
                         items:
                           type: string
+                        description: Postal addresses associated with the Legal Entity.
                         example: ["Rua A, Porto"]
 
                       email:
                         type: array
                         items:
                           type: string
+                        description: Contact email addresses.
                         example: ["test@email.com"]
 
                       phone:
                         type: array
                         items:
                           type: string
+                        description: Contact telephone numbers.
                         example: ["+351912345678"]
 
                       infoURI:
                         type: array
                         items:
                           type: string
+                        description: Public information URLs associated with the Legal Entity.
                         example: ["https://example.com"]
 
       responses:
@@ -875,7 +1220,19 @@ paths:
   /legal_entity/list:
     post:
       summary: List Legal Entities
-      description: Retrieve all legal entities for the authenticated user
+
+      description: |
+        Retrieves all Legal Entity objects associated with the authenticated user.
+
+        The returned Legal Entity objects follow the Legal Entity definition
+        described in the TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+
       tags:
         - Legal Entity
 
@@ -890,6 +1247,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
       responses:
@@ -930,7 +1288,50 @@ paths:
   /legal_entity/update_identifier:
     post:
       summary: Add Identifiers to Legal Entity
-      description: Associate identifiers to a legal entity
+      description: |
+        Associates one or more existing Identifier objects with an existing
+        Legal Entity.
+
+        The `Identifier` object follows the Identifier definition described in
+        the TS5 specification.
+
+        All referenced resources must belong to the authenticated user.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `legal_entity_id` | Identifier of the Legal Entity to update. |
+        | `identifier_ids` | List of Identifier IDs to associate with the Legal Entity. |
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - legal_entity_id
+              - identifier_ids
+            properties:
+              hash_pid:
+                type: string
+                description: Authenticated user session identifier.
+                example: "abc123hash"
+
+              legal_entity_id:
+                type: integer
+                description: Identifier of the Legal Entity to update.
+                example: 1
+
+              identifier_ids:
+                type: array
+                description: List of existing Identifier IDs to associate with the Legal Entity.
+                items:
+                  type: integer
+                example: [1, 2]
       tags:
         - Legal Entity
 
@@ -947,6 +1348,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 legal_entity_id:
@@ -972,11 +1374,55 @@ paths:
         "403":
           description: Resource does not belong to user
 
-
   /legal_entity/remove_identifier:
     post:
       summary: Remove Identifiers from Legal Entity
-      description: Remove identifier associations. A legal entity must always have at least one identifier.
+
+      description: |
+        Removes one or more existing Identifier associations from a Legal Entity.
+
+        The `Identifier` object follows the Identifier definition described in
+        the TS5 specification.
+
+        At least one Identifier must remain associated with every Legal Entity.
+
+        All referenced resources must belong to the authenticated user.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `legal_entity_id` | Identifier of the Legal Entity to update. |
+        | `identifier_ids` | List of Identifier IDs to remove from the Legal Entity. |
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - legal_entity_id
+              - identifier_ids
+            properties:
+              hash_pid:
+                type: string
+                description: Authenticated user session identifier.
+                example: "abc123hash"
+
+              legal_entity_id:
+                type: integer
+                description: Identifier of the Legal Entity to update.
+                example: 1
+
+              identifier_ids:
+                type: array
+                description: List of Identifier IDs to remove from the Legal Entity.
+                items:
+                  type: integer
+                example: [1, 2]
       tags:
         - Legal Entity
 
@@ -993,6 +1439,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 legal_entity_id:
@@ -1018,11 +1465,29 @@ paths:
         "403":
           description: Resource does not belong to user
 
-
   /policy/create:
     post:
       summary: Create Policy
-      description: Create one or more policies with a specific intention and type
+      description: |
+        Creates one or more Policy objects.
+
+        The `policy` object follows the Policy definition described in the
+        TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `policy` | Collection of Policy objects. |
+
+        ### Policy attributes (TS5)
+
+        | Attribute | Type | Description |
+        |-----------|------|-------------|
+        | `policyURI` | string | URI identifying the policy. |
+        | `type` | string | Policy type defined by TS5. |
+        | `intention` | string | Intended purpose of the policy (e.g. `wrp` or `intended_use`). |
       tags:
         - Policy
 
@@ -1038,6 +1503,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 policy:
@@ -1100,7 +1566,18 @@ paths:
   /policy/list:
     post:
       summary: List Policies
-      description: Retrieve all policies for the authenticated user
+      description: |
+        Returns all Policy objects belonging to the authenticated user.
+
+        The returned objects follow the Policy definition described in the
+        TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+  
       tags:
         - Policy
 
@@ -1115,6 +1592,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
       responses:
@@ -1156,9 +1634,78 @@ paths:
   /provider/create:
     post:
       summary: Create Provider
-      description: Create one or more providers associated with a legal entity and policies
+      description: |
+        Creates one or more Providers.
+
+        The Provider object follows the Provider definition described in the TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `provider` | Collection of Provider objects. |
+
+        ### Provider attributes (TS5)
+
+        | Attribute | Type | Description |
+        |-----------|------|-------------|
+        | `legalEntityId` | integer | Identifier of the Legal Entity associated with the Provider. |
+        | `providerType` | string | Type of Provider defined by TS5. |
+        | `policy_id` | array<integer> | References to Policy objects previously registered. Only policies with intention `wrp` are accepted. |
+        | `x5c` | array<string> | Optional X.509 certificate chain associated with the Provider. |
       tags:
         - Provider
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - provider
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
+
+              provider:
+                type: array
+                description: Collection of Provider objects as defined in the TS5 specification.
+                items:
+                  type: object
+                  required:
+                    - legalEntityId
+                    - providerType
+                    - policy_id
+                  properties:
+                    legalEntityId:
+                      type: integer
+                      description: Identifier of the Legal Entity associated with the Provider. The Legal Entity must belong to the authenticated user.
+                      example: 1
+
+                    providerType:
+                      type: string
+                      description: Provider type defined by the TS5 specification.
+                      example: "WALLET_PROVIDER"
+
+                    policy_id:
+                      type: array
+                      description: List of Policy IDs associated with the Provider. All policies must belong to the authenticated user and have intention `wrp`.
+                      items:
+                        type: integer
+                      example: [1, 2]
+
+                    x5c:
+                      type: array
+                      description: Optional X.509 certificate chain encoded as Base64.
+                      items:
+                        type: string
+                      example:
+                        - "MIIC...base64cert1"
+                        - "MIIC...base64cert2"
 
       requestBody:
         required: true
@@ -1172,6 +1719,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 provider:
@@ -1237,9 +1785,31 @@ paths:
   /provider/list:
     post:
       summary: List Providers
-      description: Retrieve all providers for the authenticated user
+      description: |
+        Retrieves all Providers associated with the authenticated user.
+
+        Each returned Provider follows the Provider definition described in the TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
       tags:
         - Provider
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
 
       requestBody:
         required: true
@@ -1252,6 +1822,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
       responses:
@@ -1295,9 +1866,50 @@ paths:
   /provider/update_policy:
     post:
       summary: Add Policies to Provider
-      description: Associate policies to a provider (must be WRP policies)
+
+      description: |
+        Associates one or more Policies with an existing Provider.
+
+        Only Policies with the `wrp` intention are accepted.
+
+        The Provider and all referenced Policies must belong to the authenticated user.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `provider_id` | Identifier of the Provider to update. |
+        | `policy_ids` | List of Policy identifiers to associate with the Provider. |
       tags:
         - Provider
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - provider_id
+              - policy_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
+
+              provider_id:
+                type: integer
+                example: 1
+                description: Identifier of the Provider to update. The Provider must belong to the authenticated user.
+
+              policy_ids:
+                type: array
+                description: List of Policy IDs to associate with the Provider. Each Policy must belong to the authenticated user and have intention `wrp`.
+                items:
+                  type: integer
+                example: [1, 2]
 
       requestBody:
         required: true
@@ -1312,6 +1924,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 provider_id:
@@ -1341,9 +1954,50 @@ paths:
   /provider/remove_policy:
     post:
       summary: Remove Policies from Provider
-      description: Remove policy associations. A provider must always have at least one policy.
+
+      description: |
+        Removes one or more Policy associations from an existing Provider.
+
+        A Provider must always remain associated with at least one Policy.
+
+        The Provider and all referenced Policies must belong to the authenticated user.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `provider_id` | Identifier of the Provider to update. |
+        | `policy_ids` | List of Policy identifiers to remove from the Provider. |
       tags:
         - Provider
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - provider_id
+              - policy_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
+
+              provider_id:
+                type: integer
+                example: 1
+                description: Identifier of the Provider to update. The Provider must belong to the authenticated user.
+
+              policy_ids:
+                type: array
+                description: List of Policy IDs to remove from the Provider. Each Policy must belong to the authenticated user.
+                items:
+                  type: integer
+                example: [1]
 
       requestBody:
         required: true
@@ -1358,6 +2012,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 provider_id:
@@ -1387,10 +2042,33 @@ paths:
   /credential/create:
     post:
       summary: Create Credential
-      description: Create one or more credentials with associated claims
+      description: |
+        Creates one or more Credential objects.
+
+        The `Credential` object follows the Credential definition described in
+        the TS5 specification.
+
+        All parameters accepted by this endpoint correspond to the fields defined
+        in the Credential table of the TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `credentials` | Collection of Credential objects. |
+
+        ### Credential attributes (TS5)
+
+        | Attribute | Type | Description |
+        |-----------|------|-------------|
+        | `format` | string | Credential format as defined in the TS5 specification. |
+        | `meta` | string | Credential metadata. |
+        | `claims` | array<object> | Collection of Claim objects associated with the Credential. |
+        | `claims.path` | array<object> | JSON path identifying the claim within the Credential. |
+
       tags:
         - Credential
-
       requestBody:
         required: true
         content:
@@ -1403,10 +2081,12 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 credentials:
                   type: array
+                  description: Collection of Credential objects as defined in the TS5 specification.
                   items:
                     type: object
                     required:
@@ -1416,16 +2096,19 @@ paths:
                     properties:
                       format:
                         type: string
+                        description: Credential format as defined in the TS5 Credential specification.
                         example: "jwt_vc"
 
                       meta:
                         type: object
+                        description: Credential metadata according to the TS5 Credential definition.
                         example:
                           vct_values:
                             - "urn:eudi:pid:1"
 
                       claims:
                         type: array
+                        description: Collection of Claim objects associated with the Credential.
                         items:
                           type: object
                           required:
@@ -1433,11 +2116,12 @@ paths:
                           properties:
                             path:
                               type: array
-                              description: Non-empty array of strings, nulls and non-negative integers.
-                              items: {}
+                              description: JSON path(s) identifying the claim within the Credential.
+                              items:
+                                type: string
                               example:
-                                - "credentialSubject"
-                                - "family_name"
+                                - "$.credentialSubject.family_name"
+                                - "$.credentialSubject.given_name"
 
       responses:
         "200":
@@ -1466,7 +2150,18 @@ paths:
   /credential/list:
     post:
       summary: List Credentials
-      description: Retrieve all credentials for the authenticated user
+      description: |
+        Retrieves all Credential objects associated with the authenticated user.
+
+        The returned Credential objects follow the Credential definition
+        described in the TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+
       tags:
         - Credential
 
@@ -1481,6 +2176,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
       responses:
@@ -1532,7 +2228,32 @@ paths:
   /intended_use/create:
     post:
       summary: Create Intended Use
-      description: Create one or more intended uses with purposes, policies and credentials
+      description: |
+        Creates one or more Intended Use objects.
+
+        The `IntendedUse` object follows the Intended Use definition described in
+        the TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `intended_uses` | Collection of Intended Use objects. |
+
+        ### IntendedUse attributes (TS5)
+
+        | Attribute | Type | Description |
+        |-----------|------|-------------|
+        | `intendedUseIdentifier` | string | Unique identifier of the Intended Use. |
+        | `createdAt` | string (date-time) | Creation timestamp of the Intended Use. |
+        | `revokedAt` | string (date-time) | Revocation timestamp of the Intended Use, if applicable. |
+        | `purpose` | array<object> | Multilingual description of the Intended Use. |
+        | `purpose.lang` | string | EU language code. |
+        | `purpose.content` | string | Description of the Intended Use in the specified language. |
+        | `privacyPolicy_id` | array<integer> | References to previously created Privacy Policy objects. |
+        | `credential_ids` | array<integer> | References to previously created Credential objects defined according to the TS5 specification. |
+
       tags:
         - Intended Use
 
@@ -1548,6 +2269,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 intended_uses:
@@ -1634,7 +2356,18 @@ paths:
   /intended_use/list:
     post:
       summary: List Intended Uses
-      description: Retrieve all intended uses for the authenticated user
+      description: |
+        Retrieves all Intended Use objects associated with the authenticated user.
+
+        The returned Intended Use objects follow the Intended Use definition
+        described in the TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+
       tags:
         - Intended Use
 
@@ -1649,6 +2382,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
       responses:
@@ -1705,8 +2439,58 @@ paths:
   /intended_use/update_credential:
     post:
       summary: Add Credentials to Intended Use
+      description: |
+        Associates one or more existing Credential objects with an existing
+        Intended Use.
+
+        The `Credential` object follows the Credential definition described in
+        the TS5 specification.
+
+        All referenced resources must belong to the authenticated user.
+
+        At least one Credential must remain associated with the Intended Use at
+        all times.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `intended_use_id` | Identifier of the Intended Use to update. |
+        | `credential_ids` | List of Credential IDs to associate with the Intended Use. |
+
       tags:
         - Intended Use
+      
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - intended_use_id
+              - credential_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
+
+              intended_use_id:
+                type: integer
+                example: 1
+                description: Identifier of the Intended Use to update.
+
+              credential_ids:
+                type: array
+                description: |
+                  List of Credential identifiers to associate with the Intended Use.
+                  Every Credential must belong to the authenticated user.
+                items:
+                  type: integer
+                example: [1,2]
 
       requestBody:
         required: true
@@ -1721,6 +2505,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                 intended_use_id:
                   type: integer
                   example: 1
@@ -1738,8 +2523,59 @@ paths:
   /intended_use/update_policy:
     post:
       summary: Add Policies to Intended Use
+
+      description: |
+        Associates one or more existing Privacy Policy objects with an existing
+        Intended Use.
+
+        The `Policy` object follows the Policy definition described in the TS5
+        specification.
+
+        Only Policies with the intention `intended_use` are accepted.
+
+        All referenced resources must belong to the authenticated user.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `intended_use_id` | Identifier of the Intended Use to update. |
+        | `policy_ids` | List of Privacy Policy IDs to associate with the Intended Use. |
+
       tags:
         - Intended Use
+      
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - intended_use_id
+              - policy_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
+
+              intended_use_id:
+                type: integer
+                example: 1
+                description: Identifier of the Intended Use to update.
+
+              policy_ids:
+                type: array
+                description: |
+                  List of Policy identifiers to associate with the Intended Use.
+                  Policies must belong to the authenticated user and have intention
+                  "intended_use".
+                items:
+                  type: integer
+                example: [1,2]
 
       requestBody:
         required: true
@@ -1754,6 +2590,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                 intended_use_id:
                   type: integer
                 policy_ids:
@@ -1769,9 +2606,53 @@ paths:
   /intended_use/remove_credential:
     post:
       summary: Remove Credentials from Intended Use
-      description: Must keep at least one credential
+
+      description: |
+        Removes one or more existing Credential associations from an Intended
+        Use.
+
+        The `Credential` object follows the Credential definition described in
+        the TS5 specification.
+
+        All referenced resources must belong to the authenticated user.
+
+        An Intended Use must always have at least one associated Credential.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `intended_use_id` | Identifier of the Intended Use to update. |
+        | `credential_ids` | List of Credential IDs to remove from the Intended Use. |
       tags:
         - Intended Use
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - intended_use_id
+              - credential_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              intended_use_id:
+                type: integer
+                example: 1
+                description: Identifier of the Intended Use.
+
+              credential_ids:
+                type: array
+                description: Credential identifiers to remove.
+                items:
+                  type: integer
+                example: [1]
 
       requestBody:
         required: true
@@ -1786,6 +2667,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                 intended_use_id:
                   type: integer
                 credential_ids:
@@ -1801,9 +2683,53 @@ paths:
   /intended_use/remove_policy:
     post:
       summary: Remove Policies from Intended Use
-      description: Must keep at least one policy
+
+      description: |
+        Removes one or more existing Privacy Policy associations from an
+        Intended Use.
+
+        The `Policy` object follows the Policy definition described in the TS5
+        specification.
+
+        All referenced resources must belong to the authenticated user.
+
+        An Intended Use must always have at least one associated Privacy Policy.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `intended_use_id` | Identifier of the Intended Use to update. |
+        | `policy_ids` | List of Privacy Policy IDs to remove from the Intended Use. |
       tags:
         - Intended Use
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - intended_use_id
+              - policy_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+
+              intended_use_id:
+                type: integer
+                example: 1
+                description: Identifier of the Intended Use.
+
+              policy_ids:
+                type: array
+                description: Policy identifiers to remove.
+                items:
+                  type: integer
+                example: [1]
 
       requestBody:
         required: true
@@ -1818,6 +2744,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                 intended_use_id:
                   type: integer
                 policy_ids:
@@ -1833,7 +2760,25 @@ paths:
   /provided_attestation/create:
     post:
       summary: Create Provided Attestation
-      description: Create one or more provided attestations for the authenticated user
+      description: |
+        Creates one or more Provided Attestation objects.
+
+        The `providesAttestations` object follows the Provided Attestation
+        definition described in the TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `providesAttestations` | Collection of Provided Attestation objects. |
+
+        ### Provided Attestation attributes (TS5)
+
+        | Attribute | Type | Description |
+        |-----------|------|-------------|
+        | `format` | string | Credential format supported by the attestation as defined in TS5. |
+        | `meta` | string | Metadata associated with the provided attestation as defined in TS5. |
       tags:
         - Provided Attestation
 
@@ -1849,8 +2794,8 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
-                  description: User session identifier
 
                 providesAttestations:
                   type: array
@@ -1898,7 +2843,18 @@ paths:
   /provided_attestation/list:
     post:
       summary: List Provided Attestations
-      description: Retrieve all provided attestations for the authenticated user
+      description: |
+        Returns all Provided Attestation objects belonging to the authenticated user.
+
+        The returned objects follow the Provided Attestation definition
+        described in the TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+
       tags:
         - Provided Attestation
 
@@ -1913,6 +2869,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
       responses:
@@ -1949,13 +2906,96 @@ paths:
         "401":
           description: Invalid hash_pid
 
-
   /supervisory_authority/create:
     post:
       summary: Create Supervisory Authority
-      description: Create one or more supervisory authorities. At least one contact method (email, formURI, or phone) is required.
+      description: |
+        Creates one or more Supervisory Authorities.
+
+        The Supervisory Authority object represents the competent supervisory
+        authority associated with a Wallet Relying Party.
+
+        At least one contact method (`email`, `formURI` or `phone`) must be provided.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `supervisoryAuthority` | Collection of Supervisory Authority objects. |
+
+        ### Supervisory Authority attributes
+
+        | Attribute | Type | Description |
+        |-----------|------|-------------|
+        | `name` | string | Name of the Supervisory Authority. |
+        | `country` | string | ISO 3166-1 alpha-2 country code. |
+        | `email` | array<string> | Contact email addresses. |
+        | `formURI` | array<string> | Contact form or website URLs. |
+        | `phone` | array<string> | Contact telephone numbers. |
+
       tags:
         - Supervisory Authority
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - supervisoryAuthority
+            properties:
+
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
+
+              supervisoryAuthority:
+                type: array
+                description: Collection of Supervisory Authority objects.
+                items:
+                  type: object
+                  required:
+                    - name
+                    - country
+                  properties:
+
+                    name:
+                      type: string
+                      example: "CNPD"
+                      description: Name of the Supervisory Authority.
+
+                    country:
+                      type: string
+                      example: "PT"
+                      description: ISO 3166-1 alpha-2 country code.
+
+                    email:
+                      type: array
+                      description: Contact email addresses.
+                      items:
+                        type: string
+                      example:
+                        - "geral@cnpd.pt"
+
+                    formURI:
+                      type: array
+                      description: Contact form or website URLs.
+                      items:
+                        type: string
+                      example:
+                        - "https://www.cnpd.pt/contactos"
+
+                    phone:
+                      type: array
+                      description: Contact telephone numbers.
+                      items:
+                        type: string
+                      example:
+                        - "+351213928400"
 
       requestBody:
         required: true
@@ -1969,8 +3009,8 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
-                  description: User session identifier
 
                 supervisoryAuthority:
                   type: array
@@ -2038,13 +3078,35 @@ paths:
         "403":
           description: Validation error (e.g., missing contact methods)
 
-
   /supervisory_authority/list:
     post:
       summary: List Supervisory Authorities
-      description: Retrieve all supervisory authorities for the authenticated user
+      description: |
+        Returns all Supervisory Authorities associated with the authenticated user.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+
       tags:
         - Supervisory Authority
+
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
 
       requestBody:
         required: true
@@ -2057,6 +3119,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
       responses:
@@ -2113,7 +3176,34 @@ paths:
   /wallet_rp/create:
     post:
       summary: Create Wallet Relying Party
-      description: Create one or more Wallet Relying Parties with full configuration (provider, intended uses, attestations, etc.)
+      description: |
+        Creates one or more Wallet Relying Party (WRP) objects.
+
+        The `WalletRelyingParty` object follows the Wallet Relying Party
+        definition described in the TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `WalletRelyingParty` | Collection of Wallet Relying Party objects. |
+
+        ### WalletRelyingParty attributes (TS5)
+
+        | Attribute | Type | Description |
+        |-----------|------|-------------|
+        | `tradeName` | string | Commercial name of the Wallet Relying Party. |
+        | `provider_id` | integer | Reference to a previously registered Provider. |
+        | `supervisoryAuthority` | integer | Reference to a previously registered Supervisory Authority. |
+        | `registryURI` | string (URI) | Registry URI associated with the Wallet Relying Party. |
+        | `supportURI` | array<string> | Support endpoint URI(s). |
+        | `srvDescription` | array<object> | Localised description(s) of the Wallet Relying Party service. |
+        | `intendedUse_ids` | array<integer> | References to Intended Use objects. |
+        | `providesAttestations_id` | array<integer> | References to Provided Attestation objects. |
+        | `usesIntermediary` | array<integer> | References to intermediary Wallet Relying Parties, when applicable. |
+        | `entitlements` | array<string> | Entitlements supported by the Wallet Relying Party. |
+        | `isPSB` | boolean | Indicates whether the Wallet Relying Party is a PSB. |
       tags:
         - WalletRelyingParty
 
@@ -2129,6 +3219,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 WalletRelyingParty:
@@ -2206,8 +3297,17 @@ paths:
                         type: array
                         items:
                           type: string
-                        example:
-                          - "AGE_VERIFICATION"
+                          enum:
+                            - "https://uri.etsi.org/19475/Entitlement/Service_Provider"
+                            - "https://uri.etsi.org/19475/Entitlement/QEAA_Provider"
+                            - "https://uri.etsi.org/19475/Entitlement/Non_Q_EAA_Provider"
+                            - "https://uri.etsi.org/19475/Entitlement/PUB_EAA_Provider"
+                            - "https://uri.etsi.org/19475/Entitlement/PID_Provider"
+                            - "https://uri.etsi.org/19475/Entitlement/QCert_for_ESeal_Provider"
+                            - "https://uri.etsi.org/19475/Entitlement/QCert_for_ESig_Provider"
+                            - "https://uri.etsi.org/19475/Entitlement/rQSealCDs_Provider"
+                            - "https://uri.etsi.org/19475/Entitlement/rQSigCDs_Provider"
+                            - "https://uri.etsi.org/19475/Entitlement/ESig_ESeal_Creation_Provider"
 
                       isPSB:
                         type: boolean
@@ -2242,8 +3342,33 @@ paths:
   /wallet_rp/list:
     post:
       summary: List Wallet Relying Parties
+      description: |
+        Retrieves all Wallet Relying Party (WRP) objects associated with the
+        authenticated user.
+
+        The returned Wallet Relying Party objects follow the TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
       tags:
         - WalletRelyingParty
+      
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
 
       requestBody:
         required: true
@@ -2256,6 +3381,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
       responses:
@@ -2265,8 +3391,48 @@ paths:
   /wallet_rp/update_intended_use:
     post:
       summary: Add Intended Uses to WRP
+      description: |
+        Associates one or more Intended Use objects with an existing Wallet Relying Party.
+
+        The Wallet Relying Party and all Intended Use objects must belong to the
+        authenticated user.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `wrp_id` | Identifier of the Wallet Relying Party to update. |
+        | `intended_use_ids` | List of Intended Use identifiers to associate with the Wallet Relying Party. |
       tags:
         - WalletRelyingParty
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - wrp_id
+              - intended_use_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
+
+              wrp_id:
+                type: integer
+                example: 1
+                description: Identifier of the Wallet Relying Party to update. The Wallet Relying Party must belong to the authenticated user.
+
+              intended_use_ids:
+                type: array
+                description: List of Intended Use IDs to associate with the Wallet Relying Party. Every Intended Use must belong to the authenticated user.
+                items:
+                  type: integer
+                example: [1, 2]
 
       requestBody:
         required: true
@@ -2281,6 +3447,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 wrp_id:
@@ -2300,8 +3467,49 @@ paths:
   /wallet_rp/update_provided_attestation:
     post:
       summary: Update Provided Attestations for Wallet Relying Party
+      description: |
+        Associates one or more Provided Attestation objects with an existing Wallet
+        Relying Party.
+
+        The Wallet Relying Party and all Provided Attestation objects must belong to
+        the authenticated user.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `wrp_id` | Identifier of the Wallet Relying Party to update. |
+        | `provided_attestation_ids` | List of Provided Attestation identifiers to associate with the Wallet Relying Party. |
       tags:
         - WalletRelyingParty
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - wrp_id
+              - provided_attestation_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
+
+              wrp_id:
+                type: integer
+                example: 1
+                description: Identifier of the Wallet Relying Party to update. The Wallet Relying Party must belong to the authenticated user.
+
+              provided_attestation_ids:
+                type: array
+                description: List of Provided Attestation IDs to associate with the Wallet Relying Party. Every Provided Attestation must belong to the authenticated user.
+                items:
+                  type: integer
+                example: [1, 2]
 
       requestBody:
         required: true
@@ -2316,6 +3524,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 wrp_id:
@@ -2335,9 +3544,48 @@ paths:
   /wallet_rp/update_uses_intermediary:
     post:
       summary: Update Uses Intermediary for Wallet Relying Party
+      description: |
+        Associates one or more intermediary Wallet Relying Parties with an existing
+        Wallet Relying Party.
+
+        All referenced Wallet Relying Parties must belong to the authenticated user.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `wrp_id` | Identifier of the Wallet Relying Party to update. |
+        | `uses_intermediary_ids` | List of Wallet Relying Party identifiers representing intermediary services. |
       tags:
         - WalletRelyingParty
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - wrp_id
+              - uses_intermediary_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
 
+              wrp_id:
+                type: integer
+                example: 1
+                description: Identifier of the Wallet Relying Party to update. The Wallet Relying Party must belong to the authenticated user.
+
+              uses_intermediary_ids:
+                type: array
+                description: List of Wallet Relying Party IDs to associate as intermediary services.
+                items:
+                  type: integer
+                example: [10, 11]
       requestBody:
         required: true
         content:
@@ -2351,6 +3599,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 wrp_id:
@@ -2370,9 +3619,48 @@ paths:
   /wallet_rp/remove_intended_use:
     post:
       summary: Remove Intended Uses from WRP
-      description: A Wallet Relying Party must always have at least one Intended Use
+      description: |
+        Removes one or more Intended Use associations from a Wallet Relying Party.
+
+        A Wallet Relying Party must always remain associated with at least one
+        Intended Use.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `wrp_id` | Identifier of the Wallet Relying Party to update. |
+        | `intended_use_ids` | List of Intended Use identifiers to remove. |
       tags:
         - WalletRelyingParty
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - wrp_id
+              - intended_use_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
+
+              wrp_id:
+                type: integer
+                example: 1
+                description: Identifier of the Wallet Relying Party to update. The Wallet Relying Party must belong to the authenticated user.
+
+              intended_use_ids:
+                type: array
+                description: List of Intended Use IDs to associate with the Wallet Relying Party. Every Intended Use must belong to the authenticated user.
+                items:
+                  type: integer
+                example: [1, 2]
 
       requestBody:
         required: true
@@ -2387,6 +3675,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 wrp_id:
@@ -2406,9 +3695,46 @@ paths:
   /wallet_rp/remove_provided_attestation:
     post:
       summary: Remove Provided Attestations from Wallet Relying Party
+      description: |
+        Removes one or more Provided Attestation associations from a Wallet Relying
+        Party.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `wrp_id` | Identifier of the Wallet Relying Party to update. |
+        | `provided_attestation_ids` | List of Provided Attestation identifiers to remove. |
       tags:
         - WalletRelyingParty
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - wrp_id
+              - provided_attestation_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
 
+              wrp_id:
+                type: integer
+                example: 1
+                description: Identifier of the Wallet Relying Party to update. The Wallet Relying Party must belong to the authenticated user.
+
+              provided_attestation_ids:
+                type: array
+                description: List of Provided Attestation IDs to associate with the Wallet Relying Party. Every Provided Attestation must belong to the authenticated user.
+                items:
+                  type: integer
+                example: [1, 2]
       requestBody:
         required: true
         content:
@@ -2422,6 +3748,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 wrp_id:
@@ -2441,8 +3768,46 @@ paths:
   /wallet_rp/remove_uses_intermediary:
     post:
       summary: Remove Uses Intermediary from Wallet Relying Party
+      description: |
+        Removes one or more intermediary Wallet Relying Party associations from an
+        existing Wallet Relying Party.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `wrp_id` | Identifier of the Wallet Relying Party to update. |
+        | `uses_intermediary_ids` | List of intermediary Wallet Relying Party identifiers to remove. |
       tags:
         - WalletRelyingParty
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+              - wrp_id
+              - uses_intermediary_ids
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
+
+              wrp_id:
+                type: integer
+                example: 1
+                description: Identifier of the Wallet Relying Party to update. The Wallet Relying Party must belong to the authenticated user.
+
+              uses_intermediary_ids:
+                type: array
+                description: List of Wallet Relying Party IDs to associate as intermediary services.
+                items:
+                  type: integer
+                example: [10, 11]
 
       requestBody:
         required: true
@@ -2457,6 +3822,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 wrp_id:
@@ -2476,6 +3842,18 @@ paths:
   /list_claim:
     post:
       summary: List Claims
+
+      description: |
+        Retrieves all Claim objects associated with the authenticated user.
+
+        The returned Claim objects follow the Claim definition described in the
+        TS5 specification.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
       tags:
         - Claim
 
@@ -2490,6 +3868,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
       responses:
@@ -2499,9 +3878,40 @@ paths:
   /list_full_info:
     post:
       summary: Get full hierarchical user information
-      description: Returns legal entities with providers, wallet relying parties and intended uses
+
+      description: |
+        Retrieves the complete hierarchical information associated with the
+        authenticated user.
+
+        The response aggregates all registered entities and their relationships,
+        including Legal Entities, Providers, Wallet Relying Parties, Intended Uses,
+        Credentials, Policies and other associated resources.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+
+        ### Response
+
+        Returns a hierarchical representation of all resources belonging to the
+        authenticated user and the relationships between them.
       tags:
         - FullInfo
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            required:
+              - hash_pid
+            properties:
+              hash_pid:
+                type: string
+                example: "abc123hash"
+                description: Authenticated user session identifier.
 
       requestBody:
         required: true
@@ -2514,6 +3924,7 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
       responses:
@@ -2525,11 +3936,21 @@ paths:
       tags:
         - Certificates
 
-      summary: Generate Intended Use Registration Certificate
+      summary: Generate Wallet Relying Party Registration Certificate (WRPRC)
 
       description: |
-        Generates a signed certificate (JAdES + COSE) for a given Intended Use.
-        Returns both the signed document and COSE payload encoded in base64.
+        Generates the Wallet Relying Party Registration Certificate (WRPRC)
+        for the specified Intended Use.
+
+        The certificate is signed using JAdES and COSE and is returned
+        encoded in Base64 together with the signed document.
+        
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `intended_use_id` | Identifier of the Intended Use for which the Wallet Relying Party Registration Certificate (WRPRC) will be generated. |
 
       requestBody:
         required: true
@@ -2543,10 +3964,12 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
 
                 intended_use_id:
                   type: integer
+                  description: Identifier of the Intended Use for which the Wallet Relying Party Registration Certificate (WRPRC) will be generated.
                   example: 10
 
       responses:
@@ -2585,11 +4008,22 @@ paths:
       tags:
         - Certificates
 
-      summary: Generate Wallet Relying Party Certificate (PKCS#12)
+      summary: Generate Wallet Relying Party Attestation Certificate (WRPAC)
 
       description: |
-        Generates a certificate for a Wallet Relying Party using EJBCA.
-        Returns a PKCS#12 (.p12) file encoded in base64.
+        Generates a Wallet Relying Party Attestation Certificate (WRPAC)
+        for the specified Wallet Relying Party using EJBCA.
+
+        The generated certificate is returned as a PKCS#12 (.p12) file,
+        encoded in Base64.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `wrp_id` | Identifier of the Wallet Relying Party for which the WRPAC will be generated. |
+        | `password` | Password used to protect the generated PKCS#12 container. |
 
       requestBody:
         required: true
@@ -2604,8 +4038,8 @@ paths:
               properties:
                 hash_pid:
                   type: string
+                  description: Authenticated user session identifier.
                   example: "abc123hash"
-                  description: User session identifier
 
                 wrp_id:
                   type: integer
@@ -2615,7 +4049,7 @@ paths:
                 password:
                   type: string
                   example: "StrongPassword123!"
-                  description: Password used to encrypt the PKCS#12 file
+                  description: Password used to encrypt the generated PKCS#12 (.p12) file.
 
       responses:
         "200":
@@ -2674,10 +4108,31 @@ paths:
 
   /wrp:
     get:
-      summary: Public search for Wallet Relying Parties (signed response)
-      description: >
-        Returns filtered Wallet Relying Parties. Response is signed using JWS (ES256).
-        The response is NOT JSON but a signed token.
+      summary: Search Wallet Relying Parties
+      description: |
+        Searches for Wallet Relying Party (WRP) objects matching the supplied
+        query parameters.
+
+        The Wallet Relying Party object follows the Wallet Relying Party
+        definition described in the TS5 specification.
+
+        The response is digitally signed using JWS (ES256). As defined in the
+        TS5 specification, the JWS payload contains an array of matching
+        `WalletRelyingParty` objects.
+
+        ### Query Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `identifier` | Wallet Relying Party identifier. |
+        | `legalname` | Legal name of the Wallet Relying Party. |
+        | `tradename` | Trade name of the Wallet Relying Party. |
+        | `policy` | Policy identifier associated with the Wallet Relying Party. |
+        | `entitlement` | Supported entitlement. |
+        | `providesattestation` | Provided Attestation identifier. |
+        | `intendeduseidentifier` | Intended Use identifier. |
+        | `isintermediary` | Indicates whether the Wallet Relying Party acts as an intermediary. |
+        | `usesintermediary` | Identifier of an intermediary Wallet Relying Party. |
       tags:
         - Public
 
@@ -2730,19 +4185,32 @@ paths:
 
       responses:
         "200":
-          description: Signed JWS response (ES256)
-          content:
-            text/plain:
-              schema:
-                type: string
-                example: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
+          description: |
+            JWS (ES256) signed response.
+
+            The JWS payload contains an array of matching
+            `WalletRelyingParty` objects as defined in the TS5 specification.
+          schema:
+            type: string
+            example: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
 
   /wrp/{identifier}:
     get:
-      summary: Get WRP by Identifier (signed response)
-      description: >
-        Returns a Wallet Relying Party by identifier.
-        The response is signed using ES256 JWS and must be verified using the public key.
+      summary: Get Wallet Relying Party by Identifier
+      description: |
+        Retrieves a Wallet Relying Party identified by the supplied identifier.
+
+        The returned Wallet Relying Party object follows the Wallet Relying Party
+        definition described in the TS5 specification.
+
+        As defined in the TS5 specification, the response is a signed JWT
+        containing the Wallet Relying Party object.
+
+        ### Path Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `identifier` | Unique identifier of the Wallet Relying Party. |
       tags:
         - Public
 
@@ -2756,12 +4224,12 @@ paths:
 
       responses:
         "200":
-          description: Signed WRP object (JWS ES256)
-          content:
-            text/plain:
-              schema:
-                type: string
-                example: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
+          description: |
+            Signed JWT containing the requested Wallet Relying Party object,
+            as defined in the TS5 specification.
+          schema:
+            type: string
+            example: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
 
         "404":
           description: WRP not found
@@ -2786,8 +4254,25 @@ paths:
         - Public
       summary: Check Intended Use
       description: |
-        Verifies if a given combination of identifier, claim, credential and intended use exists.
-        Returns a signed JWS response.
+        Verifies whether a given combination of Wallet Relying Party identifier,
+        Intended Use, Credential and Claim is registered.
+
+        This endpoint follows the Intended Use verification procedure defined in
+        the TS5 specification.
+
+        The response is digitally signed using JWS (ES256). As defined in the
+        TS5 specification, the JWS payload contains a boolean value (`true` or
+        `false`) indicating whether the supplied combination exists.
+
+        ### Query Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `identifier` | Wallet Relying Party identifier. |
+        | `claim_path` | JSON path of the claim to verify. |
+        | `credential_format` | Credential format as defined in TS5. |
+        | `credential_meta` | Credential metadata associated with the credential. |
+        | `intended_use_identifier` | Intended Use identifier to verify. |
 
       parameters:
         - in: query
@@ -2823,15 +4308,15 @@ paths:
 
       responses:
         "200":
-          description: Signed verification result (JWS)
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  payload:
-                    type: string
-                    example: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
+          description: |
+            JWS (ES256) signed boolean response.
+
+            The JWS payload contains either `true` or `false`, indicating whether
+            the supplied Wallet Relying Party identifier, Intended Use, Credential
+            and Claim combination exists, as defined in the TS5 specification.
+          schema:
+            type: string
+            example: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
 
         "400":
           description: Missing required fields

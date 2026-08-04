@@ -2539,7 +2539,11 @@ def get_wrp_intended_id(intended_use_id):
                     sa.country,
                     sae.email,
                     sap.phone,
-                    saf.formURI
+                    saf.formURI,
+
+                    pa.id,
+                    pa.format,
+                    pa.meta
 
                 FROM wallet_relying_party wrp
 
@@ -2572,6 +2576,12 @@ def get_wrp_intended_id(intended_use_id):
 
                 LEFT JOIN supervisory_authority_formuri saf
                     ON saf.authority_id = sa.id
+                    
+                LEFT JOIN wrp_provided_attestation wpa
+                    ON wrp.id = wpa.wrp_id
+                    
+                LEFT JOIN provided_attestation pa
+                    ON wpa.provided_attestation_id = pa.id
 
                 WHERE wiu.intended_use_id = %s;
                 """
@@ -2588,7 +2598,8 @@ def get_wrp_intended_id(intended_use_id):
                 intermediary_id,
                 lang, content,
                 sa_name, sa_country,
-                sa_email, sa_phone, sa_form
+                sa_email, sa_phone, sa_form,
+                pa_id, pa_format, pa_meta
             ) in rows:
 
                 if wrp_id not in result:
@@ -2604,6 +2615,8 @@ def get_wrp_intended_id(intended_use_id):
                         "entitlements": [],
                         "srvDescription": [],
                         "usesIntermediary": [],
+
+                        "provides_attestations": [],
 
                         "SupervisoryAuthority": None
                     }
@@ -2650,8 +2663,14 @@ def get_wrp_intended_id(intended_use_id):
                     if sa_form and sa_form not in sa["formURI"]:
                         sa["formURI"].append(sa_form)
 
+                if pa_id:
+                    obj = {
+                        "format": pa_format, 
+                        "meta": deserialize_json(pa_meta)
+                    }
+                    if obj not in wrp["provides_attestations"]:
+                        wrp["provides_attestations"].append(obj)
             return list(result.values())
-
     except pymysql.MySQLError as e:
         logger.error(f"Error: {e}")
         return []

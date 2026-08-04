@@ -200,31 +200,6 @@ def initial_page():
 
 @rpr.route("/authentication", methods=["GET"])
 def authentication():
-    """
-Start Authentication Flow
----
-tags:
-  - Authentication
-consumes:
-  - application/json
-produces:
-  - application/json
-
-responses:
-  200:
-    description: Authentication initiated successfully
-    schema:
-      type: object
-      properties:
-        QR_code_url:
-          type: string
-          description: URL to generate/display the QR code for authentication
-          example: https://example.com/qr/123456
-        presentation_id:
-          type: string
-          description: Transaction identifier for the authentication session
-          example: 550e8400-e29b-41d4-a716-446655440000
-"""
 
     payload ={
       "type": "vp_token",
@@ -324,45 +299,6 @@ responses:
 
 @rpr.route("/pid_authorization")
 def pid_authorization_get():
-    """
-PID Authorization
----
-tags:
-  - Authentication
-consumes:
-  - application/json
-produces:
-  - application/json
-parameters:
-  - in: query
-    name: presentation_id
-    required: true
-    type: string
-    description: Transaction identifier received from the authentication step
-    example: 550e8400-e29b-41d4-a716-446655440000
-
-responses:
-  200:
-    description: Authorization successful
-    schema:
-      type: object
-      properties:
-        message:
-          type: object
-          properties:
-            message:
-              type: string
-              example: Sucess
-
-  500:
-    description: Error during authorization request
-    schema:
-      type: object
-      properties:
-        error:
-          type: string
-          example: "500"
-"""
 
     presentation_id= request.args.get("presentation_id")
 
@@ -381,47 +317,8 @@ responses:
         return jsonify({"message": data}),200
             
     
-@rpr.route("/getpidoid4vp", methods=["GET", "POST"])
+@rpr.route("/getpidoid4vp", methods=["POST"])
 def getpidoid4vp():
-    """
-Get PID (OID4VP)
----
-tags:
-  - Authentication
-consumes:
-  - application/json
-produces:
-  - application/json
-parameters:
-  - in: query
-    name: presentation_id
-    required: true
-    type: string
-    description: Transaction identifier received from the authentication step
-    example: 550e8400-e29b-41d4-a716-446655440000
-
-responses:
-  200:
-    description: PID retrieved successfully
-    schema:
-      type: string
-      example: abc123hashpid
-
-  400:
-    description: Missing presentation_id
-    schema:
-      type: object
-      properties:
-        status:
-          type: string
-          example: error
-        code:
-          type: integer
-          example: 400
-        message:
-          type: string
-          example: Missing presentation_id
-"""
     if "presentation_id" not in request.args:
         return {
             "status": "error",
@@ -2682,9 +2579,9 @@ def intended_use_registration_certificate():
     if info_uri:
         json_payload["info_uri"] = info_uri
     
-    if wrp[0].get("providesAttestations"):
-        json_payload["provides_attestations"] = wrp[0]["providesAttestations"]
-    
+    if wrp[0].get("provides_attestations"):
+        json_payload["provides_attestations"] = wrp[0]["provides_attestations"]
+
     sa = wrp[0].get("SupervisoryAuthority")
     if sa:
         supervisory_authority = {}
@@ -2755,7 +2652,7 @@ def intended_use_registration_certificate():
         })
     
     with open(cfgserv.wrprc_certificate, "rb") as f:
-        cert = x509.load_der_x509_certificate(f.read(), default_backend())
+        cert = x509.load_pem_x509_certificate(f.read(), default_backend())
 
     base64_cert = base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode("utf-8")
     
