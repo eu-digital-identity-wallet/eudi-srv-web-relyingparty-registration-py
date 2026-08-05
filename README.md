@@ -817,7 +817,7 @@ Generates a Wallet Relying Party certificate in PKCS#12 format.
 Full API documentation is available through Swagger UI.
 
 ```
-/apidocs/
+/swagger/
 ```
 
 ---
@@ -1045,8 +1045,8 @@ The Swagger interface provides an interactive environment where users can explor
 
 | Environment | URL                                                    |
 | ----------- | ------------------------------------------------------ |
-| Local       | `http://localhost:5000/apidocs/`                       |
-| Online      | `https://registry.serviceproviders.eudiw.dev/apidocs/` |
+| Local       | `http://localhost:5000/swagger/`                       |
+| Online      | `https://registry.serviceproviders.eudiw.dev/swagger/` |
 
 The Swagger documentation should be considered the primary reference for the API specification, as it is kept up to date with the latest endpoint definitions and supported request/response formats.
 
@@ -1435,7 +1435,7 @@ The complete API documentation, including all available endpoints, request param
 When running the project locally, the Swagger documentation is available at:
 
 ```
-http://localhost:5000/apidocs
+http://localhost:5000/swagger
 ```
 
 *(Adjust the host and port if your local deployment uses different values.)*
@@ -1445,7 +1445,7 @@ http://localhost:5000/apidocs
 The latest online Swagger documentation is available at:
 
 ```
-https://registry.serviceproviders.eudiw.dev/apidocs
+https://registry.serviceproviders.eudiw.dev/swagger
 ```
 
 ## How to contribute
