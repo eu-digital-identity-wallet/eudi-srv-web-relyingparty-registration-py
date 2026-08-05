@@ -5,8 +5,8 @@ info:
   version: 1.0.0
 
 servers:
-  # - url: https://registry.serviceproviders.eudiw.dev
-  # - url: https://dev.registry.serviceproviders.eudiw.dev
+  - url: https://registry.serviceproviders.eudiw.dev
+  - url: https://dev.registry.serviceproviders.eudiw.dev
   - url: http://localhost:5000
 
 paths:
