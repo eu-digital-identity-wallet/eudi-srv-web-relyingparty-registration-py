@@ -2652,7 +2652,7 @@ def intended_use_registration_certificate():
         })
     
     with open(cfgserv.wrprc_certificate, "rb") as f:
-        cert = x509.load_pem_x509_certificate(f.read(), default_backend())
+        cert = x509.load_der_x509_certificate(f.read(), default_backend())
 
     base64_cert = base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode("utf-8")
     
