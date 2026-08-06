@@ -3970,3 +3970,93 @@ def check_intended_use(
     except Exception as e:
         logger.error(e)
         return False
+
+## -access_certificate-insert 
+def insert_access_certificate(pkcs12_certificate, serial_number, subject, state, created_at, expires_at, wrp_id, user_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = "INSERT INTO access_certificate (pkcs12_certificate, " \
+                                                            "serial_number, " \
+                                                            "subject, state, " \
+                                                            "created_at, " \
+                                                            "expires_at, " \
+                                                            "wrp_id, " \
+                                                            "user_id)" \
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+            
+            cursor.execute(insert_query, (pkcs12_certificate, serial_number, subject, state, created_at, expires_at, wrp_id, user_id,))
+            
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Access Certificate successfully added. New Access Certificate ID: {cursor.lastrowid}")
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        extra = {'code'} 
+        logger.error(f"Error inserting Access Certificate: {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+            
+## -registration_certificate-insert
+def insert_registration_certificate(
+    jwt_certificate,
+    cbor_certificate,
+    state,
+    created_at,
+    expires_at,
+    intended_use_id,
+    user_id
+):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = """
+                INSERT INTO registration_certificate (
+                    jwt_certificate,
+                    cbor_certificate,
+                    state,
+                    created_at,
+                    expires_at,
+                    intended_use_id,
+                    user_id
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """
+
+            cursor.execute(
+                insert_query,
+                (
+                    jwt_certificate,
+                    cbor_certificate,
+                    state,
+                    created_at,
+                    expires_at,
+                    intended_use_id,
+                    user_id,
+                ),
+            )
+
+            connection.commit()
+
+            logger.info(
+                f"Registration Certificate successfully added. "
+                f"New Registration Certificate ID: {cursor.lastrowid}"
+            )
+
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error inserting Registration Certificate: {e}")
+
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()

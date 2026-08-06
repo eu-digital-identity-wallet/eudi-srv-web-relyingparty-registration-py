@@ -2405,6 +2405,18 @@ def wrp_access_certificate():
     }
 
     file_base64 = base64.b64encode(p12).decode()
+    serial_number = response["serial_number"]
+
+    db.insert_access_certificate(
+        pkcs12_certificate=file_base64,
+        serial_number=serial_number,
+        subject=cert_subject_rfc4514_string,
+        state="ACTIVE",
+        created_at=datetime.now(),
+        expires_at=certificate.not_valid_after_utc,
+        wrp_id=wrp_id,
+        user_id=user_id
+    )
 
     return jsonify({
         "status": "success",
@@ -2784,6 +2796,16 @@ def intended_use_registration_certificate():
 
     file_base64 = base64.urlsafe_b64encode(jwt.encode()).decode()
     cose_base64 = base64.urlsafe_b64encode(cose_bytes).decode()
+
+    db.insert_registration_certificate(
+        jwt_certificate=file_base64,
+        cbor_certificate=cose_base64,
+        state="ACTIVE",
+        created_at=datetime.now(),
+        expires_at=datetime.utcfromtimestamp(iat),
+        intended_use_id=intended_use_id,
+        user_id=user_id,
+    )
 
     return jsonify({
         "status": "success",
