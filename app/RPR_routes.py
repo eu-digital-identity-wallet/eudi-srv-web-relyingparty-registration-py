@@ -2802,7 +2802,7 @@ def intended_use_registration_certificate():
         jwt_certificate=file_base64,
         cbor_certificate=cose_base64,
         state="ACTIVE",
-        created_at=datetime.now(),
+        created_at=now,
         expires_at=(now + timedelta(days=6*30)),
         intended_use_id=intended_use_id,
         user_id=user_id,
