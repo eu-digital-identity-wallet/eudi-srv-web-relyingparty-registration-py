@@ -23,7 +23,7 @@ import ast
 import base64
 import binascii
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import io
 import json
 import os
@@ -2471,7 +2471,8 @@ def intended_use_registration_certificate():
 # family_name=natural_person_data["family_name"]
 
 
-    iat= int(time.time())
+    now = datetime.now(timezone.utc)
+    iat = int(now.timestamp())
 
 # name=RP_data["tradeName"]
 # purpose=intended_use_data["purpose"]
@@ -2549,7 +2550,7 @@ def intended_use_registration_certificate():
     data={
         "country":"FC",
         "doctype":"wrprc",
-        "expiry_date":datetime.utcfromtimestamp(iat).strftime("%Y-%m-%d")
+        "expiry_date":(now + timedelta(days=6*30)).strftime("%Y-%m-%d")
     }
 
     response = requests.post(cfgserv.url_statuslist, headers=headers, data=data)
@@ -2802,7 +2803,7 @@ def intended_use_registration_certificate():
         cbor_certificate=cose_base64,
         state="ACTIVE",
         created_at=datetime.now(),
-        expires_at=datetime.utcfromtimestamp(iat),
+        expires_at=(now + timedelta(days=6*30)),
         intended_use_id=intended_use_id,
         user_id=user_id,
     )
