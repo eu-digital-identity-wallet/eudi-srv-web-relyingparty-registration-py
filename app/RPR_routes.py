@@ -297,7 +297,7 @@ def authentication():
 
     return (return_json)
 
-@rpr.route("/pid_authorization")
+@rpr.route("/pid_authorization", methods=["GET"])
 def pid_authorization_get():
 
     presentation_id= request.args.get("presentation_id")
