@@ -2650,37 +2650,32 @@ def intended_use_registration_certificate():
 
         for intermediary_id in wrp[0]["usesIntermediary"]:
 
-            wrp_intermediary = db.get_wrp_intermediary(intermediary_id)
+            rp_intermediary = db.get_wrp_id(intermediary_id)
 
-            if wrp_intermediary != []:
+            legalentity_intermediary = db.get_legal_entity_id(
+                rp_intermediary[0]["provider_id"]
+            )
 
-                rp_intermediary = db.get_wrp_id(wrp_intermediary)
+            if legalentity_intermediary:
+                identifier = legalentity_intermediary[0]["identifier"][0]
+                country = legalentity_intermediary[0]["country"]
 
-                if rp_intermediary:
-                    legalentity_intermediary = db.get_legal_entity_id(
-                        rp_intermediary[0]["provider_id"]
-                    )
+                country_code = (
+                    "XG"
+                    if TypeIdentifier[identifier["type"]] == "LEI"
+                    else country
+                )
 
-                    if legalentity_intermediary:
-                        identifier = legalentity_intermediary[0]["identifier"][0]
-                        country = legalentity_intermediary[0]["country"]
+                aux = (
+                    f"{TypeIdentifier[identifier['type']]}"
+                    f"{country_code}-"
+                    f"{identifier['identifier']}"
+                )
 
-                        country_code = (
-                            "XG"
-                            if TypeIdentifier[identifier["type"]] == "LEI"
-                            else country
-                        )
-
-                        aux = (
-                            f"{TypeIdentifier[identifier['type']]}"
-                            f"{country_code}-"
-                            f"{identifier['identifier']}"
-                        )
-
-                        intermediaries.append({
-                            "sub": aux,
-                            "sname": rp_intermediary[0]["trade_name"]
-                        })
+                intermediaries.append({
+                    "sub": aux,
+                    "sname": rp_intermediary[0]["trade_name"]
+                })
 
         json_payload.update({
             "intermediary": intermediaries
