@@ -2645,7 +2645,7 @@ def intended_use_registration_certificate():
         })
         
     if db.get_wrp_intermediary(wrp[0]["wrp_id"]) != []:
-        
+        return ("teste1")
         rp_intermediary = db.get_wrp_id(db.get_wrp_intermediary(wrp[0]["wrp_id"]))
         legalentity_intermediary = db.get_legal_entity_id(rp_intermediary[0]["provider_id"])
 
