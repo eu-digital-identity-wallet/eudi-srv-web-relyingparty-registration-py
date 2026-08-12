@@ -2554,9 +2554,12 @@ def intended_use_registration_certificate():
     }
 
     response = requests.post(cfgserv.url_statuslist, headers=headers, data=data)
-
-    status=response.json()
     
+    status=response.json()
+
+    if "status_list" not in status:
+        return error_invalid("Status List error")
+
     status_idx=status["status_list"]["idx"]
     status_uri=status["status_list"]["uri"]
 
