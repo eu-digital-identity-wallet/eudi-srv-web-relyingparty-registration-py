@@ -204,6 +204,7 @@ def authentication():
     payload ={
       "type": "vp_token",
       "nonce": "hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc=",
+      "intended_use_id": "TEST-01",
       "dcql_query": {
           "credentials": [
           {
@@ -2455,6 +2456,17 @@ def intended_use_registration_certificate():
     if wrp == []:
         return error_invalid(f"Intended Use id {intended_use_id} doesn't have a Wallet Relying Party associated.")
 
+    intermediary_id = data.get("intermediary_id")
+    if intermediary_id:
+        if user_id != db.check_wrp(intermediary_id):
+            return error_invalid(f"Wallet Relying Party id {intermediary_id} doesn't belong to this user")
+        
+    wrp_intermediary = db.get_wrp_intermediary(intermediary_id)
+    if not wrp_intermediary or wrp[0]["wrp_id"] != wrp_intermediary[0]:
+        return error_invalid(
+            f"The usesIntermediary ID {intermediary_id} does not belong to this Wallet Relying Party"
+        )
+        
     legal_entity = db.get_legal_entity_id(wrp[0]["provider_id"])
 
 # #if legal person
@@ -2643,42 +2655,27 @@ def intended_use_registration_certificate():
             "sub_ln": legalName,
             "certificate_policy":certificate_policy
         })
-    
-    if wrp[0]["usesIntermediary"]:
 
-        intermediaries = []
+    if intermediary_id:
+        rp_intermediary = db.get_wrp_id(intermediary_id)
+        legalentity_intermediary = db.get_legal_entity_id(rp_intermediary[0]["provider_id"])
 
-        for intermediary_id in wrp[0]["usesIntermediary"]:
+        identifier = legalentity_intermediary[0]["identifier"][0]
+        country = legalentity_intermediary[0]["country"]
 
-            rp_intermediary = db.get_wrp_id(intermediary_id)
+        country_code = "XG" if TypeIdentifier[identifier['type']] == "LEI" else country
 
-            legalentity_intermediary = db.get_legal_entity_id(
-                rp_intermediary[0]["provider_id"]
-            )
-
-            if legalentity_intermediary:
-                identifier = legalentity_intermediary[0]["identifier"][0]
-                country = legalentity_intermediary[0]["country"]
-
-                country_code = (
-                    "XG"
-                    if TypeIdentifier[identifier["type"]] == "LEI"
-                    else country
-                )
-
-                aux = (
-                    f"{TypeIdentifier[identifier['type']]}"
-                    f"{country_code}-"
-                    f"{identifier['identifier']}"
-                )
-
-                intermediaries.append({
-                    "sub": aux,
-                    "sname": rp_intermediary[0]["trade_name"]
-                })
+        aux = (
+            f"{TypeIdentifier[identifier['type']]}"
+            f"{country_code}-"
+            f"{identifier['identifier']}"
+        )
 
         json_payload.update({
-            "intermediary": intermediaries
+            "intermediary": {
+                "sub": aux,
+                "sname": rp_intermediary[0]["trade_name"]
+            }
         })
     
     with open(cfgserv.wrprc_certificate, "rb") as f:
