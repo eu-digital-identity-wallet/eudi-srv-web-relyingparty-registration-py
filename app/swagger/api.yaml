@@ -3930,7 +3930,6 @@ paths:
       responses:
         "200":
           description: Full structured data returned
-
   /intended_use/certificate:
     post:
       tags:
@@ -3942,15 +3941,21 @@ paths:
         Generates the Wallet Relying Party Registration Certificate (WRPRC)
         for the specified Intended Use.
 
+        An Intermediary may optionally be specified. If `intermediary_id` is
+        provided, the generated certificate will include the specified
+        Intermediary. If no `intermediary_id` is provided, the certificate
+        will be generated without an Intermediary.
+
         The certificate is signed using JAdES and COSE and is returned
         encoded in Base64 together with the signed document.
-        
+
         ### Request Parameters
 
-        | Parameter | Description |
-        |-----------|-------------|
-        | `hash_pid` | Authenticated user session identifier. |
-        | `intended_use_id` | Identifier of the Intended Use for which the Wallet Relying Party Registration Certificate (WRPRC) will be generated. |
+        | Parameter | Type | Description |
+        |-----------|------|-------------|
+        | `hash_pid` | string | Authenticated user session identifier. |
+        | `intermediary_id` | integer | Identifier of the Intermediary to be associated with the WRPRC. If omitted, no Intermediary is included in the certificate. |
+        | `intended_use_id` | integer | Identifier of the Intended Use for which the WRPRC will be generated. |
 
       requestBody:
         required: true
@@ -3961,16 +3966,28 @@ paths:
               required:
                 - hash_pid
                 - intended_use_id
+
               properties:
                 hash_pid:
                   type: string
-                  description: Authenticated user session identifier.
+                  description: >
+                    Authenticated user session identifier.
                   example: "abc123hash"
+
+                intermediary_id:
+                  type: integer
+                  description: >
+                    Optional identifier of the Intermediary to be associated
+                    with the Wallet Relying Party Registration Certificate.
+                    If omitted, no Intermediary is included in the certificate.
+                  example: 14
 
                 intended_use_id:
                   type: integer
-                  description: Identifier of the Intended Use for which the Wallet Relying Party Registration Certificate (WRPRC) will be generated.
-                  example: 10
+                  description: >
+                    Identifier of the Intended Use for which the Wallet Relying
+                    Party Registration Certificate (WRPRC) will be generated.
+                  example: 1
 
       responses:
         "200":
