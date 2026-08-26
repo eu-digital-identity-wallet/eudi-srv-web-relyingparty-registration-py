@@ -2461,11 +2461,11 @@ def intended_use_registration_certificate():
         if user_id != db.check_wrp(intermediary_id):
             return error_invalid(f"Wallet Relying Party id {intermediary_id} doesn't belong to this user")
         
-    wrp_intermediary = db.get_wrp_intermediary(intermediary_id)
-    if not wrp_intermediary or wrp[0]["wrp_id"] != wrp_intermediary[0]:
-        return error_invalid(
-            f"The usesIntermediary ID {intermediary_id} does not belong to this Wallet Relying Party"
-        )
+        wrp_intermediary = db.get_wrp_intermediary(intermediary_id)
+        if not wrp_intermediary or wrp[0]["wrp_id"] != wrp_intermediary[0]:
+            return error_invalid(
+                f"The usesIntermediary ID {intermediary_id} does not belong to this Wallet Relying Party"
+            )
         
     legal_entity = db.get_legal_entity_id(wrp[0]["provider_id"])
 
