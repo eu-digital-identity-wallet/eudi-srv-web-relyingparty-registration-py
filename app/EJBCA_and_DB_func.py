@@ -110,6 +110,7 @@ def getJsonBody(certificateRequest, certificateAuthorityName, countryName):
             "password":ejbca.password,
             "include_chain": ejbca.includeChain
         }
+    
     return payload
 
 def getTrustManagerOfCACertificate(ManagementCA):

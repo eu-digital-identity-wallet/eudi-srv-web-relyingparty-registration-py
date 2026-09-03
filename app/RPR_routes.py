@@ -23,7 +23,7 @@ import ast
 import base64
 import binascii
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import io
 import json
 import os
@@ -96,6 +96,7 @@ import user as get_hash_user_pid
 from app.data_management import oid4vp_requests,p12_temp, certificate_data_List
 
 from app import logger
+from flask import send_from_directory
 
 rpr = Blueprint("RPR", __name__, url_prefix="/")
 
@@ -172,6 +173,24 @@ def list_response(message, result, name, code=200):
         }
     }, code
 
+@rpr.route("/swagger/api.yaml")
+def swagger_yaml():
+    return send_from_directory("swagger", "api.yaml")
+
+def serialize_json(value):
+    return json.dumps(value) if value is not None else None
+
+def deserialize_json(value):
+    return json.loads(value) if value else None
+
+def validate_date_field(value, field_name):
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return error_response(
+            f"Invalid '{field_name}'. Expected format: YYYY-MM-DD."
+        )
+    return None
 
 @rpr.route('/', methods=['GET','POST'])
 def initial_page():
@@ -181,35 +200,11 @@ def initial_page():
 
 @rpr.route("/authentication", methods=["GET"])
 def authentication():
-    """
-Start Authentication Flow
----
-tags:
-  - Authentication
-consumes:
-  - application/json
-produces:
-  - application/json
-
-responses:
-  200:
-    description: Authentication initiated successfully
-    schema:
-      type: object
-      properties:
-        QR_code_url:
-          type: string
-          description: URL to generate/display the QR code for authentication
-          example: https://example.com/qr/123456
-        presentation_id:
-          type: string
-          description: Transaction identifier for the authentication session
-          example: 550e8400-e29b-41d4-a716-446655440000
-"""
 
     payload ={
       "type": "vp_token",
       "nonce": "hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc=",
+      "intended_use_id": "TEST-01",
       "dcql_query": {
           "credentials": [
           {
@@ -303,47 +298,8 @@ responses:
 
     return (return_json)
 
-@rpr.route("/pid_authorization")
+@rpr.route("/pid_authorization", methods=["GET"])
 def pid_authorization_get():
-    """
-PID Authorization
----
-tags:
-  - Authentication
-consumes:
-  - application/json
-produces:
-  - application/json
-parameters:
-  - in: query
-    name: presentation_id
-    required: true
-    type: string
-    description: Transaction identifier received from the authentication step
-    example: 550e8400-e29b-41d4-a716-446655440000
-
-responses:
-  200:
-    description: Authorization successful
-    schema:
-      type: object
-      properties:
-        message:
-          type: object
-          properties:
-            message:
-              type: string
-              example: Sucess
-
-  500:
-    description: Error during authorization request
-    schema:
-      type: object
-      properties:
-        error:
-          type: string
-          example: "500"
-"""
 
     presentation_id= request.args.get("presentation_id")
 
@@ -362,47 +318,8 @@ responses:
         return jsonify({"message": data}),200
             
     
-@rpr.route("/getpidoid4vp", methods=["GET", "POST"])
+@rpr.route("/getpidoid4vp", methods=["POST"])
 def getpidoid4vp():
-    """
-Get PID (OID4VP)
----
-tags:
-  - Authentication
-consumes:
-  - application/json
-produces:
-  - application/json
-parameters:
-  - in: query
-    name: presentation_id
-    required: true
-    type: string
-    description: Transaction identifier received from the authentication step
-    example: 550e8400-e29b-41d4-a716-446655440000
-
-responses:
-  200:
-    description: PID retrieved successfully
-    schema:
-      type: string
-      example: abc123hashpid
-
-  400:
-    description: Missing presentation_id
-    schema:
-      type: object
-      properties:
-        status:
-          type: string
-          example: error
-        code:
-          type: integer
-          example: 400
-        message:
-          type: string
-          example: Missing presentation_id
-"""
     if "presentation_id" not in request.args:
         return {
             "status": "error",
@@ -1272,23 +1189,38 @@ def create_credential():
         if missing:
             return error_response("Missing required fields.", missing)
         
+        if not isinstance(credential["meta"], dict):
+            return error_response(
+                "Field 'meta' must be an object."
+            )
+        
         claims = credential.get("claims", [])
         for claim in claims:
             missing = validate_required_fields(claim, ["path"])
             if missing:
                 return error_response("Missing required fields.", missing)
 
+            if not isinstance(claim["path"], list):
+                return error_response(
+                    "Field 'path' must be an array."
+                )
+
+            if len(claim["path"]) == 0:
+                return error_response(
+                    "Field 'path' cannot be empty."
+                )
+
     #insert data base
     for credential in credentials:
         format = credential.get("format")
-        meta = credential.get("meta")
+        meta = serialize_json(credential["meta"])
         claims = credential.get("claims", [])
         
         credential_id = db.insert_credential(format, meta, user_id)
         result.append(credential_id)
 
         for claim in claims:
-            path = claim.get("path")
+            path = serialize_json(claim["path"])
 
             db.insert_claim(credential_id, path)
     
@@ -1372,11 +1304,20 @@ def create_intended_use():
     #insert data base
     for intended_use in intended_uses:
         intendedUseIdentifier = intended_use.get("intendedUseIdentifier")
-        createdAt = intended_use.get("createdAt")
-        revokedAt = intended_use.get("revokedAt")
         purposes = intended_use.get("purpose", [])
         privacyPolicy_ids = intended_use.get("privacyPolicy_id", [])
         credential_ids = intended_use.get("credential_ids", [])
+
+        createdAt = intended_use.get("createdAt")
+        revokedAt = intended_use.get("revokedAt")
+
+        error = validate_date_field(createdAt, "createdAt")
+        if error:
+            return error
+
+        error = validate_date_field(revokedAt, "revokedAt")
+        if error:
+            return error
 
         intended_use_id = db.insert_intended_use(intendedUseIdentifier, createdAt, revokedAt, user_id)
         result.append(intended_use_id)
@@ -1620,11 +1561,16 @@ def create_provided_attestation():
         missing = validate_required_fields(providesAttestation, ["format", "meta"])
         if missing:
             return error_response("Missing required fields.", missing)
+        
+        if not isinstance(providesAttestation["meta"], dict):
+            return error_response(
+                "Field 'meta' must be an object."
+            )
     
     #insert data base
     for providesAttestation in providesAttestations:
         format = providesAttestation.get("format")
-        meta = providesAttestation.get("meta")
+        meta = serialize_json(providesAttestation["meta"])
         
         provided_attestation_id = db.insert_provided_attestation(format, meta, user_id)
         result.append(provided_attestation_id)
@@ -1763,7 +1709,7 @@ def create_wrp():
     #validation
     for wrp in wrps:
         missing = validate_required_fields(wrp, ["supportURI", "provider_id", "srvDescription", 
-                                                 "intendedUse_ids", "isPSB", "entitlements", 
+                                                 "isPSB", "entitlements", 
                                                  "supervisoryAuthority", "registryURI"])
         if missing:
             return error_response("Missing required fields.", missing)
@@ -1795,9 +1741,10 @@ def create_wrp():
         if user_id != db.check_provider(provider_id):
                 return error_invalid(f"The Provider ID {provider_id} does not belong to this user")
         
-        for intendedUse_id in intendedUse_ids:
-            if user_id != db.check_intendedUse(intendedUse_id):
-                return error_invalid(f"The intendedUse ID {intendedUse_id} does not belong to this user")
+        if intendedUse_ids:
+            for intendedUse_id in intendedUse_ids:
+                if user_id != db.check_intendedUse(intendedUse_id):
+                    return error_invalid(f"The intendedUse ID {intendedUse_id} does not belong to this user")
 
             if db.check_wrp_intendedUse(intendedUse_id) != []:
                 return error_invalid(f"Intended Use id {intendedUse_id} already belongs to other wallet relying party")
@@ -2366,7 +2313,13 @@ def wrp_access_certificate():
         surname=legal_entity[0]["NaturalPerson"]["familyName"]
 
         first = legal_entity[0]["identifier"][0]
-        serial_number = (TypeIdentifier[first["type"]] + first["identifier"])
+        country_code = "XG" if TypeIdentifier[first['type']] == "LEI" else country
+
+        serial_number = (
+            f"{TypeIdentifier[first['type']]}"
+            f"{country_code}-"
+            f"{first['identifier']}"
+        )
 
         certificateRequest= generateCertificateRequest(priv_key=priv_key, commonName=tradeName, countryName=country, uniformResourceIdentifier=supportURI, 
                                                        givenName=givenName, surname=surname, serialNumber=serial_number, email=email)
@@ -2378,7 +2331,13 @@ def wrp_access_certificate():
         legalName = legal_entity[0]["LegalPerson"]["legalName"][0]
 
         first = legal_entity[0]["identifier"][0]
-        organizationIdentifier = (TypeIdentifier[first["type"]] + first["identifier"])
+        country_code = "XG" if TypeIdentifier[first['type']] == "LEI" else country
+
+        organizationIdentifier = (
+            f"{TypeIdentifier[first['type']]}"
+            f"{country_code}-"
+            f"{first['identifier']}"
+        )
         
         certificateRequest = generateCertificateRequest(priv_key=priv_key, commonName=tradeName, countryName=country, uniformResourceIdentifier=supportURI, 
                                                        organizationName=legalName, organizationIdentifier=organizationIdentifier, email=None)
@@ -2447,6 +2406,18 @@ def wrp_access_certificate():
     }
 
     file_base64 = base64.b64encode(p12).decode()
+    serial_number = response["serial_number"]
+
+    db.insert_access_certificate(
+        pkcs12_certificate=file_base64,
+        serial_number=serial_number,
+        subject=cert_subject_rfc4514_string,
+        state="ACTIVE",
+        created_at=datetime.now(),
+        expires_at=certificate.not_valid_after_utc,
+        wrp_id=wrp_id,
+        user_id=user_id
+    )
 
     return jsonify({
         "status": "success",
@@ -2482,7 +2453,20 @@ def intended_use_registration_certificate():
     intended_use = db.get_intended_use_id(intended_use_id)
 
     wrp = db.get_wrp_intended_id(intended_use_id)
+    if wrp == []:
+        return error_invalid(f"Intended Use id {intended_use_id} doesn't have a Wallet Relying Party associated.")
 
+    intermediary_id = data.get("intermediary_id")
+    if intermediary_id:
+        if user_id != db.check_wrp(intermediary_id):
+            return error_invalid(f"Wallet Relying Party id {intermediary_id} doesn't belong to this user")
+        
+        wrp_intermediary = db.get_wrp_intermediary(intermediary_id)
+        if not wrp_intermediary or wrp[0]["wrp_id"] != wrp_intermediary[0]:
+            return error_invalid(
+                f"The usesIntermediary ID {intermediary_id} does not belong to this Wallet Relying Party"
+            )
+        
     legal_entity = db.get_legal_entity_id(wrp[0]["provider_id"])
 
 # #if legal person
@@ -2499,7 +2483,8 @@ def intended_use_registration_certificate():
 # family_name=natural_person_data["family_name"]
 
 
-    iat= int(time.time())
+    now = datetime.now(timezone.utc)
+    iat = int(now.timestamp())
 
 # name=RP_data["tradeName"]
 # purpose=intended_use_data["purpose"]
@@ -2534,7 +2519,7 @@ def intended_use_registration_certificate():
     # if wrp[0]["providesAttestations"]:
     #     providesAttestations = wrp[0]["providesAttestations"]
     public_body = wrp[0]["isPSB"]
-    service = wrp[0]["srvDescription"]
+    srv_description = wrp[0]["srvDescription"]
 
 # #A URI to a status list presenting information about validity of the WRPRC. 
 # #status=
@@ -2552,7 +2537,14 @@ def intended_use_registration_certificate():
     }
     
     identifier = legal_entity[0]["identifier"][0]
-    sub_id = TypeIdentifier[identifier["type"]] + '-' + id
+
+    country_code = "XG" if TypeIdentifier[identifier['type']] == "LEI" else country
+
+    sub_id = (
+        f"{TypeIdentifier[identifier['type']]}"
+        f"{country_code}-"
+        f"{identifier['identifier']}"
+    )
 
     #sub_id = TypeIdentifier[legal_entity[0]["identifierType"]] + '-' + id
 
@@ -2570,12 +2562,15 @@ def intended_use_registration_certificate():
     data={
         "country":"FC",
         "doctype":"wrprc",
-        "expiry_date":datetime.utcfromtimestamp(iat).strftime("%Y-%m-%d")
+        "expiry_date":(now + timedelta(days=6*30)).strftime("%Y-%m-%d")
     }
 
     response = requests.post(cfgserv.url_statuslist, headers=headers, data=data)
-
+    
     status=response.json()
+
+    if "status_list" not in status:
+        return error_invalid("Status List error")
 
     status_idx=status["status_list"]["idx"]
     status_uri=status["status_list"]["uri"]
@@ -2591,14 +2586,17 @@ def intended_use_registration_certificate():
                         "purpose": purpose, 
                         "country": country,
                         "sub": sub_id,
+                        "registry_uri": cfgserv.service_url,
                         "privacy_policy": privacy_policy, 
-                        "policy_id": [ "{ itu-t(0) identified-organization(4) etsi(0) eudiwrpa(19475) policy-identifiers(3) wrprc (1)}" ],
+                        "policy_id": [
+                            "0.4.0.19475.3.1"
+                        ],
                         "iat": iat, 
                         "credentials": credentials,
                         "entitlements": entitlement,
                         "public_body": False,
-                        "service": service,
-                        "supportURI":supportURI,
+                        "srv_description": srv_description,
+                        "support_uri":supportURI,
                         "status": { 
                             "status_list": { 
                                             "idx": status_idx, "uri": status_uri
@@ -2609,9 +2607,9 @@ def intended_use_registration_certificate():
     if info_uri:
         json_payload["info_uri"] = info_uri
     
-    if wrp[0].get("providesAttestations"):
-        json_payload["provides_attestations"] = wrp[0]["providesAttestations"]
-    
+    if wrp[0].get("provides_attestations"):
+        json_payload["provides_attestations"] = wrp[0]["provides_attestations"]
+
     sa = wrp[0].get("SupervisoryAuthority")
     if sa:
         supervisory_authority = {}
@@ -2626,7 +2624,7 @@ def intended_use_registration_certificate():
             supervisory_authority["uri"] = sa["formURI"][0]
 
         if supervisory_authority:
-            json_payload["supervisory_Authority"] = supervisory_authority
+            json_payload["supervisory_authority"] = supervisory_authority
     
     if legal_entity[0]["LegalPerson"] is None:
         #se user for natural person
@@ -2637,7 +2635,7 @@ def intended_use_registration_certificate():
         # givenName=legal_entity[0]["givenName"]
         # #surname
         # surname=natural_person[0]["familyName"]
-        certificate_policy = "itu-t(0) identified-organization(4) etsi(0) eudiwrp(194118) policy-identifiers(1) ncp-natural (1)"
+        certificate_policy = cfgserv.service_url + "certificate_policy"
         json_payload.update({
             "sub_gn": givenName,
             "sub_fn":surname,
@@ -2652,22 +2650,31 @@ def intended_use_registration_certificate():
         
         legalName = legal_entity[0]["LegalPerson"]["legalName"][0]
         #legalName=legal_person[0]["legalName"]
-        certificate_policy = "itu-t(0) identified-organization(4) etsi(0) eudiwrp(194118) policy-identifiers(1) ncp-legal (2)"
+        certificate_policy = cfgserv.service_url + "certificate_policy"
         json_payload.update({
             "sub_ln": legalName,
             "certificate_policy":certificate_policy
         })
-        
-    if db.get_wrp_intermediary(wrp[0]["wrp_id"]) != []:
-        
-        rp_intermediary = db.get_wrp_id(db.get_wrp_intermediary(wrp[0]["wrp_id"]))
+
+    if intermediary_id:
+        rp_intermediary = db.get_wrp_id(intermediary_id)
         legalentity_intermediary = db.get_legal_entity_id(rp_intermediary[0]["provider_id"])
-        aux = TypeIdentifier[legalentity_intermediary[0]["identifier"][0]["type"]] + '-' + legalentity_intermediary[0]["identifier"][0]['identifier']
+
+        identifier = legalentity_intermediary[0]["identifier"][0]
+        country = legalentity_intermediary[0]["country"]
+
+        country_code = "XG" if TypeIdentifier[identifier['type']] == "LEI" else country
+
+        aux = (
+            f"{TypeIdentifier[identifier['type']]}"
+            f"{country_code}-"
+            f"{identifier['identifier']}"
+        )
 
         json_payload.update({
-            "intermediary":{
-                "sub":aux,
-                "sname":rp_intermediary[0]["trade_name"]
+            "intermediary": {
+                "sub": aux,
+                "sname": rp_intermediary[0]["trade_name"]
             }
         })
     
@@ -2779,13 +2786,14 @@ def intended_use_registration_certificate():
     
     document_with_signature=obtain_signed_document.json()["documentWithSignature"][0]
 
-    # data=json.loads(base64.b64decode(document_with_signature).decode("utf-8"))
+    data=json.loads(base64.b64decode(document_with_signature).decode("utf-8"))
 
-    # jwt_payload=data["payload"]
-    # jwt_header=data["signatures"][0]["protected"]
-    # jwt_signature=data["signatures"][0]["signature"]
+    jwt_payload=data["payload"]
+    jwt_header=data["signatures"][0]["protected"]
+    jwt_signature=data["signatures"][0]["signature"]
 
-    # jwt = jwt_header + "." + jwt_payload + "." + jwt_signature
+    jwt = jwt_header + "." + jwt_payload + "." + jwt_signature
+
     #cbor
 
     cbor_data= cbor2.dumps(json_payload)
@@ -2799,10 +2807,20 @@ def intended_use_registration_certificate():
     msg.key = cose_key
     cose_bytes = msg.encode()
 
-    file_data = base64.b64decode(document_with_signature)
+    #file_data = base64.b64decode(document_with_signature)
 
-    file_base64 = base64.b64encode(file_data).decode()
+    file_base64 = base64.urlsafe_b64encode(jwt.encode()).decode()
     cose_base64 = base64.urlsafe_b64encode(cose_bytes).decode()
+
+    db.insert_registration_certificate(
+        jwt_certificate=file_base64,
+        cbor_certificate=cose_base64,
+        state="ACTIVE",
+        created_at=now,
+        expires_at=(now + timedelta(days=6*30)),
+        intended_use_id=intended_use_id,
+        user_id=user_id,
+    )
 
     return jsonify({
         "status": "success",

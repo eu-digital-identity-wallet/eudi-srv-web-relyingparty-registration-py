@@ -27,6 +27,12 @@ from db import get_db_connection as conn
 
 from app import logger
 
+def serialize_json(value):
+    return json.dumps(value) if value is not None else None
+
+def deserialize_json(value):
+    return json.loads(value) if value else None
+
 def check_user(hash_pid):
     try:
         connection = conn()
@@ -2533,7 +2539,11 @@ def get_wrp_intended_id(intended_use_id):
                     sa.country,
                     sae.email,
                     sap.phone,
-                    saf.formURI
+                    saf.formURI,
+
+                    pa.id,
+                    pa.format,
+                    pa.meta
 
                 FROM wallet_relying_party wrp
 
@@ -2566,6 +2576,12 @@ def get_wrp_intended_id(intended_use_id):
 
                 LEFT JOIN supervisory_authority_formuri saf
                     ON saf.authority_id = sa.id
+                    
+                LEFT JOIN wrp_provided_attestation wpa
+                    ON wrp.id = wpa.wrp_id
+                    
+                LEFT JOIN provided_attestation pa
+                    ON wpa.provided_attestation_id = pa.id
 
                 WHERE wiu.intended_use_id = %s;
                 """
@@ -2582,7 +2598,8 @@ def get_wrp_intended_id(intended_use_id):
                 intermediary_id,
                 lang, content,
                 sa_name, sa_country,
-                sa_email, sa_phone, sa_form
+                sa_email, sa_phone, sa_form,
+                pa_id, pa_format, pa_meta
             ) in rows:
 
                 if wrp_id not in result:
@@ -2598,6 +2615,8 @@ def get_wrp_intended_id(intended_use_id):
                         "entitlements": [],
                         "srvDescription": [],
                         "usesIntermediary": [],
+
+                        "provides_attestations": [],
 
                         "SupervisoryAuthority": None
                     }
@@ -2618,7 +2637,7 @@ def get_wrp_intended_id(intended_use_id):
 
                 # srvDescription
                 if lang and content:
-                    obj = {"lang": lang, "content": content}
+                    obj = {"lang": lang, "value": content}
                     if obj not in wrp["srvDescription"]:
                         wrp["srvDescription"].append(obj)
 
@@ -2644,8 +2663,14 @@ def get_wrp_intended_id(intended_use_id):
                     if sa_form and sa_form not in sa["formURI"]:
                         sa["formURI"].append(sa_form)
 
+                if pa_id:
+                    obj = {
+                        "format": pa_format, 
+                        "meta": deserialize_json(pa_meta)
+                    }
+                    if obj not in wrp["provides_attestations"]:
+                        wrp["provides_attestations"].append(obj)
             return list(result.values())
-
     except pymysql.MySQLError as e:
         logger.error(f"Error: {e}")
         return []
@@ -2691,7 +2716,7 @@ def get_provided_attestation(user_id):
             cursor = connection.cursor()
 
             query = """
-                SELECT 
+                SELECT
                     pa.id,
                     pa.format,
                     pa.meta
@@ -2708,7 +2733,7 @@ def get_provided_attestation(user_id):
                 result.append({
                     "provided_attestation_id": pa_id,
                     "format": format_,
-                    "meta": meta
+                    "meta": deserialize_json(meta)
                 })
 
             return result
@@ -3389,7 +3414,7 @@ def get_intended_use_id(intended_use_id):
                     if key not in iu["_purpose_seen"]:
                         iu["purpose"].append({
                             "lang": lang,
-                            "content": content
+                            "value": content
                         })
                         iu["_purpose_seen"].add(key)
 
@@ -3409,8 +3434,8 @@ def get_intended_use_id(intended_use_id):
                     if cred_id not in iu["credentials"]:
                         iu["credentials"][cred_id] = {
                             "format": cred_format,
-                            "meta": cred_meta,
-                            "claims": [],
+                            "meta": deserialize_json(cred_meta),
+                            "claim": [],
                             "_claims_seen": set()
                         }
 
@@ -3418,8 +3443,8 @@ def get_intended_use_id(intended_use_id):
 
                     # CLAIMS
                     if claim_path and claim_path not in cred["_claims_seen"]:
-                        cred["claims"].append({
-                            "path": claim_path
+                        cred["claim"].append({
+                            "path": deserialize_json(claim_path)
                         })
                         cred["_claims_seen"].add(claim_path)
 
@@ -3521,14 +3546,14 @@ def get_credentials(user_id):
                     result[cred_id] = {
                         "credential_id": cred_id,
                         "format": format,
-                        "meta": meta,
+                        "meta": deserialize_json(meta),
                         "claims": []
                     }
 
                 if claim_id:
                     result[cred_id]["claims"].append({
                         "claim_id": claim_id,
-                        "path": path
+                        "path": deserialize_json(path)
                     })
 
             return list(result.values())
@@ -3945,3 +3970,93 @@ def check_intended_use(
     except Exception as e:
         logger.error(e)
         return False
+
+## -access_certificate-insert 
+def insert_access_certificate(pkcs12_certificate, serial_number, subject, state, created_at, expires_at, wrp_id, user_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = "INSERT INTO access_certificate (pkcs12_certificate, " \
+                                                            "serial_number, " \
+                                                            "subject, state, " \
+                                                            "created_at, " \
+                                                            "expires_at, " \
+                                                            "wrp_id, " \
+                                                            "user_id)" \
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+            
+            cursor.execute(insert_query, (pkcs12_certificate, serial_number, subject, state, created_at, expires_at, wrp_id, user_id,))
+            
+            connection.commit()
+            
+            extra = {'code'} 
+            logger.info(f"Access Certificate successfully added. New Access Certificate ID: {cursor.lastrowid}")
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        extra = {'code'} 
+        logger.error(f"Error inserting Access Certificate: {e}")
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+            
+## -registration_certificate-insert
+def insert_registration_certificate(
+    jwt_certificate,
+    cbor_certificate,
+    state,
+    created_at,
+    expires_at,
+    intended_use_id,
+    user_id
+):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            insert_query = """
+                INSERT INTO registration_certificate (
+                    jwt_certificate,
+                    cbor_certificate,
+                    state,
+                    created_at,
+                    expires_at,
+                    intended_use_id,
+                    user_id
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """
+
+            cursor.execute(
+                insert_query,
+                (
+                    jwt_certificate,
+                    cbor_certificate,
+                    state,
+                    created_at,
+                    expires_at,
+                    intended_use_id,
+                    user_id,
+                ),
+            )
+
+            connection.commit()
+
+            logger.info(
+                f"Registration Certificate successfully added. "
+                f"New Registration Certificate ID: {cursor.lastrowid}"
+            )
+
+            return cursor.lastrowid
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error inserting Registration Certificate: {e}")
+
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()

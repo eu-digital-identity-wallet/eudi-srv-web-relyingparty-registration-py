@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.2.2]
+
+21 Jul 2026
+
+### Added
+- Modify the database and add new tables (access_certificate, registration_certificate) to store the certificate history.
+
+### Fixed
+- Fix for the error when entering dates in the “Intended Uses” field.
+
+### Changed
+- Changes to the database to support changes to the meta format in the provided attestations and credentials.
+- The “meta” field is now an object instead of a string in the “provided attestation”.
+- The “meta” field is now an object instead of a string in the “Credential.
+- Swagger Update.
+- Update to the registration certificate endpoint (/intended_use/certificate), if you want the certificate to include intermediary information, you must now specify the intermediary id.
+
+---
+
 ## [0.2.1]
 
 06 Jul 2026
