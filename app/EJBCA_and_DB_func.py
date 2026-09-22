@@ -157,7 +157,7 @@ def http_post_requests_with_custom_ssl_context(trust_manager, key_manager_filepa
     return response
 
 
-def generateCertificateRequest(priv_key, commonName, countryName, uniformResourceIdentifier, organizationIdentifier=None, organizationName=None, organizationalUnit=None, email=None, phone=None, givenName=None,surname=None, serialNumber=None ):
+def generateCertificateRequest(priv_key, commonName, countryName, uniformResourceIdentifier, dnsName, organizationIdentifier=None, organizationName=None, organizationalUnit=None, email=None, phone=None, givenName=None,surname=None, serialNumber=None ):
 
     #PHONE_OID = ObjectIdentifier("2.5.4.20")
     #encoded_phone = phone.encode('utf-8')
@@ -191,6 +191,7 @@ def generateCertificateRequest(priv_key, commonName, countryName, uniformResourc
         final_SubjectAlternativename.append(x509.RFC822Name(email))
 
     final_SubjectAlternativename.append(x509.UniformResourceIdentifier(uniformResourceIdentifier))
+    final_SubjectAlternativename.append(x509.DNSName(dnsName))
     
     final_subject=x509.Name(subject)
     alt_name_extension = x509.SubjectAlternativeName(final_SubjectAlternativename)
