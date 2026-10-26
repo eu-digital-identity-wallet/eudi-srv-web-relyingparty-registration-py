@@ -1,6 +1,6 @@
-# Launchpad 2026 — Get your WRP registration and access certificates — v1.0
+# Launchpad 2026 — Get your WRP registration and access certificates — v1.1
 
-**Document version:** 1.0 · **Date:** 2026-09-16
+**Document version:** 1.1 · **Date:** 2026-10-26
 
 ## What this guide is for
 
@@ -40,6 +40,7 @@ This workflow is for an RP that is a **legal person**, operating **without an in
 | `QEAA_Provider` — issues qualified electronic attestations of attributes                           | Steps 1–10, then step 12. Select this role and`Service_Provider` in step 10.                                                                 | Run step 11 with the ID saved in step 7 and linked in step 10. |
 | `Non_Q_EAA_Provider` — issues non-qualified electronic attestations of attributes                  | Steps 1–10, then step 12. Select this role and`Service_Provider` in step 10.                                                                 | Run step 11 with the ID saved in step 7 and linked in step 10. |
 | `PUB_EAA_Provider` — issues public-sector electronic attestations of attributes                    | Steps 1–10, then step 12. Select this role and`Service_Provider` in step 10.                                                                 | Run step 11 with the ID saved in step 7 and linked in step 10. |
+| `mDL_Provider` — issues mobile driving licences for Launchpad testing                              | Steps 1–10, then step 12. Select this role and `Service_Provider` in step 10.                                                                | Run step 11 with the ID saved in step 7 and linked in step 10. |
 | `QCert_for_ESeal_Provider` — issues qualified certificates for electronic seals                    | Steps 1–7, 9 and 10, then step 12. Select this role and`Service_Provider` in step 10. Skip step 8 and use `"providesAttestations_id": []`. | Run step 11 with the ID saved in step 7 and linked in step 10. |
 | `QCert_for_ESig_Provider` — issues qualified certificates for electronic signatures                | Steps 1–7, 9 and 10, then step 12. Select this role and`Service_Provider` in step 10. Skip step 8 and use `"providesAttestations_id": []`. | Run step 11 with the ID saved in step 7 and linked in step 10. |
 | `rQSealCDs_Provider` — manages remote qualified electronic seal creation devices                   | Steps 1–7, 9 and 10, then step 12. Select this role and`Service_Provider` in step 10. Skip step 8 and use `"providesAttestations_id": []`. | Run step 11 with the ID saved in step 7 and linked in step 10. |
@@ -49,6 +50,8 @@ This workflow is for an RP that is a **legal person**, operating **without an in
 If your RP issues PID or attestations, follow its issuer row, including when it also requests Wallet data. For that combined activity, select both the issuer entitlement and `Service_Provider` in step 10; create the RP record only once. For other combinations of roles, combine the relevant preparation steps. 
 
 The **`entitlements` in the WRPRC identify the roles registered for this RP record**. Select the applicable roles in step 10 using the complete URIs listed there. 
+
+**Launchpad-only test entitlement:** `mDL_Provider` is included solely to test the handling of mDL issuer entitlements during Launchpad 2026. The URI `https://uri.etsi.org/19475/Entitlement/mDL_Provider` is not defined in the applicable ETSI specifications and must not be treated as a normative entitlement outside these tests.
 
 Placeholders such as `<LegalPerson.legalName>` identify the data you must supply, using the specification's field names. The class before the dot identifies which record the field belongs to. Legal-entity, identifier and policy definitions come from [TS2](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/blob/ee91a294c833af5188726fd8c302c641212192aa/docs/technical-specifications/ts2-notification-publication-provider-information.md), referenced by TS5. Uppercase placeholders ending in `_ID` are the numbers returned by earlier API requests. Keep the JSON field names and the fixed values shown in the commands.
 
@@ -333,10 +336,11 @@ JSON
 - `Non_Q_EAA_Provider`
 - `PUB_EAA_Provider`
 - `PID_Provider`
+- `mDL_Provider` — Launchpad testing only
 
 **For all other RPs, skip this step** and use `"providesAttestations_id": []` in step 10.
 
-For the four roles above, describe each attestation type the RP issues. Set `<ProvidedAttestation.format>` and replace `<ProvidedAttestation.meta>` with the matching JSON object:
+For the roles above, describe each attestation type the RP issues. Set `<ProvidedAttestation.format>` and replace `<ProvidedAttestation.meta>` with the matching JSON object:
 
 | Issued attestation format | Value for`format` | Example`meta` object                         |
 | ------------------------- | ------------------- | ---------------------------------------------- |
@@ -398,7 +402,7 @@ JSON
 
 Create the RP record by linking the information and IDs from the previous steps. Choose a name and description that a Wallet user can recognise. See [TS5 §2.1](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/blob/af9b1460f02eb1904120c0cb5c020568538378db/docs/technical-specifications/ts5-common-formats-and-api-for-rp-registration-information.md#21-walletrelyingparty) and [TS6 §2](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/blob/8a0bc4d3829aa6e86de1c68891695add7c37b9b8/docs/technical-specifications/ts6-common-set-of-rp-information-to-be-registered.md#2-common-data-set).
 
-Replace `<WalletRelyingParty.entitlements>` with the complete URI for the RP's role:
+Replace `<WalletRelyingParty.entitlements>` with the complete URI for the RP's role. The ETSI-defined entitlement URIs used by this guide are:
 
 - `https://uri.etsi.org/19475/Entitlement/Service_Provider`
 - `https://uri.etsi.org/19475/Entitlement/QEAA_Provider`
@@ -410,6 +414,12 @@ Replace `<WalletRelyingParty.entitlements>` with the complete URI for the RP's r
 - `https://uri.etsi.org/19475/Entitlement/rQSealCDs_Provider`
 - `https://uri.etsi.org/19475/Entitlement/rQSigCDs_Provider`
 - `https://uri.etsi.org/19475/Entitlement/ESig_ESeal_Creation_Provider`
+
+For the Launchpad mDL entitlement test only, the service also accepts:
+
+- `https://uri.etsi.org/19475/Entitlement/mDL_Provider`
+
+This is a Launchpad test value. It is not an entitlement URI defined in the applicable ETSI specifications.
 
 For example, choose `https://uri.etsi.org/19475/Entitlement/PID_Provider` for a PID provider. If that issuer also acts as a service provider requesting attestations, include `https://uri.etsi.org/19475/Entitlement/Service_Provider` as well. If the RP has several applicable entitlements, include each complete URI as a separate quoted entry in the array.
 
@@ -542,6 +552,127 @@ PYTHON
 
 The response's `filename` may say `document_with_signature.json`; use `wrpac.p12` for the decoded access-certificate bundle.
 
+## Generate deliberately invalid certificates for testing
+
+The Launchpad service provides separate error-test routes that generate deliberately invalid WRP certificates. Use them **only to verify that your component detects and rejects invalid certificates**. Do not use the resulting certificates as credentials in a normal Launchpad flow.
+
+Complete the applicable registration steps above before using these routes. Each error-test request uses the same payload as the corresponding normal certificate request, with one additional field: `error_type`. Use the same `hash_pid`, `WRP_ID` or `INTENDED_USE_ID` that you would use for a normal request.
+
+| Certificate under test | Error-test route | Accepted `error_type` | What your component should detect |
+| ---------------------- | ---------------- | --------------------- | --------------------------------- |
+| WRPAC | `/wallet_rp/certificate_error` | `invalid_signature` | The WRPAC signature is invalid. |
+| WRPAC | `/wallet_rp/certificate_error` | `expired` | The WRPAC is outside its validity period. |
+| WRPRC | `/intended_use/certificate_error` | `invalid_signature` | The WRPRC signature is invalid. |
+
+### Test an invalid WRPAC signature
+
+```bash
+curl --silent --show-error --fail-with-body \
+  "$BASE_URL/wallet_rp/certificate_error" \
+  --header 'Content-Type: application/json' \
+  --output wrpac-invalid-signature-response.json \
+  --data-binary @- <<'JSON'
+{
+  "hash_pid": "1a2b3c4d5e6f7g8h9i0j",
+  "wrp_id": <WRP_ID>,
+  "password": "<password>",
+  "error_type": "invalid_signature"
+}
+JSON
+```
+
+Decode the returned bundle without overwriting the valid WRPAC created in step 12:
+
+```bash
+python3 - <<'PYTHON'
+import base64, json
+from pathlib import Path
+r = json.loads(Path("wrpac-invalid-signature-response.json").read_text())
+if r.get("status") != "success":
+    raise SystemExit(r.get("message", "Certificate request failed"))
+Path("wrpac-invalid-signature.p12").write_bytes(
+    base64.b64decode(r["data"]["file_base64"], validate=True)
+)
+print("Saved wrpac-invalid-signature.p12")
+PYTHON
+```
+
+The test succeeds if your component rejects this WRPAC because its signature is invalid.
+
+### Test an expired WRPAC
+
+```bash
+curl --silent --show-error --fail-with-body \
+  "$BASE_URL/wallet_rp/certificate_error" \
+  --header 'Content-Type: application/json' \
+  --output wrpac-expired-response.json \
+  --data-binary @- <<'JSON'
+{
+  "hash_pid": "1a2b3c4d5e6f7g8h9i0j",
+  "wrp_id": <WRP_ID>,
+  "password": "<password>",
+  "error_type": "expired"
+}
+JSON
+```
+
+Decode the returned bundle without overwriting the valid WRPAC:
+
+```bash
+python3 - <<'PYTHON'
+import base64, json
+from pathlib import Path
+r = json.loads(Path("wrpac-expired-response.json").read_text())
+if r.get("status") != "success":
+    raise SystemExit(r.get("message", "Certificate request failed"))
+Path("wrpac-expired.p12").write_bytes(
+    base64.b64decode(r["data"]["file_base64"], validate=True)
+)
+print("Saved wrpac-expired.p12")
+PYTHON
+```
+
+The test succeeds if your component rejects this WRPAC because it has expired.
+
+### Test an invalid WRPRC signature
+
+The WRPRC error-test route supports only `invalid_signature`:
+
+```bash
+curl --silent --show-error --fail-with-body \
+  "$BASE_URL/intended_use/certificate_error" \
+  --header 'Content-Type: application/json' \
+  --output wrprc-invalid-signature-response.json \
+  --data-binary @- <<'JSON'
+{
+  "hash_pid": "1a2b3c4d5e6f7g8h9i0j",
+  "intended_use_id": <INTENDED_USE_ID>,
+  "error_type": "invalid_signature"
+}
+JSON
+```
+
+Extract both returned WRPRC formats without overwriting the valid files created in step 11:
+
+```bash
+python3 - <<'PYTHON'
+import base64, json
+from pathlib import Path
+r = json.loads(Path("wrprc-invalid-signature-response.json").read_text())
+if r.get("status") != "success":
+    raise SystemExit(r.get("message", "Certificate request failed"))
+for field, filename in [
+    ("file_base64", "wrprc-invalid-signature.jwt"),
+    ("cose_base64", "wrprc-invalid-signature.cose"),
+]:
+    value = r["data"][field]
+    Path(filename).write_bytes(base64.urlsafe_b64decode(value + "=" * (-len(value) % 4)))
+    print("Saved", filename)
+PYTHON
+```
+
+The test succeeds if your component rejects the WRPRC because its signature is invalid. A successful response from the Registrar means that the test certificate was generated; it does not mean that the certificate should pass validation.
+
 ## Ready for integration
 
 For each RP, check that you have `wrpac.p12` and the `wrprc.jwt` and `wrprc.cose` files saved in step 11. If you made several registration-certificate requests, keep each result in its own directory. The JWT and COSE files are two formats of the same WRPRC. Use the WRPRC format expected by your test component and import the PKCS#12 bundle using the password chosen in step 12.
@@ -567,3 +698,10 @@ Successful decoding does not establish trust or interoperability. Configure the 
 | Certificate request fails           | Keep the HTTP error and response message for the Registrar team. Do not share passwords or private keys. |
 
 *Field descriptions are adapted and summarised from European Union TS5, TS6 and TS2 (© European Union, 2025–2026), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).*
+
+## Changes from version 1.0
+
+- Updated the document version and date to 1.1 and 2026-10-26.
+- Added the Launchpad-only `mDL_Provider` test entitlement to the role-selection table and to the instructions for describing issued attestations and registering the Wallet Relying Party.
+- Clarified that `https://uri.etsi.org/19475/Entitlement/mDL_Provider` is a Launchpad 2026 test value and is not an entitlement URI defined in the applicable ETSI specifications.
+- Added the Launchpad-only error-test routes for generating WRPACs with an invalid signature or expired validity and WRPRCs with an invalid signature.
