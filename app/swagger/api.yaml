@@ -4034,6 +4034,9 @@ paths:
         The generated certificate is returned as a PKCS#12 (.p12) file,
         encoded in Base64.
 
+        The certificate includes the first registered `supportURI` as a URI Subject
+        Alternative Name and its HTTP(S) DNS hostname as a DNS Subject Alternative Name.
+
         ### Request Parameters
 
         | Parameter | Description |

@@ -25,6 +25,7 @@ import binascii
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 import io
+import ipaddress
 import json
 import os
 import re
@@ -127,6 +128,37 @@ def validate_required_fields(data, required_fields):
             continue
 
     return missing
+
+def get_dns_name_from_support_uri(support_uri):
+    try:
+        parsed_uri = urllib.parse.urlsplit(support_uri)
+        hostname = parsed_uri.hostname
+    except (TypeError, ValueError):
+        return None
+
+    if parsed_uri.scheme.lower() not in {"http", "https"} or not hostname:
+        return None
+
+    try:
+        hostname = hostname.rstrip(".").encode("idna").decode("ascii")
+    except UnicodeError:
+        return None
+
+    try:
+        ipaddress.ip_address(hostname)
+        return None
+    except ValueError:
+        pass
+
+    labels = hostname.split(".")
+    if len(hostname) > 253 or any(
+        len(label) > 63
+        or re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", label) is None
+        for label in labels
+    ):
+        return None
+
+    return hostname
 
 def error_response(message, missing_fields=None, code=400):
     return {
@@ -2430,8 +2462,15 @@ def wrp_access_certificate():
     #commonName
     tradeName = wrp[0]["trade_name"]
 
-    #uniformResourceIdentifier
-    supportURI = wrp[0]["supportURI"][0]
+    # uniformResourceIdentifier and DNSName
+    supportURIs = wrp[0].get("supportURI", [])
+    if not supportURIs:
+        return error_invalid(f"Wallet Relying Party id {wrp_id} has no supportURI")
+
+    supportURI = supportURIs[0]
+    dnsName = get_dns_name_from_support_uri(supportURI)
+    if dnsName is None:
+        return error_invalid("The first supportURI must be an HTTP(S) URI with a valid DNS hostname")
 
     legal_entity = db.get_legal_entity_id(wrp[0]["provider_id"])
     
@@ -2462,7 +2501,7 @@ def wrp_access_certificate():
             f"{first['identifier']}"
         )
 
-        certificateRequest= generateCertificateRequest(priv_key=priv_key, commonName=tradeName, countryName=country, uniformResourceIdentifier=supportURI, 
+        certificateRequest= generateCertificateRequest(priv_key=priv_key, commonName=tradeName, countryName=country, uniformResourceIdentifier=supportURI, dnsName=dnsName,
                                                        givenName=givenName, surname=surname, serialNumber=serial_number, email=email)
         
     else:
@@ -2480,7 +2519,7 @@ def wrp_access_certificate():
             f"{first['identifier']}"
         )
         
-        certificateRequest = generateCertificateRequest(priv_key=priv_key, commonName=tradeName, countryName=country, uniformResourceIdentifier=supportURI, 
+        certificateRequest = generateCertificateRequest(priv_key=priv_key, commonName=tradeName, countryName=country, uniformResourceIdentifier=supportURI, dnsName=dnsName,
                                                        organizationName=legalName, organizationIdentifier=organizationIdentifier, email=None)
 
     #como as TSLs, ex: lang en, description=test  
