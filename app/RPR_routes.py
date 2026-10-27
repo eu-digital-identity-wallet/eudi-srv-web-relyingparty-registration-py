@@ -2635,6 +2635,7 @@ def intended_use_registration_certificate():
     name = wrp[0]["trade_name"]
     supportURI = wrp[0]["supportURI"][0]
     purpose = intended_use[0]["purpose"]
+    info_uri = None
     if legal_entity[0].get("infoURI") and len(legal_entity[0]["infoURI"]) > 0:
         info_uri = legal_entity[0]["infoURI"][0]
     country = legal_entity[0]["country"]
@@ -2645,7 +2646,7 @@ def intended_use_registration_certificate():
     id = legal_entity[0]["identifier"][0]["identifier"]
 
     #id = legal_entity_data[0]["identifier"]
-    privacy_policy = intended_use[0]["privacyPolicy"][0]["policy_uri"]
+    privacy_policy = intended_use[0]["privacyPolicy"][0]["policyURI"]
 
 # # definir de acordo com os dados do certificado
 # # policy_id=certificate_policy_id
