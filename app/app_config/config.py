@@ -73,6 +73,7 @@ class ConfService:
                        "https://uri.etsi.org/19475/Entitlement/Non_Q_EAA_Provider",
                        "https://uri.etsi.org/19475/Entitlement/PUB_EAA_Provider",
                        "https://uri.etsi.org/19475/Entitlement/PID_Provider",
+                       "https://uri.etsi.org/19475/Entitlement/mDL_Provider",
                        "https://uri.etsi.org/19475/Entitlement/QCert_for_ESeal_Provider",
                        "https://uri.etsi.org/19475/Entitlement/QCert_for_ESig_Provider",
                        "https://uri.etsi.org/19475/Entitlement/rQSealCDs_Provider",

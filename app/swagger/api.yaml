@@ -3182,6 +3182,8 @@ paths:
         The `WalletRelyingParty` object follows the Wallet Relying Party
         definition described in the TS5 specification.
 
+        If usesIntermediary is provided (non-empty array), isIntermediary will be set to False.
+
         ### Request Parameters
 
         | Parameter | Description |
@@ -3204,6 +3206,7 @@ paths:
         | `usesIntermediary` | array<integer> | References to intermediary Wallet Relying Parties, when applicable. |
         | `entitlements` | array<string> | Entitlements supported by the Wallet Relying Party. |
         | `isPSB` | boolean | Indicates whether the Wallet Relying Party is a PSB. |
+        | `isIntermediary` | boolean | Indicates whether the Wallet Relying Party is an intermediary (Optional, by default False) . | 
       tags:
         - WalletRelyingParty
 
@@ -3312,6 +3315,10 @@ paths:
                       isPSB:
                         type: boolean
                         example: true
+
+                      isIntermediary:
+                        type: boolean
+                        example: false
 
       responses:
         "200":
@@ -4019,6 +4026,104 @@ paths:
                       cose_base64:
                         type: string
                         example: BASE64_ENCODED_COSE
+                        
+  /intended_use/certificate_error:
+    post:
+      tags:
+        - Certificates
+
+      summary: Generate Invalid Wallet Relying Party Registration Certificate (WRPRC)
+
+      description: |
+        Generates Invalid Wallet Relying Party Registration Certificate (WRPRC)
+        for the specified Intended Use.
+
+        An Intermediary may optionally be specified. If `intermediary_id` is
+        provided, the generated certificate will include the specified
+        Intermediary. If no `intermediary_id` is provided, the certificate
+        will be generated without an Intermediary.
+
+        The invalidcertificate is signed using JAdES and COSE and is returned
+        encoded in Base64 together with the signed document.
+
+        ### Request Parameters
+
+        | Parameter | Type | Description |
+        |-----------|------|-------------|
+        | `hash_pid` | string | Authenticated user session identifier. |
+        | `intermediary_id` | integer | Identifier of the Intermediary to be associated with the WRPRC. If omitted, no Intermediary is included in the certificate. |
+        | `intended_use_id` | integer | Identifier of the Intended Use for which the WRPRC will be generated. |
+        | `error_type` | string | Type of the error that occurred (e.g., "invalid_signature"). |
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - intended_use_id
+                - error_type
+
+              properties:
+                hash_pid:
+                  type: string
+                  description: >
+                    Authenticated user session identifier.
+                  example: "abc123hash"
+
+                intermediary_id:
+                  type: integer
+                  description: >
+                    Optional identifier of the Intermediary to be associated
+                    with the Wallet Relying Party Registration Certificate.
+                    If omitted, no Intermediary is included in the certificate.
+                  example: 14
+
+                intended_use_id:
+                  type: integer
+                  description: >
+                    Identifier of the Intended Use for which the Wallet Relying
+                    Party Registration Certificate (WRPRC) will be generated.
+                  example: 1
+
+                error_type:
+                  type: string
+                  description: >
+                    Type of the error that occurred (e.g., "invalid_signature").
+                  example: "invalid_signature"
+
+      responses:
+        "200":
+          description: Certificate generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+
+                  code:
+                    type: integer
+                    example: 200
+
+                  data:
+                    type: object
+                    properties:
+                      filename:
+                        type: string
+                        example: document_with_signature.json
+
+                      file_base64:
+                        type: string
+                        example: BASE64_ENCODED_SIGNED_DOCUMENT
+
+                      cose_base64:
+                        type: string
+                        example: BASE64_ENCODED_COSE
 
   /wallet_rp/certificate:
     post:
@@ -4067,6 +4172,116 @@ paths:
                   type: string
                   example: "StrongPassword123!"
                   description: Password used to encrypt the generated PKCS#12 (.p12) file.
+
+      responses:
+        "200":
+          description: Certificate generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+
+                  code:
+                    type: integer
+                    example: 200
+
+                  data:
+                    type: object
+                    properties:
+                      filename:
+                        type: string
+                        example: document_with_signature.json
+
+                      file_base64:
+                        type: string
+                        example: BASE64_ENCODED_P12_FILE
+
+        "400":
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+
+                  message:
+                    type: string
+                    example: Missing required fields.
+
+                  details:
+                    type: string
+                    example: wrp_id
+
+        "401":
+          description: Invalid hash_pid
+
+        "403":
+          description: Resource does not belong to the authenticated user
+
+        "500":
+          description: Internal server error
+
+  /wallet_rp/certificate_error:
+    post:
+      tags:
+        - Certificates
+
+      summary: Generate Invalid Wallet Relying Party Attestation Certificate (WRPAC)
+
+      description: |
+        Generates a Invalid Wallet Relying Party Attestation Certificate (WRPAC)
+        for the specified Wallet Relying Party using EJBCA.
+
+        The generated certificate is returned as a PKCS#12 (.p12) file,
+        encoded in Base64.
+
+        ### Request Parameters
+
+        | Parameter | Description |
+        |-----------|-------------|
+        | `hash_pid` | Authenticated user session identifier. |
+        | `wrp_id` | Identifier of the Wallet Relying Party for which the WRPAC will be generated. |
+        | `password` | Password used to protect the generated PKCS#12 container. |
+        | `error_type` | Type of error that occurred (e.g., "invalid_signature", "expired"). |
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hash_pid
+                - wrp_id
+                - password
+                - error_type
+              properties:
+                hash_pid:
+                  type: string
+                  description: Authenticated user session identifier.
+                  example: "abc123hash"
+
+                wrp_id:
+                  type: integer
+                  example: 5
+                  description: Wallet Relying Party identifier
+
+                password:
+                  type: string
+                  example: "StrongPassword123!"
+                  description: Password used to encrypt the generated PKCS#12 (.p12) file.
+
+                error_type:
+                  type: string
+                  example: "invalid_signature"
+                  description: Type of error that occurred.
 
       responses:
         "200":

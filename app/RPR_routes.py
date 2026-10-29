@@ -270,6 +270,8 @@ def authentication():
         + response["client_id"]
         + "&request_uri="
         + response["request_uri"]
+        + "&request_uri_method="
+        + response["request_uri_method"]
     )
 
     
@@ -329,8 +331,7 @@ def getpidoid4vp():
     else:
         presentation_id = request.args.get("presentation_id")
           
-        url = "https://" + cfgserv.url_verifier +"/ui/presentations/" + presentation_id + "?nonce=hiCV7lZi5qAeCy7NFzUWSR4iCfSmRb99HfIvCkPaCLc="
-    
+        url = "https://" + cfgserv.url_verifier +"/ui/presentations/" + presentation_id 
     headers = {
     'Content-Type': 'application/json',
     }
@@ -1221,94 +1222,112 @@ def remove_provider_policy():
     )
 
 ## -credential
+def error_server(message="Internal server error. Please try again later.", code=500):
+    return {
+        "status": "error",
+        "code": code,
+        "message": message
+    }, code
+
 @rpr.route('/credential/create', methods=['POST'])
 def create_credential():
-
+ 
     data = request.get_json(silent=True)
     if not data:
         return error_response("Invalid or missing JSON body")
-
+ 
     missing = validate_required_fields(data, ["hash_pid", "credentials"])
     if missing:
         return error_response("Missing required fields.", missing)
-
+ 
     hash_pid = data.get("hash_pid")
     credentials = data.get("credentials", [])
-
+ 
+    if not isinstance(credentials, list):
+        return error_response("Field 'credentials' must be an array.")
+ 
     user_id = db.check_user(hash_pid)
     if user_id is None:
         return error_invalid("Invalid hash_pid")
-    
-    result = []
-
+ 
     #verification
     for credential in credentials:
+        if not isinstance(credential, dict):
+            return error_response("Each credential must be an object.")
+ 
         missing = validate_required_fields(credential, ["format", "meta", "claims"])
         if missing:
             return error_response("Missing required fields.", missing)
-
+ 
         if credential["format"] not in cfgserv.formats["SUPPORTED_FORMATS"]:
             return error_invalid(
                 f"Invalid credential format. Must be one of: "
                 f"{', '.join(cfgserv.formats['SUPPORTED_FORMATS'])}"
             )
-        
+ 
         if not isinstance(credential["meta"], dict):
-            return error_response(
-                "Field 'meta' must be an object."
-            )
-        
-        claims = credential.get("claims", [])
-        for claim in claims:
+            return error_response("Field 'meta' must be an object.")
+ 
+        if not isinstance(credential["claims"], list):
+            return error_response("Field 'claims' must be an array.")
+ 
+        for claim in credential["claims"]:
+            if not isinstance(claim, dict):
+                return error_response("Each claim must be an object.")
+ 
             missing = validate_required_fields(claim, ["path"])
             if missing:
                 return error_response("Missing required fields.", missing)
-
+ 
             if not isinstance(claim["path"], list):
-                return error_response(
-                    "Field 'path' must be an array."
-                )
-
+                return error_response("Field 'path' must be an array.")
+ 
             if len(claim["path"]) == 0:
-                return error_response(
-                    "Field 'path' cannot be empty."
-                )
-
-    #insert data base
-    for credential in credentials:
-        format = credential.get("format")
-        meta = serialize_json(credential["meta"])
-        claims = credential.get("claims", [])
-        
-        credential_id = db.insert_credential(format, meta, user_id)
-        result.append(credential_id)
-
-        for claim in claims:
-            path = serialize_json(claim["path"])
-
-            db.insert_claim(credential_id, path)
-    
+                return error_response("Field 'path' cannot be empty.")
+            
+    to_insert = [
+        {
+            "format": credential["format"],
+            "meta": serialize_json(credential["meta"]),
+            "paths": [serialize_json(claim["path"]) for claim in credential["claims"]],
+        }
+        for credential in credentials
+    ]
+ 
+    try:
+        result = db.insert_credentials_with_claims(to_insert, user_id)
+    except db.DuplicateCredentialError:
+        return error_invalid(
+            "A credential with this format already exists for this user.",
+            code=409
+        )
+    except db.DatabaseError:
+        return error_server("Error creating credentials. No data was saved.")
+ 
     return create_response("Credential created successfully", "Credentials ids", result)
 
 @rpr.route('/credential/list', methods=['POST'])
 def list_credential():
     data = request.get_json(silent=True)
-    
+ 
     if not data:
         return error_response("Invalid or missing JSON body")
-
+ 
     missing = validate_required_fields(data, ["hash_pid"])
     if missing:
         return error_response("Missing required fields.", missing)
-
+ 
     hash_pid = data.get("hash_pid")
-    
+ 
     user_id = db.check_user(hash_pid)
     if user_id is None:
         return error_invalid("Invalid hash_pid")
-    
-    result = db.get_credentials(user_id)
-
+ 
+    try:
+        result = db.get_credentials(user_id)
+    except db.DatabaseError:
+        return error_server("Error retrieving credentials.")
+ 
     return list_response("Credentials retrieved successfully.", result, "credential")
 
 ## -intended use
@@ -1470,7 +1489,7 @@ def create_intended_use():
         for credential_id in credential_ids:
             db.insert_intended_use_credential(intended_use_id, credential_id)
     
-    return create_response("Intended Use created successfully", "Credentials ids", result)
+    return create_response("Intended Use created successfully", "Intended Use ids", result)
 
 @rpr.route('/intended_use/list', methods=['POST'])
 def list_intended_use():
@@ -1867,12 +1886,13 @@ def create_wrp():
             return error_invalid(f"The supervisoryAuthority ID {supervisoryAuthority} does not belong to this user")
         
         if usesIntermediarys:
+
             for usesIntermediary in usesIntermediarys:
                 if user_id != db.check_wrp(usesIntermediary):
                     return error_invalid(f"The usesIntermediary ID {usesIntermediary} does not belong to this user")
                 
-                if db.check_wrp_intermediary(usesIntermediary) != []:
-                    return error_invalid(f"The usesIntermediary ID {usesIntermediary} already is a Intermediary")
+                if db.check_wrp_intermediary(usesIntermediary) != 1:
+                    return error_invalid(f"The usesIntermediary ID {usesIntermediary} is not a Intermediary Wallet Relying Party")
 
         if providesAttestations_ids:
             for providesAttestations_id in providesAttestations_ids:
@@ -1909,7 +1929,7 @@ def create_wrp():
         supportURIs = wrp.get("supportURI", [])
         srvDescriptions = wrp.get("srvDescription", [])
         isPSB = wrp.get("isPSB")
-        isIntermediary = True
+        isIntermediary = wrp.get("isIntermediary", False)
         entitlements = wrp.get("entitlements", [])
         usesIntermediarys = wrp.get("usesIntermediary", [])
         providesAttestations_ids = wrp.get("providesAttestations_id", [])
@@ -2068,7 +2088,10 @@ def update_wrp_uses_intermediary():
         if user_id != db.check_wrp(uses_intermediary_id):
             return error_invalid(f"Wallet Relying Party id {uses_intermediary_id} doesn't belong to this user")
         
-        if db.check_wrp_intermediary(uses_intermediary_id) != []:
+        if db.check_wrp_intermediary(uses_intermediary_id) != 1:
+            return error_invalid(f"The usesIntermediary ID {uses_intermediary_id} is not a Intermediary Wallet Relying Party")
+
+        if db.check_wrp_intermediary_with_wpr(wrp_id, uses_intermediary_id) != []:
             return error_invalid(f"The usesIntermediary ID {uses_intermediary_id} already is a Intermediary")
         
     #insert data base
@@ -2198,26 +2221,28 @@ def remove_wrp_uses_intermediary():
         "Wallet Relying Party uses Intermediary associations removed successfully",
         deleted_count
     )
-
 @rpr.route('/list_claim', methods=['POST'])
 def list_claim():
     data = request.get_json(silent=True)
-        
+ 
     if not data:
         return error_response("Invalid or missing JSON body")
-
+ 
     missing = validate_required_fields(data, ["hash_pid"])
     if missing:
         return error_response("Missing required fields.", missing)
-    
+ 
     hash_pid = data.get("hash_pid")
-    
+ 
     user_id = db.check_user(hash_pid)
     if user_id is None:
         return error_invalid("Invalid hash_pid")
-
-    result = db.get_claim(user_id)
-
+ 
+    try:
+        result = db.get_claim(user_id)
+    except db.DatabaseError:
+        return error_server("Error retrieving claims.")
+ 
     return list_response("Claims retrieved successfully.", result, "claim")
 
 @rpr.route('/list_full_info', methods=['POST'])
@@ -2487,7 +2512,7 @@ def wrp_access_certificate():
     #servicesDescription=RP[0]["srvDescription"]#como as TSLs, ex: lang en, description=test  
     #entitlement=RP[0]["entitlement"]
     # verificar legal entity se é pertence ao sector público, se sim True, se não False
-    isPSB= False
+    #isPSB= False
 #### ------
     # password=request.form.get("Password")
 
@@ -2508,12 +2533,19 @@ def wrp_access_certificate():
     ManagementCA = ejbca.managementCA
 
     trustCA= getTrustManagerOfCACertificate(ManagementCA)
-
+    
     response = http_post_requests_with_custom_ssl_context(ManagementCA, clientP12ArchiveFilepath, clientP12ArchivePassword, postUrl,certificateRequestBody, headers)
 
     response = response.json()
-    
-    certificate_bytes=base64.b64decode(response["certificate"])
+
+    certificate = response.get("certificate")
+
+    if not certificate:
+        extra = {"response": response}
+        logger.error("Error EJBCA response.", extra=extra)
+        return error_invalid("Error EJBCA response.")
+
+    certificate_bytes = base64.b64decode(certificate)
 
     certificate = x509.load_der_x509_certificate(certificate_bytes, default_backend())
 
@@ -2635,6 +2667,7 @@ def intended_use_registration_certificate():
     name = wrp[0]["trade_name"]
     supportURI = wrp[0]["supportURI"][0]
     purpose = intended_use[0]["purpose"]
+    info_uri = None
     if legal_entity[0].get("infoURI") and len(legal_entity[0]["infoURI"]) > 0:
         info_uri = legal_entity[0]["infoURI"][0]
     country = legal_entity[0]["country"]
@@ -2645,7 +2678,7 @@ def intended_use_registration_certificate():
     id = legal_entity[0]["identifier"][0]["identifier"]
 
     #id = legal_entity_data[0]["identifier"]
-    privacy_policy = intended_use[0]["privacyPolicy"][0]["policy_uri"]
+    privacy_policy = intended_use[0]["privacyPolicy"][0]["policyURI"]
 
 # # definir de acordo com os dados do certificado
 # # policy_id=certificate_policy_id
@@ -2660,7 +2693,8 @@ def intended_use_registration_certificate():
     # if wrp[0]["providesAttestations"]:
     #     providesAttestations = wrp[0]["providesAttestations"]
     public_body = wrp[0]["isPSB"]
-    srv_description = wrp[0]["srvDescription"]
+    srv_descriptions = wrp[0]["srvDescription"]
+    
 
 # #A URI to a status list presenting information about validity of the WRPRC. 
 # #status=
@@ -2696,7 +2730,7 @@ def intended_use_registration_certificate():
 
     headers={
         "accept": "application/json",
-        "X-API-Key": cfgserv.statuslist_apikey ,
+        "X-API-Key": cfgserv.statuslist_apikey,
         "Content-Type": "application/x-www-form-urlencoded",
     }
 
@@ -2705,7 +2739,7 @@ def intended_use_registration_certificate():
         "doctype":"wrprc",
         "expiry_date":(now + timedelta(days=6*30)).strftime("%Y-%m-%d")
     }
-
+    
     response = requests.post(cfgserv.url_statuslist, headers=headers, data=data)
     
     status=response.json()
@@ -2735,8 +2769,8 @@ def intended_use_registration_certificate():
                         "iat": iat, 
                         "credentials": credentials,
                         "entitlements": entitlement,
-                        "public_body": False,
-                        "srv_description": srv_description,
+                        "public_body": public_body,
+                        "srv_description": srv_descriptions,
                         "support_uri":supportURI,
                         "status": { 
                             "status_list": { 
@@ -2818,16 +2852,11 @@ def intended_use_registration_certificate():
                 "sname": rp_intermediary[0]["trade_name"]
             }
         })
-    
+        
     with open(cfgserv.wrprc_certificate, "rb") as f:
-        cert = x509.load_der_x509_certificate(f.read(), default_backend())
+        cert = x509.load_pem_x509_certificate(f.read(), default_backend())
 
     base64_cert = base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode("utf-8")
-
-    with open(cfgserv.wrprc_intermediate, "rb") as f:
-        intermediate_cert = x509.load_der_x509_certificate(f.read(), default_backend())
-
-    base64_intermediate_cert = base64.b64encode(intermediate_cert.public_bytes(serialization.Encoding.PEM)).decode("utf-8")
 
     #Jades with b-b profile
 
@@ -2847,34 +2876,42 @@ def intended_use_registration_certificate():
 
     base64_payload=base64.b64encode(file_bytes).decode("utf-8")
 
+    cbor_data= cbor2.dumps(json_payload)
+
+    base64_cbor=base64.b64encode(cbor_data).decode("utf-8")
+
     #print(document)
-    payload=json.dumps({
-
-            "documents":[
-                {
-                    "document": base64_payload,
-                    "signature_format": "CB",
-                    "conformance_level":"Ades-B-B",
-                    "signed_envelope_property": "ENVELOPING",
-                    "container": "No"
-                },
-                {
-
-
-                    "document": base64_payload,
-                    "signature_format": "J",
-                    "conformance_level":"Ades-B-B",
-                    "signed_envelope_property": "ENVELOPING",
-                    "container": "No"
-
-                } ],
-        "endEntityCertificate": base64_cert,
-        "certificateChain": [
-            base64_intermediate_cert
+    payload = {
+        "documents": [
+            {
+                "document": base64_cbor,
+                "signature_format": "CB",
+                "conformance_level":"Ades-B-B",
+                "signed_envelope_property": "ENVELOPING",
+                "container": "No"
+            },
+            {
+                "document": base64_payload,
+                "signature_format": "J",
+                "conformance_level":"Ades-B-B",
+                "signed_envelope_property": "ENVELOPING",
+                "container": "No"
+            }
         ],
-        "hashAlgorithmOID": "2.16.840.1.101.3.4.2.1"
+        "hashAlgorithmOID": "2.16.840.1.101.3.4.2.1",
+        "returnValidationInfo": False,
+        "endEntityCertificate": base64_cert,
+        "certificateChain": []
+    }
+    
+    if cfgserv.wrprc_intermediate:
+        with open(cfgserv.wrprc_intermediate, "rb") as f:
+            intermediate_cert = x509.load_pem_x509_certificate(f.read(), default_backend())
 
-    })
+        base64_intermediate_cert = base64.b64encode(intermediate_cert.public_bytes(serialization.Encoding.PEM)).decode("utf-8")
+        payload["certificateChain"].append(base64_intermediate_cert)
+
+    payload = json.dumps(payload).encode()
 
     headers={
         'Content-Type': 'application/json'
@@ -2925,10 +2962,10 @@ def intended_use_registration_certificate():
     base64_signature_jwt= base64.b64encode(signature_jwt).decode()
     #print(base64_signature)
 
-    payload = json.dumps({
+    payload = {
         "documents": [
             {
-                "document": base64_payload,
+                "document": base64_cbor,
                 "signature_format": "CB",
                 "conformance_level":"Ades-B-B",
                 "signed_envelope_property": "ENVELOPING",
@@ -2945,12 +2982,19 @@ def intended_use_registration_certificate():
         "hashAlgorithmOID": "2.16.840.1.101.3.4.2.1",
         "returnValidationInfo": False,
         "endEntityCertificate": base64_cert,
-        "certificateChain": [
-            base64_intermediate_cert
-        ],
+        "certificateChain": [],
         "signatures":[base64_signature_cbor, base64_signature_jwt],
         "date": signature_date
-    }).encode()
+    }
+    
+    if cfgserv.wrprc_intermediate:
+        with open(cfgserv.wrprc_intermediate, "rb") as f:
+            intermediate_cert = x509.load_pem_x509_certificate(f.read(), default_backend())
+
+        base64_intermediate_cert = base64.b64encode(intermediate_cert.public_bytes(serialization.Encoding.PEM)).decode("utf-8")
+        payload["certificateChain"].append(base64_intermediate_cert)
+
+    payload = json.dumps(payload).encode()
 
     obtain_signed_document=requests.post(url=cfgserv.sca_signer_url+"/signatures/obtain_signed_doc",headers=headers, data=payload)
     
@@ -2996,3 +3040,604 @@ def intended_use_registration_certificate():
 
     cose_base64 = base64.urlsafe_b64encode(cose_bytes).decode()
     return cose_base64
+
+
+@rpr.route("/wallet_rp/certificate_error", methods=["POST"])
+def wrp_access_certificate_error():
+    data = request.get_json(silent=True)
+
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(
+        data,
+        ["hash_pid", "wrp_id", "password", "error_type"]
+    )
+
+    if missing:
+        return error_response("Missing required fields.", missing)
+
+    hash_pid = data.get("hash_pid")
+    wrp_id = data.get("wrp_id")
+    password = data.get("password")
+    error_type = data.get("error_type")
+
+    supported_errors = ["invalid_signature", "expired"]
+
+    if error_type not in supported_errors:
+        return error_invalid(
+            "Invalid error_type.",
+            {
+                "allowed_values": supported_errors
+            }
+        )
+
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    if user_id != db.check_wrp(wrp_id):
+        return error_invalid(f"Wallet Relying Party id {wrp_id} doesn't belong to this user")
+
+    wrp = db.get_wrp_id(wrp_id)
+
+    modulus=crypto.key_size
+    exponent=crypto.exponent
+    priv_key = ec.generate_private_key(ec.SECP256R1(), default_backend() )
+
+    #dados da RP
+    TypeIdentifier={
+        "http://data.europa.eu/eudi/id/EORI-No":"EOR",
+        "http://data.europa.eu/eudi/id/LEI":"LEI" ,
+        "http://data.europa.eu/eudi/id/EUID":"NTR" ,
+        "http://data.europa.eu/eudi/id/VATIN":"VAT"  ,
+        "http://data.europa.eu/eudi/id/TIN":"TIN",
+        "http://data.europa.eu/eudi/id/Excise":"EXC"
+    }
+    #commonName
+    tradeName = wrp[0]["trade_name"]
+
+    #uniformResourceIdentifier
+    supportURI = wrp[0]["supportURI"][0]
+
+    legal_entity = db.get_legal_entity_id(wrp[0]["provider_id"])
+    
+    #dados da legalEntity
+    #caso for natural person é serialNumber no caso de uma legal person organizationIdentifier
+    identifier = legal_entity[0]["identifier"]
+    country = legal_entity[0]["country"]
+
+    email = None
+    if email:
+        email = legal_entity[0]["email"][0]
+    phone = None
+    if phone:
+        phone = legal_entity[0]["phone"][0]
+
+    if legal_entity[0]["LegalPerson"] is None:
+        #se user for natural person
+        givenName=legal_entity[0]["NaturalPerson"]["givenName"]
+        #surname
+        surname=legal_entity[0]["NaturalPerson"]["familyName"]
+
+        first = legal_entity[0]["identifier"][0]
+        country_code = "XG" if TypeIdentifier[first['type']] == "LEI" else country
+
+        serial_number = (
+            f"{TypeIdentifier[first['type']]}"
+            f"{country_code}-"
+            f"{first['identifier']}"
+        )
+
+        certificateRequest= generateCertificateRequest(priv_key=priv_key, commonName=tradeName, countryName=country, uniformResourceIdentifier=supportURI, 
+                                                       givenName=givenName, surname=surname, serialNumber=serial_number, email=email)
+        
+    else:
+        #se user for legal person
+        #dados da legal person
+        #organizationName
+        legalName = legal_entity[0]["LegalPerson"]["legalName"][0]
+
+        first = legal_entity[0]["identifier"][0]
+        country_code = "XG" if TypeIdentifier[first['type']] == "LEI" else country
+
+        organizationIdentifier = (
+            f"{TypeIdentifier[first['type']]}"
+            f"{country_code}-"
+            f"{first['identifier']}"
+        )
+        
+        certificateRequest = generateCertificateRequest(priv_key=priv_key, commonName=tradeName, countryName=country, uniformResourceIdentifier=supportURI, 
+                                                       organizationName=legalName, organizationIdentifier=organizationIdentifier, email=None)
+
+    #como as TSLs, ex: lang en, description=test  
+    #servicesDescription=RP[0]["srvDescription"]#como as TSLs, ex: lang en, description=test  
+    #entitlement=RP[0]["entitlement"]
+    # verificar legal entity se é pertence ao sector público, se sim True, se não False
+    isPSB= False
+#### ------
+    # password=request.form.get("Password")
+
+
+    certificateRequestString = "-----BEGIN CERTIFICATE REQUEST-----\n"+ base64.b64encode(certificateRequest).decode("utf-8") + "\n"+ "-----END CERTIFICATE REQUEST-----"
+    certificateAuthorityName = getCertificateAuthorityName(country)
+    certificateRequestBody = getJsonBody(certificateRequestString, certificateAuthorityName, country)
+
+    postUrl = "https://" + ejbca.cahost + "/ejbca/ejbca-rest-api/v1" + ejbca.endpoint
+
+    headers ={
+        "Content-Type": "application/json",
+        'Authorization': 'Bearer test',
+    }
+
+    clientP12ArchiveFilepath = ejbca.clientP12ArchiveFilepath
+    clientP12ArchivePassword = ejbca.clientP12ArchivePassword
+    ManagementCA = ejbca.managementCA
+
+    trustCA= getTrustManagerOfCACertificate(ManagementCA)
+    
+    response = http_post_requests_with_custom_ssl_context(ManagementCA, clientP12ArchiveFilepath, clientP12ArchivePassword, postUrl,certificateRequestBody, headers)
+
+    response = response.json()
+
+    certificate = response.get("certificate")
+
+    if not certificate:
+        extra = {"response": response}
+        logger.error("Error EJBCA response.", extra=extra)
+        return error_invalid("Error EJBCA response.")
+
+    certificate_bytes = base64.b64decode(certificate)
+
+    certificate = x509.load_der_x509_certificate(certificate_bytes, default_backend())
+
+    serial_number=response["serial_number"]
+
+    if error_type == "expired":
+        now = datetime.now(timezone.utc)
+
+        certificate = (
+            x509.CertificateBuilder()
+            .subject_name(certificate.subject)
+            .issuer_name(certificate.issuer)
+            .public_key(certificate.public_key())
+            .serial_number(certificate.serial_number)
+            .not_valid_before(now - timedelta(days=30))
+            .not_valid_after(now - timedelta(days=1))
+            .sign(
+                private_key=priv_key,
+                algorithm=hashes.SHA256(),
+                backend=default_backend()
+            )
+        )
+
+    elif error_type == "invalid_signature":
+        invalid_signature_key = ec.generate_private_key(
+            ec.SECP256R1(),
+            default_backend()
+        )
+
+        certificate_builder = (
+            x509.CertificateBuilder()
+            .subject_name(certificate.subject)
+            .issuer_name(certificate.issuer)
+            .public_key(certificate.public_key())
+            .serial_number(certificate.serial_number)
+            .not_valid_before(certificate.not_valid_before_utc)
+            .not_valid_after(certificate.not_valid_after_utc)
+        )
+
+        for extension in certificate.extensions:
+            certificate_builder = certificate_builder.add_extension(
+                extension.value,
+                critical=extension.critical
+            )
+
+        certificate = certificate_builder.sign(
+            private_key=invalid_signature_key,
+            algorithm=hashes.SHA256(),
+            backend=default_backend()
+        )
+
+    p12=pkcs12.serialize_key_and_certificates(
+        name=tradeName.encode("utf-8"),key=priv_key,cert=certificate, cas=[trustCA],
+        encryption_algorithm=serialization.BestAvailableEncryption(password.encode("utf-8"))
+    )
+
+    tag = uuid.uuid4()
+
+    file_name = tradeName + "_" + str(tag)
+
+    p12_temp.update({file_name:{"response": p12, "expires":datetime.now() + timedelta(minutes=cfgserv.deffered_expiry)}})
+
+    cert = certificate.subject.rfc4514_string().split(",")
+    dic = {parte.split("=")[0]: parte for parte in cert}
+    order = [dic.get("C"),
+            #dic.get("O"),
+            dic.get("CN")]
+    aux = [v for k, v in dic.items() if k not in ["C", "O", "CN"]]
+
+    cert_subject_rfc4514_string = ",".join(order + aux)
+
+    certificate_presentation={
+        "certificate_issuer":certificate.issuer.rfc4514_string(),
+        "certificate_distinguished_name":cert_subject_rfc4514_string,
+        "validity_from":certificate.not_valid_before_utc,
+        "validity_to":certificate.not_valid_after_utc,
+    }
+
+    file_base64 = base64.b64encode(p12).decode()
+    serial_number = response["serial_number"]
+
+    return jsonify({
+        "status": "success",
+        "code": 200,
+        "data": {
+            "filename": "document_with_signature.json",
+            "file_base64": file_base64
+        }
+    })
+
+@rpr.route("/intended_use/certificate_error", methods=["POST"])
+def intended_use_registration_certificate_error():
+    data = request.get_json(silent=True)
+
+    if not data:
+        return error_response("Invalid or missing JSON body")
+
+    missing = validate_required_fields(
+        data,
+        ["hash_pid", "intended_use_id", "error_type"]
+    )
+
+    if missing:
+        return error_response("Missing required fields.", missing)
+
+    hash_pid = data.get("hash_pid")
+    intended_use_id = data.get("intended_use_id")
+    error_type = data.get("error_type")
+
+    supported_errors = ["invalid_signature"]
+
+    if error_type not in supported_errors:
+        return error_invalid(
+            "Invalid error_type.",
+            {
+                "allowed_values": supported_errors
+            }
+        )
+
+    user_id = db.check_user(hash_pid)
+    if user_id is None:
+        return error_invalid("Invalid hash_pid")
+    
+    if user_id != db.check_intendedUse(intended_use_id):
+        return error_invalid(f"Intended Use id {intended_use_id} doesn't belong to this user")
+    
+    intended_use = db.get_intended_use_id(intended_use_id)
+
+    wrp = db.get_wrp_intended_id(intended_use_id)
+    if wrp == []:
+        return error_invalid(f"Intended Use id {intended_use_id} doesn't have a Wallet Relying Party associated.")
+
+    intermediary_id = data.get("intermediary_id")
+    if intermediary_id:
+        if user_id != db.check_wrp(intermediary_id):
+            return error_invalid(f"Wallet Relying Party id {intermediary_id} doesn't belong to this user")
+        
+        wrp_intermediary = db.get_wrp_intermediary(intermediary_id)
+        if not wrp_intermediary or wrp[0]["wrp_id"] != wrp_intermediary[0]:
+            return error_invalid(
+                f"The usesIntermediary ID {intermediary_id} does not belong to this Wallet Relying Party"
+            )
+        
+    legal_entity = db.get_legal_entity_id(wrp[0]["provider_id"])
+
+    now = datetime.now(timezone.utc)
+    iat = int(now.timestamp())
+
+    name = wrp[0]["trade_name"]
+    supportURI = wrp[0]["supportURI"][0]
+    purpose = intended_use[0]["purpose"]
+    info_uri = None
+    if legal_entity[0].get("infoURI") and len(legal_entity[0]["infoURI"]) > 0:
+        info_uri = legal_entity[0]["infoURI"][0]
+    country = legal_entity[0]["country"]
+
+    id = legal_entity[0]["identifier"][0]["identifier"]
+
+    privacy_policy = intended_use[0]["privacyPolicy"][0]["policyURI"]
+
+    entitlement = wrp[0]["entitlements"]
+    public_body = wrp[0]["isPSB"]
+    srv_description = wrp[0]["srvDescription"]
+
+    TypeIdentifier={
+        "http://data.europa.eu/eudi/id/EORI-No":"EOR",
+        "http://data.europa.eu/eudi/id/LEI":"LEI" ,
+        "http://data.europa.eu/eudi/id/EUID":"NTR" ,
+        "http://data.europa.eu/eudi/id/VATIN":"VAT"  ,
+        "http://data.europa.eu/eudi/id/TIN":"TIN",
+        "http://data.europa.eu/eudi/id/Excise":"EXC"
+    }
+    
+    identifier = legal_entity[0]["identifier"][0]
+
+    country_code = "XG" if TypeIdentifier[identifier['type']] == "LEI" else country
+
+    sub_id = (
+        f"{TypeIdentifier[identifier['type']]}"
+        f"{country_code}-"
+        f"{identifier['identifier']}"
+    )
+
+    headers={
+        "accept": "application/json",
+        "X-API-Key": cfgserv.statuslist_apikey,
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+
+
+    expiry_date = (now + timedelta(days=6*30)).strftime("%Y-%m-%d")
+
+    data = {
+        "country": "FC",
+        "doctype": "wrprc",
+        "expiry_date": expiry_date
+    }
+
+    response = requests.post(
+        cfgserv.url_statuslist,
+        headers=headers,
+        data=data
+    )
+
+    status=response.json()
+
+    if "status_list" not in status:
+        return error_invalid("Status List error")
+
+    status_idx=status["status_list"]["idx"]
+    status_uri=status["status_list"]["uri"]
+
+    credentials = [
+        cred
+        for item in intended_use
+        for cred in item.get("credentials", [])
+    ]
+
+    json_payload = { 
+                        "name": name,
+                        "purpose": purpose, 
+                        "country": country,
+                        "sub": sub_id,
+                        "registry_uri": cfgserv.service_url,
+                        "privacy_policy": privacy_policy, 
+                        "policy_id": [
+                            "0.4.0.19475.3.1"
+                        ],
+                        "iat": iat, 
+                        "credentials": credentials,
+                        "entitlements": entitlement,
+                        "public_body": False,
+                        "srv_description": srv_description,
+                        "support_uri":supportURI,
+                        "status": { 
+                            "status_list": { 
+                                            "idx": status_idx, "uri": status_uri
+                            } 
+                        }
+        }
+
+    if info_uri:
+        json_payload["info_uri"] = info_uri
+    
+    if wrp[0].get("provides_attestations"):
+        json_payload["provides_attestations"] = wrp[0]["provides_attestations"]
+
+    sa = wrp[0].get("SupervisoryAuthority")
+    if sa:
+        supervisory_authority = {}
+
+        if sa.get("email"):
+            supervisory_authority["email"] = sa["email"][0]
+
+        if sa.get("phone"):
+            supervisory_authority["phone"] = sa["phone"][0]
+
+        if sa.get("formURI"):
+            supervisory_authority["uri"] = sa["formURI"][0]
+
+        if supervisory_authority:
+            json_payload["supervisory_authority"] = supervisory_authority
+    
+    if legal_entity[0]["LegalPerson"] is None:
+        givenName=legal_entity[0]["NaturalPerson"]["givenName"]
+        surname=legal_entity[0]["NaturalPerson"]["familyName"]
+
+        certificate_policy = cfgserv.service_url + "certificate_policy"
+        json_payload.update({
+            "sub_gn": givenName,
+            "sub_fn":surname,
+            "certificate_policy":certificate_policy
+        })
+
+        
+    else:
+        
+        legalName = legal_entity[0]["LegalPerson"]["legalName"][0]
+        #legalName=legal_person[0]["legalName"]
+        certificate_policy = cfgserv.service_url + "certificate_policy"
+        json_payload.update({
+            "sub_ln": legalName,
+            "certificate_policy":certificate_policy
+        })
+
+    if intermediary_id:
+        rp_intermediary = db.get_wrp_id(intermediary_id)
+        legalentity_intermediary = db.get_legal_entity_id(rp_intermediary[0]["provider_id"])
+
+        identifier = legalentity_intermediary[0]["identifier"][0]
+        country = legalentity_intermediary[0]["country"]
+
+        country_code = "XG" if TypeIdentifier[identifier['type']] == "LEI" else country
+
+        aux = (
+            f"{TypeIdentifier[identifier['type']]}"
+            f"{country_code}-"
+            f"{identifier['identifier']}"
+        )
+
+        json_payload.update({
+            "intermediary": {
+                "sub": aux,
+                "sname": rp_intermediary[0]["trade_name"]
+            }
+        })
+
+    with open(cfgserv.wrprc_certificate, "rb") as f:
+        cert = x509.load_der_x509_certificate(f.read(), default_backend())
+
+    base64_cert = base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode("utf-8")
+
+    file_bytes = json.dumps(json_payload).encode()
+
+    base64_payload=base64.b64encode(file_bytes).decode("utf-8")
+
+    cbor_data= cbor2.dumps(json_payload)
+
+    base64_cbor=base64.b64encode(cbor_data).decode("utf-8")
+
+    payload=json.dumps({
+
+            "documents":[
+                {
+                    "document": base64_cbor,
+                    "signature_format": "CB",
+                    "conformance_level":"Ades-B-B",
+                    "signed_envelope_property": "ENVELOPING",
+                    "container": "No"
+                },
+                {
+
+
+                    "document": base64_payload,
+                    "signature_format": "J",
+                    "conformance_level":"Ades-B-B",
+                    "signed_envelope_property": "ENVELOPING",
+                    "container": "No"
+
+                } ],
+        "endEntityCertificate": base64_cert,
+        "certificateChain": [],
+        "hashAlgorithmOID": "2.16.840.1.101.3.4.2.1"
+
+    })
+
+    headers={
+        'Content-Type': 'application/json'
+    }
+
+    calculate_hash=requests.post(url=cfgserv.sca_signer_url+"/signatures/calculate_hash",headers=headers, data=payload)
+
+    hashes1 = calculate_hash.json()["hashes"]
+
+    base64_string_cbor = urllib.parse.unquote(hashes1[0])
+
+    data_to_be_signed_cbor = base64.b64decode(base64_string_cbor)
+
+    base64_string_JWT = urllib.parse.unquote(hashes1[1])
+    
+    data_to_be_signed_jwt = base64.b64decode(base64_string_JWT)
+
+    signature_date = calculate_hash.json()["signature_date"]
+
+    with open(cfgserv.wrprc_privateKey, "rb") as f:
+        private_key = serialization.load_pem_private_key(
+        f.read(),
+        password=None,
+        backend=default_backend()
+    )
+
+    signature_cbor = private_key.sign(
+        data_to_be_signed_cbor,
+        ec.ECDSA(utils.Prehashed(hashes.SHA256()))
+    )
+    base64_signature_cbor= base64.b64encode(signature_cbor).decode()
+
+    signature_jwt = private_key.sign(
+        data_to_be_signed_jwt,
+        ec.ECDSA(utils.Prehashed(hashes.SHA256()))
+    )
+    base64_signature_jwt= base64.b64encode(signature_jwt).decode()
+
+    if error_type == "invalid_signature":
+
+        json_payload["name"] = "Invalid Signature"
+        
+        file_bytes = json.dumps(json_payload).encode()
+        
+        base64_payload=base64.b64encode(file_bytes).decode("utf-8")
+    
+        cbor_data= cbor2.dumps(json_payload)
+    
+        base64_cbor=base64.b64encode(cbor_data).decode("utf-8")
+
+        payload = {
+            "documents": [
+                {
+                    "document": base64_cbor,
+                    "signature_format": "CB",
+                    "conformance_level":"Ades-B-B",
+                    "signed_envelope_property": "ENVELOPING",
+                    "container": "No"
+                },
+                {
+                    "document": base64_payload,
+                    "signature_format": "J",
+                    "conformance_level":"Ades-B-B",
+                    "signed_envelope_property": "ENVELOPING",
+                    "container": "No"
+                }
+            ],
+            "hashAlgorithmOID": "2.16.840.1.101.3.4.2.1",
+            "returnValidationInfo": False,
+            "endEntityCertificate": base64_cert,
+            "certificateChain": [],
+            "signatures":[base64_signature_cbor, base64_signature_jwt],
+            "date": signature_date
+        }
+        
+        if cfgserv.wrprc_intermediate:
+            with open(cfgserv.wrprc_intermediate, "rb") as f:
+                intermediate_cert = x509.load_der_x509_certificate(f.read(), default_backend())
+    
+            base64_intermediate_cert = base64.b64encode(intermediate_cert.public_bytes(serialization.Encoding.PEM)).decode("utf-8")
+            payload["certificateChain"].append(base64_intermediate_cert)
+    
+        payload = json.dumps(payload).encode()
+
+    obtain_signed_document=requests.post(url=cfgserv.sca_signer_url+"/signatures/obtain_signed_doc",headers=headers, data=payload)
+    
+    document_with_signature=obtain_signed_document.json()["documentWithSignature"]
+
+    data=json.loads(base64.b64decode(document_with_signature[1]).decode("utf-8"))
+
+    jwt_payload=data["payload"]
+    jwt_header=data["signatures"][0]["protected"]
+    jwt_signature=data["signatures"][0]["signature"]
+
+    jwt = jwt_header + "." + jwt_payload + "." + jwt_signature
+
+    file_base64 = base64.urlsafe_b64encode(jwt.encode()).decode()
+    cose_base64 = document_with_signature[0]
+
+    return jsonify({
+        "status": "success",
+        "code": 200,
+        "data": {
+            "filename": "document_with_signature.json",
+            "file_base64": file_base64,
+            "cose_base64": cose_base64
+        }
+    })

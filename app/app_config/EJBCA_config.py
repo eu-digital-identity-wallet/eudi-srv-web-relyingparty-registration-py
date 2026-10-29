@@ -36,7 +36,7 @@ class EJBCA_Config:
     managementCA=os.getenv("managementCA")
 
     # Endpoint:
-    endpoint= "/certificate/pkcs10enroll/certificate/pkcs10enroll"
+    endpoint= "/certificate/pkcs10enroll"
     # Values required by the endpoint "/pkcs10enroll":
     certificateProfileName= os.getenv("CERTIFICATE_PROFILE_NAME")
     endEntityProfileName= os.getenv("END_ENTITY_PROFILE_NAME")
@@ -47,13 +47,13 @@ class EJBCA_Config:
     includeChain= True
 
     countries={
-      "CZ":"PID Issuer CA - CZ 02",
-      "EE":"PID Issuer CA - EE 02",
-      "EU":"PID Issuer CA - EU 02",
-      "LU":"PID Issuer CA - LU 02",
-      "NL":"PID Issuer CA - NL 02",
-      "PT":"PID Issuer CA - PT 02",
-      "UT":"PID Issuer CA - UT 02",
+      "CZ":"WRPAC Issuer CA - CZ 01",
+      "EE":"WRPAC Issuer CA - EE 01",
+      "EU":"WRPAC Issuer CA - EU 01",
+      "LU":"WRPAC Issuer CA - LU 01",
+      "NL":"WRPAC Issuer CA - NL 01",
+      "PT":"WRPAC Issuer CA - PT 01",
+      "UT":"WRPAC Issuer CA - UT 01",
       "AV":"Age Verification Issuer CA 01"
     }
 

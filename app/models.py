@@ -27,6 +27,12 @@ from db import get_db_connection as conn
 
 from app import logger
 
+class DatabaseError(Exception):
+    """Erro de base de dados que deve chegar à rota (não deve ser engolido)."""
+
+class DuplicateCredentialError(DatabaseError):
+    """Violação de chave única ao inserir uma credencial."""
+
 def serialize_json(value):
     return json.dumps(value) if value is not None else None
 
@@ -3305,14 +3311,42 @@ def check_wrp_intermediary(intermediary_wrp_id):
 
             query = """
                 SELECT 
+                    wrp.is_intermediary
+
+                FROM wallet_relying_party wrp
+
+                WHERE wrp.id = %s;
+            """
+            
+            cursor.execute(query, (intermediary_wrp_id,))
+            row = cursor.fetchone()
+            if row:
+                return bool(row[0])
+
+    except pymysql.MySQLError as e:
+        logger.error(f"Error: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+def check_wrp_intermediary_with_wpr(wrp, intermediary_wrp_id):
+    try:
+        connection = conn()
+        if connection:
+            cursor = connection.cursor()
+
+            query = """
+                SELECT 
                     wrpi.intermediary_wrp_id
 
                 FROM wrp_intermediary wrpi
 
-                WHERE wrpi.intermediary_wrp_id = %s;
+                WHERE wrpi.intermediary_wrp_id = %s AND wrpi.wrp_id = %s;
             """
             
-            cursor.execute(query, (intermediary_wrp_id,))
+            cursor.execute(query, (intermediary_wrp_id, wrp))
             row = cursor.fetchone()
             if row:
                 return row
@@ -3508,63 +3542,47 @@ def insert_credential(format, meta, user_id):
 
 ## -credential-get
 def get_credentials(user_id):
+    connection = conn()
+    if connection is None:
+        raise DatabaseError("Could not connect to the database")
+ 
     try:
-        connection = conn()
-        if connection:
-            cursor = connection.cursor()
-
-            query = """
-                SELECT 
-                    c.id,
-                    c.format,
-                    c.meta,
-                    cl.id,
-                    cl.path
-
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT c.id, c.format, c.meta, cl.id, cl.path
                 FROM credential c
-
-                LEFT JOIN claim cl 
-                    ON cl.credential_id = c.id
-
+                LEFT JOIN claim cl ON cl.credential_id = c.id
                 WHERE c.user_id = %s
-            """
-
-            cursor.execute(query, (user_id,))
+                ORDER BY c.id, cl.id
+                """,
+                (user_id,),
+            )
             rows = cursor.fetchall()
-
-            result = {}
-
-            for (
-                cred_id,
-                format,
-                meta,
-                claim_id,
-                path
-            ) in rows:
-
-                if cred_id not in result:
-                    result[cred_id] = {
-                        "credential_id": cred_id,
-                        "format": format,
-                        "meta": deserialize_json(meta),
-                        "claims": []
-                    }
-
-                if claim_id:
-                    result[cred_id]["claims"].append({
-                        "claim_id": claim_id,
-                        "path": deserialize_json(path)
-                    })
-
-            return list(result.values())
-
-    except pymysql.MySQLError as e:
-        logger.error(f"Error: {e}")
-        return []
+ 
+        result = {}
+        for cred_id, format, meta, claim_id, path in rows:
+            if cred_id not in result:
+                result[cred_id] = {
+                    "credential_id": cred_id,
+                    "format": format,
+                    "meta": deserialize_json(meta),
+                    "claims": [],
+                }
+            if claim_id:
+                result[cred_id]["claims"].append({
+                    "claim_id": claim_id,
+                    "path": deserialize_json(path),
+                })
+ 
+        return list(result.values())
+ 
+    except (pymysql.MySQLError, ValueError) as e:  # ValueError: JSON inválido na BD
+        logger.error(f"Error getting credentials for user {user_id}: {e}")
+        raise DatabaseError(str(e)) from e
+ 
     finally:
-        if connection:
-            cursor.close()
-            connection.close()
+        connection.close()
 
 def check_credentials(id):
     try:
@@ -4060,3 +4078,81 @@ def insert_registration_certificate(
         if connection:
             cursor.close()
             connection.close()
+
+def insert_credentials_with_claims(credentials, user_id):
+    connection = conn()
+    if connection is None:
+        raise DatabaseError("Could not connect to the database")
+
+    try:
+        with connection.cursor() as cursor:
+            credential_ids = []
+
+            for credential in credentials:
+                cursor.execute(
+                    "INSERT INTO credential (format, meta, user_id) VALUES (%s, %s, %s)",
+                    (credential["format"], credential["meta"], user_id),
+                )
+                credential_id = cursor.lastrowid
+
+                for path in credential["paths"]:
+                    cursor.execute(
+                        "INSERT INTO claim (credential_id, path) VALUES (%s, %s)",
+                        (credential_id, path),
+                    )
+
+                credential_ids.append(credential_id)
+
+        connection.commit()
+        logger.info(f"Credentials successfully added. IDs: {credential_ids}")
+        return credential_ids
+
+    except pymysql.err.IntegrityError as e:
+        connection.rollback()
+        logger.error(f"Integrity error inserting credentials (rolled back): {e}")
+        if e.args and e.args[0] == 1062:  # ER_DUP_ENTRY
+            raise DuplicateCredentialError(str(e)) from e
+        raise DatabaseError(str(e)) from e
+
+    except pymysql.MySQLError as e:
+        connection.rollback()
+        logger.error(f"Error inserting credentials (rolled back): {e}")
+        raise DatabaseError(str(e)) from e
+
+    finally:
+        connection.close()
+
+def get_claim(user_id):
+    connection = conn()
+    if connection is None:
+        raise DatabaseError("Could not connect to the database")
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT cl.id, cl.credential_id, cl.path
+                FROM claim cl
+                JOIN credential c ON c.id = cl.credential_id
+                WHERE c.user_id = %s
+                ORDER BY cl.credential_id, cl.id
+                """,
+                (user_id,),
+            )
+            rows = cursor.fetchall()
+
+        return [
+            {
+                "claim_id": claim_id,
+                "credential_id": credential_id,
+                "path": deserialize_json(path),
+            }
+            for claim_id, credential_id, path in rows
+        ]
+
+    except (pymysql.MySQLError, ValueError) as e:
+        logger.error(f"Error getting claims for user {user_id}: {e}")
+        raise DatabaseError(str(e)) from e
+
+    finally:
+        connection.close()

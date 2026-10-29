@@ -88,6 +88,13 @@ def setup_logger():
     formatter = logging.Formatter(log_format)
     log_handler.setFormatter(formatter)
 
+    def add_default_code(record):
+        if not hasattr(record, "code"):
+            record.code = "-"
+        return True
+
+    log_handler.addFilter(add_default_code)
+
     logger.addHandler(log_handler)
 
     return logger
@@ -164,24 +171,21 @@ def setup_trusted_CAs():
 setup_trusted_CAs()
 
 def handle_exception(e):
-
     return (
-        render_template(
-            "500.html",
-            error="Sorry, an internal server error has occurred. Our team has been notified and is working to resolve the issue. Please try again later.",
-            error_code="Internal Server Error",
-        ),
+        jsonify({
+            "error": "Internal Server Error",
+            "message": "An internal server error occurred."
+        }),
         500,
     )
 
-def page_not_found(e):
 
+def page_not_found(e):
     return (
-        render_template(
-            "500.html",
-            error_code="Page not found",
-            error="Page not found.We're sorry, we couldn't find the page you requested.",
-        ),
+        jsonify({
+            "error": "Not Found",
+            "message": "The requested resource was not found."
+        }),
         404,
     )
 
@@ -216,6 +220,7 @@ def create_app():
     app.config['SECRET_KEY'] = ConfService.secret_key
 
     app.register_error_handler(404, page_not_found)
+    app.register_error_handler(500, handle_exception)
     
     from . import (RPR_routes)
     app.register_blueprint(RPR_routes.rpr)
